@@ -1,0 +1,32 @@
+**amino acid per chain**	**total chains**	**total sheets**
+7	8	2
+**initial_structure**		**recalculation_swtich**
+comp1.pdb  	0
+**step_start**		**step_end**
+1 	10000
+**seed_switch(1=yes,0=default)**     **random_seed**		**ekt_seq**
+0	0	1.00
+**sheet_switch**	**ekt_sheet*	**sheetmove_interval**
+0.60  	0.50  	200
+**rmsd_max_x** **rmsd_max_y** **rmsd_max_z** **d_x** **d_y** **d_z**
+1.0	1.0	2.5	0.05	0.05	0.2
+**propensity_weighting_factor**
+2.0
+**N_hydrophobic**	**N_polar**	**N_charged**	**N_other**			
+5	0	2	0
+**number of peptides in group i**
+**chainID of peptides in group i**
+4
+1 3 5 7
+4
+2 4 6 8
+**NMR constrained sites (e.g. 4, 5-6, 12)**
+
+**Sites with no sequence change moves (e.g. 1, 2-6, 14)**
+  
+**Must have amino acids (be consistent with hydration property, use three capital letters)**
+
+**NMR constrained amino acid pool**
+
+**restrictions on amino acid**
+
