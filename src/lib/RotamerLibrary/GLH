@@ -1,0 +1,16 @@
+ATOM     21  N   GLH A   4       1.677  -2.408  -0.416
+ATOM     22  H   GLH A   4       2.261  -2.080  -1.172
+ATOM     23  CA  GLH A   4       0.268  -2.072  -0.440
+ATOM     24  HA  GLH A   4      -0.324  -2.987  -0.461
+ATOM     25  CB  GLH A   4      -0.125  -1.264   0.792
+ATOM     26  HB2 GLH A   4      -1.195  -1.057   0.765
+ATOM     27  HB3 GLH A   4       0.111  -1.834   1.691
+ATOM     28  CG  GLH A   4       0.639   0.037   0.806
+ATOM     29  HG2 GLH A   4       1.709  -0.169   0.834
+ATOM     30  HG3 GLH A   4       0.404   0.607  -0.093
+ATOM     31  CD  GLH A   4       0.246   0.846   2.040
+ATOM     32  OE1 GLH A   4      -0.845   0.553   2.597
+ATOM     33  OE2 GLH A   4       1.042   1.749   2.414
+ATOM     34  HE2 GLH A   4       0.688   2.185   3.193
+ATOM     35  C   GLH A   4      -0.076  -1.242  -1.670
+ATOM     36  O   GLH A   4       0.794  -0.943  -2.484
