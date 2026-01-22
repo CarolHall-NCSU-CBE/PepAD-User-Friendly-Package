@@ -50,7 +50,7 @@ Users must provide an initial structure PDB file for PepAD. The PDB file format 
   <img width="450" alt="image" src="https://github.com/user-attachments/assets/3059ea8b-0e86-44dd-858b-50d21276b000" />
   <img width="450" alt="image" src="https://github.com/user-attachments/assets/e5b3ac63-57e5-465e-ac81-ac454022c324" />
   </p>
-<p align="center"><b>Fig. 3. (Top) A 7-mer fibril structure built using crystal structure of peptide GNNQQNY (PDB ID: 2omm) and molecular dynamics simulation. (Bottom) A 14-mer fibril strucutre built using peptide-building tool in PepAD package.</b>  .</figcaption></p>
+<p align="center"><b>Fig. 3. (Top) A 7-mer fibril structure built using crystal structure of peptide GNNQQNY (PDB ID: 2omm) and molecular dynamics simulation. (Bottom) A 14-mer fibril strucutre built using peptide-building tool in PepAD package.</b></figcaption></p>
 
 #### input.txt
 The 'input.txt' contains the necessary parameters for designing a fibril structure.
@@ -83,7 +83,7 @@ The 'input.txt' contains the necessary parameters for designing a fibril structu
 | Restrictions on amino acids | Restrict the count of specific amino acids. Use 3-letter code + number. Example: `ASN3` (limit to 3 ASN). Enter `None` or leave blank for no restriction |
 
 ### Submission Script
-Once the input files are prepared. User can submit the following example script to run PepAD:
+Once the input files are prepared, users can submit the following example script to run PepAD:
 
 >
 	#!/bin/bash
@@ -96,8 +96,8 @@ Once the input files are prepared. User can submit the following example script 
 **Table 2:** PepAD output files 
 |File extension| Description|
 |----------------|------------|
-|`Energy profile`| Records Steps, Sequences, Γ<sub>score</sub>, ΔG<sub>bind</sub>, ΔE<sub>bind</sub>, ΔTS<sub>conf</sub>, ΔTS<sub>conf</sub>, and P<sub>agg</sub>-I<sub>hydr</sub>|
-|`Energy details`| Records Steps, Trials, Sequences, Γ<sub>score</sub>, ΔG<sub>bind</sub>, ΔE<sub>bind</sub>, ΔTS<sub>conf</sub>, ΔTS<sub>conf</sub>, and P<sub>agg</sub>-I<sub>hydr</sub>, MC moves, Trial results|
+|`Energy profile`| Records Steps, Sequences, Γ<sub>score</sub>, ΔG<sub>bind</sub>, ΔE<sub>bind</sub>, ΔTS<sub>conf</sub>, I<sub>hydr</sub>, and P<sub>agg</sub>-I<sub>hydr</sub>|
+|`Energy details`| Records Steps, Trials, Sequences, Γ<sub>score</sub>, ΔG<sub>bind</sub>, ΔE<sub>bind</sub>, ΔTS<sub>conf</sub>, I<sub>hydr</sub>, and P<sub>agg</sub>-I<sub>hydr</sub>, MC moves, Trial results|
 |`Minimal energy`| Records Steps, Trials, Γ<sub>score</sub>, and Sequences with minimal Γ<sub>score</sub> along the search|
 |`RMSD profile`  | Records Steps, RMSD<sub>x</sub>, RMSD<sub>y</sub>, RMSD<sub>z</sub>, RMSD|
 |`PDB files`     | PDB files for peptides with minimal scores during the evolution|
