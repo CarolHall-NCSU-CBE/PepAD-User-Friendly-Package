@@ -1,10 +1,11 @@
 # PepAD-User-Friendly-Package
 PepAD: a user-friendly Monte Carlo algorithm for designing amyloid-forming self-assembling peptides
 ## Introduction
-The Peptide Assembly Design (PepAD) is a Monte Carlo (MC)-based algorithm for discovering self-assembling peptides [1-3]. PepAD can design peptides that can self-assemble into the user-defined reference structures. Users can customize designs according to their experimental goals, such as excluding residues from mutations, restricting the number of certain amino acids, and designating NMR-constrained sites.
+  The Peptide Assembly Design (PepAD) is a Monte Carlo algorithm for discovering self-assembling peptides [1-3], which assemble into user-defined reference structures. 
 
 ## Workflow
-  A simplified flow chart describing the PepAD algorithm is shown in Fig 1. The algorithm begins with an initial structure peptide fibril structure. This structure typically consists of two stacked β-sheets and can be classified as a certain class of cross β-spine, defined by Sawaya and Eisenberg [4-5]. To initiate the design process, a random sequence is draped upon the backbone (-NH-Cα-CO-) of the initial structure. The binding affinity of the resulting fibril structure is evaluated using a score function (Γ<sub>score</sub>). Then one of the three types of MC moves are applied to search for new self-assembling peptides. After each move, the Γ<sub>score</sub> is evaluated for the new configuration (after sequence change move or sheet position perturbation move). The Monte-Carlo Metropolis criterion is then applied to accept or reject this new configuration. The entire process is iterated for multiple steps and the peptides with lowest Γ<sub>score</sub> are usually considered as the best design throughout the entire run.
+  PepAD starts from an initial peptide fibril structure, typically consisting of two stacked β-sheets corresponding to a specific class of cross-β spine[4-5]. At beign, a random sequence is draped upon the backbone (–NH–Cα–CO–), and its binding affinity is evaluated using a score function (Γ<sub>score</sub>). PepAD then explores new sequences using three MC moves—residue mutation, residue exchange, and sheet position perturbation. After each move, the Γ<sub>score</sub> is evaluated for the new configuration, and the new design is accepted or rejected based on Metropolis criterion. This process is iterated over multiple steps, and peptides with the lowest Γ<sub>score</sub> are identified as the best designs.
+
 <p align="center">
   <img width="300" alt="Flow chart of PepAD algorithm" src="https://github.com/user-attachments/assets/572abb95-0b87-435f-b154-17b3910b86e4">
   </p>
@@ -91,10 +92,9 @@ Once the input files are prepared, users can submit the following example script
 **Table 2:** PepAD output files 
 |File extension| Description|
 |----------------|------------|
-|`Energy profile`| Records Steps, Sequences, Γ<sub>score</sub>, ΔG<sub>bind</sub>, ΔE<sub>bind</sub>, ΔTS<sub>conf</sub>, I<sub>hydr</sub>, and P<sub>agg</sub>-I<sub>hydr</sub>|
-|`Energy details`| Records Steps, Trials, Sequences, Γ<sub>score</sub>, ΔG<sub>bind</sub>, ΔE<sub>bind</sub>, ΔTS<sub>conf</sub>, I<sub>hydr</sub>, and P<sub>agg</sub>-I<sub>hydr</sub>, MC moves, Trial results|
+|`Energy profile`| Records Steps, Sequences, Γ<sub>score</sub>, ΔG<sub>bind</sub>, $$\lambda \times P_{agg}$$, and RMSD |
+|`Energy details`| Records Steps, Trials, Sequences, Γ<sub>score</sub>, ΔG<sub>bind</sub>, ΔE<sub>bind</sub>, ΔTS<sub>conf</sub>, $$\lambda \times P_{agg}$$, MC moves, and Trial results|
 |`Minimal energy`| Records Steps, Trials, Γ<sub>score</sub>, and Sequences with minimal Γ<sub>score</sub> along the search|
-|`RMSD profile`  | Records Steps, RMSD<sub>x</sub>, RMSD<sub>y</sub>, RMSD<sub>z</sub>, RMSD|
 |`PDB files`     | PDB files for peptides with minimal scores during the evolution|
 #### terms
 - Γ<sub>score</sub>: PepAD score function
