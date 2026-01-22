@@ -50,12 +50,13 @@ module constant
     type :: AminoRestriction
 		character*4 :: gtype
 		integer		:: max
+        integer     :: min
         integer		:: count
         integer		:: clas
 	end type AminoRestriction
 
-	type(AminoRestriction)  :: aa_restrictions(10)
-	integer					:: n_restrictions		! number of restriction of AA
+	type(AminoRestriction)  :: aa_restrictions(10), aa_morethan(10)
+	integer					:: n_restrictions, n_morethan		! number of restriction of AA
     
     integer					:: gnum, repeated_unit, num4category				
 	integer					:: atom_num
@@ -78,14 +79,15 @@ module constant
 	real, parameter			:: scmfswitch1=0.6
 !	real, parameter			:: scmfswitch2=0.8
 	real, parameter			:: dihedral_weighting_factor=0.20
-	!real, parameter			:: propensity_weighting_factor=3.0 !数值为固定值
+	!real, parameter        :: propensity_weighting_factor=3.0 !数值为固定值
     real					:: propensity_weighting_factor
 	real, parameter			:: vdw14_coeff=2.0  !1-4 VDW scale factor
 	real, parameter			:: ele14_coeff=1.2  !1-4 ELE scale factor
 
 	real					:: ekt, ekt_sequence
 	real					:: energy_min(num4pdbsave)
-	real					:: sheet_switch, ekt_sheet, rmsd_max, rmsd_max_x, rmsd_max_y, rmsd_max_z
+    real, parameter			:: sheet_switch=0.6
+	real					:: ekt_sheet, rmsd_max, rmsd_max_x, rmsd_max_y, rmsd_max_z
 	real					:: displacement_factor, displacement_factor_x, displacement_factor_y, displacement_factor_z
 	!type RES4chain
 	!	integer				:: num
@@ -110,14 +112,23 @@ module randomgenerator
 ! Generate the random number
     
 	subroutine init_random_seed()
-		integer ::  iiii, kkk, clock
-		integer, dimension(:), allocatable :: seed
-		real :: ran
-   
-		call random_seed(size = kkk)
-		allocate(seed(kkk))   
-		call system_clock(count=clock)
-        seed = clock + 37 * (/ (iiii - 1, iiii = 1, kkk) /)
+        implicit none
+        integer :: kkk, i
+        integer, allocatable :: seed(:)
+        integer :: values(8)
+        integer :: base
+
+        real :: ran
+
+        call random_seed(size = kkk)
+        allocate(seed(kkk))
+
+        call date_and_time(values = values)
+        base = values(8) + 1000 * ( values(7) + 60 * ( values(6) + 60 * values(5) ) )
+        base = base + 100000000 * ( values(3) + 31 * ( values(2) + 12 * values(1) ) )
+        do i = 1, kkk
+            seed(i) = base + 37 * i
+        end do
     
         if(seed_switch == 1) then
 			seed(1) = 4390990 + idum
@@ -127,7 +138,7 @@ module randomgenerator
 		call random_seed(put = seed)
 		deallocate(seed)
 		call random_number(ran) !discard first random value
-    
+        write(*,*) "the first random number:", ran
     end subroutine init_random_seed 
  
 	subroutine ran_gen(ran2,flag_ran)
@@ -149,88 +160,266 @@ module input
 	contains
 	subroutine inputfile
 	implicit none
-	integer						:: i,j,pos,iostat
+	integer						:: i,j,n,pos,iostat, line_count, espos, tmp, p
+    !real						:: max_rmsd
+    character(len=256), allocatable :: lines(:)
+    character(len=256)			:: line
+    character(len=256)			:: shortline, shortline2
     character(len=100)          :: void_site_input, nmr_site_input
     character(len=100)          :: restraints_input, exception_input, restriction_inputs, NMR_res_pool_input
-    n_restrictions=0			! set number of restrictions, this limit maximum number of certain AA
-	open(10, file="input.txt", status="old")
-		read(10,*)
-        read(10,*) gnum, repeated_unit, num4category
-		read(10,*)
-		read(10,*) filename, recalcu_switch
-		read(10,*)
-		read(10,*) nstep_start, nstep_terminal
-		read(10,*)
-		read(10,*) seed_switch, idum, ekt_sequence
-		read(10,*)
-		read(10,*) sheet_switch, ekt_sheet, sheetmove_interval
-        read(10,*)
-		read(10,*) rmsd_max_x, rmsd_max_y, rmsd_max_z, displacement_factor_x, displacement_factor_y, displacement_factor_z
-        read(10,*)
-        read(10,*) propensity_weighting_factor
-		read(10,*)
-		read(10,*) fpho,fpol,fchg,foth
-		read(10,*)
-		read(10,*)
-        
-        allocate (selfassembly(num4category))
-        
-		do i=1, num4category
-			read(10,*) selfassembly(i)%num4peptides
-			read(10,*) (selfassembly(i)%peptideID(j),j=1,selfassembly(i)%num4peptides)
-        enddo
-        
- 		read(10,*) 
-        read(10,'(A)') nmr_site_input
-        call read_nmr_site_input(trim(nmr_site_input), ',')
-        
-        !*******************output the info*********
-		write(*, "(A,1X,I0)") "Number of NMR sites:", nmr_site_num
-		write(*, "(A, *(I0, 1X))") "Residue ID of the NMR sites:", (nmr_site_ID(i), i = 1, nmr_site_num)
-		!*******************output the info*********
-        
-  !      read(10,*) nmr_site_num
-		!read(10,*) (nmr_site_ID(j),j=1,nmr_site_num)
-		read(10,*)
-        read(10,'(A)') void_site_input							! add "(a)" in the read to read entire line
-        call read_void_site_input(trim(void_site_input), ',')
-        
-		read(10,*)
-        read(10,'(A)') restraints_input        
-        call read_restraints_input(trim(restraints_input), 1)
-        
- 		!read(10,*)
-   !     read(10,'(A)') exception_input
-   !     call read_restraints_input(trim(exception_input), 2)       
-        
- 		read(10,*)
-        read(10,'(A)') NMR_res_pool_input
-        call read_restraints_input(trim(NMR_res_pool_input), 3)          
-        
- 		read(10,*)
-   !     read(10,*) ASN_limit
-        
-        do
-			read(10, '(A)', iostat=iostat) restriction_inputs
-			if (iostat /= 0) exit  ! End of file
-			if (trim(restriction_inputs) == '') exit   ! Blank line ends block
-			if (trim(restriction_inputs)=='NONE'.or.trim(restriction_inputs)=='None'.or.trim(restriction_inputs)=='none') exit   ! "None" ends block
-			if (restriction_inputs(1:2) == '**') exit  ! New section starts
-			n_restrictions = n_restrictions + 1
-            read(restriction_inputs, *) aa_restrictions(n_restrictions)%gtype, aa_restrictions(n_restrictions)%max
-        end do
-        
-        !*******************output restrictions*********
-		write(*, "(A,1X,I0)") "Number of restrictions:", n_restrictions
-		do i = 1, n_restrictions
-			write(*, "(A3, ': ', I0)") aa_restrictions(i)%gtype, aa_restrictions(i)%max
-		end do
-		!***********************************************
-        
-	close(10)
+    n_restrictions=0			! set number of upper restrictions, this limit maximum number of certain AA
+	n_morethan=0				! set number of bottom restrictions, minimum number of an AA
+    nstep_start=1               ! PepAD starting step, always = 1
+    num4category=2	            ! number of sheets, always = 2
+    sheetmove_interval=200      ! perform only sequence move between two successful sheet move
+    displacement_factor_x=0.05 
+    displacement_factor_y=0.05
+    displacement_factor_z=0.1
+    seed_switch=0
+    allocate (selfassembly(num4category))
+    !!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!
+    ! read in the entire input.txt into "lines"
+    open(10, file="input.txt", status="old")
+    line_count=0
+    do
+		read(10,'(A)', iostat=iostat) line
+		if (iostat /= 0) exit
+		call strip_comment(line)
+		line = trim(adjustl(line))
+		if (len_trim(line) == 0) cycle   ! skip empty lines
+        line_count = line_count + 1
+	enddo
+    close(10)
+    if (line_count <= 0) stop "ERROR: no valid input lines."
+    allocate(lines(line_count))
+    open(10, file="input.txt", status="old")
+    line_count=0
+    do
+		read(10,'(A)', iostat=iostat) line
+		if (iostat /= 0) exit
+		call strip_comment(line)
+		line = trim(adjustl(line))
+		if (len_trim(line) == 0) cycle   ! skip empty lines
+        line_count = line_count + 1
+        lines(line_count) = line
+	enddo
+    close(10)
+    !!!!! Initial structure info
+    line=lines(1)
+    espos = index(line,'=')
+    shortline = adjustl(line((espos+1):len(line)))
+    read(shortline,*) gnum
+    write(6,'(A,i3)') ' Number of residues per chain (including caps) = ', gnum
+
+    line=lines(2)
+    espos = index(line,'=')
+    shortline = adjustl(line((espos+1):len(line)))
+    read(shortline,*) repeated_unit
+    write(6,'(A,i3)') ' Number of chains in total = ', repeated_unit
+
+    line=lines(3)
+    espos = index(line,'=')
+    shortline = adjustl(line((espos+1):len(line)))
+    read(shortline,*) filename
+    write(6,'(A,A)') ' PDB file name: ', filename
+
+    line=lines(4)
+    espos = index(line,'=')
+    shortline = adjustl(line((espos+1):len(line)))
+    read(shortline,*) recalcu_switch
+    write(6,'(A,i3)') ' Recalculation = ', recalcu_switch
+    
+    line=lines(5)
+    espos = index(line,'=')
+    shortline = adjustl(line((espos+1):len(line)))
+    do p = 1, len_trim(shortline)
+		if (shortline(p:p) == ',') shortline(p:p) = ' '
+	enddo    
+    shortline2= shortline
+    n = 0
+	do
+		read(shortline2,*,iostat=iostat) tmp
+		if (iostat /= 0) exit
+		n = n + 1
+		p = index(shortline2,' ')
+		if (p == 0) then
+			shortline2 = ''
+		else
+			shortline2 = shortline2(p+1:)
+		endif
+		shortline2 = adjustl(shortline2)
+		if (len_trim(shortline2) == 0) exit
+    enddo
+    selfassembly(1)%num4peptides = n
+    read(shortline,*) (selfassembly(1)%peptideID(j),j=1,n)
+    write(6,'(A,*(1X,I0))') ' Group 1 peptides indices = ', (selfassembly(1)%peptideID(j),j=1,n)
+    
+    line=lines(6)
+    espos = index(line,'=')
+    shortline = adjustl(line((espos+1):len(line)))
+    do p = 1, len_trim(shortline)
+		if (shortline(p:p) == ',') shortline(p:p) = ' '
+	enddo
+    shortline2= shortline
+    n = 0
+	do
+		read(shortline2,*,iostat=iostat) tmp
+		if (iostat /= 0) exit
+		n = n + 1
+		p = index(shortline2,' ')
+		if (p == 0) then
+			shortline2 = ''
+		else
+			shortline2 = shortline2(p+1:)
+		endif
+		shortline2 = adjustl(shortline2)
+		if (len_trim(shortline2) == 0) exit
+    enddo
+    selfassembly(2)%num4peptides = n
+    read(shortline,*) (selfassembly(2)%peptideID(j),j=1,n)
+    write(6,'(A,*(1X,I0))') ' Group 2 peptides indices = ', (selfassembly(2)%peptideID(j),j=1,n)   
+
+    !!!!! MC info    
+    line=lines(7)
+    espos = index(line,'=')
+    shortline = adjustl(line((espos+1):len(line)))
+    read(shortline,*) nstep_terminal
+    write(6,'(A,i10)') ' MC steps = ', nstep_terminal
+    
+    line=lines(8)
+    espos = index(line,'=')
+    shortline = adjustl(line((espos+1):len(line)))
+    read(shortline,*) ekt_sequence
+    write(6,'(A,F10.5)') ' Ekt(sequence) = ', ekt_sequence
+    
+    line=lines(9)
+    espos = index(line,'=')
+    shortline = adjustl(line((espos+1):len(line)))
+    read(shortline,*) ekt_sheet
+    write(6,'(A,F10.5)') ' Ekt(sheet move) = ', ekt_sheet
+    
+    line=lines(10)
+    espos = index(line,'=')
+    shortline = adjustl(line((espos+1):len(line)))
+    read(shortline,*) rmsd_max
+    write(6,'(A,F10.5)') ' Allowed maximum RMSD (ang) ', rmsd_max   
+    
+    line=lines(11)
+    espos = index(line,'=')
+    shortline = adjustl(line((espos+1):len(line)))
+    read(shortline,*) propensity_weighting_factor
+    write(6,'(A,F10.5)') ' Aggregation propensity weight (lambda) = ', propensity_weighting_factor   
+    
+    !!!!!!  Composition  
+    line=lines(12)
+    espos = index(line,'=')
+    shortline = adjustl(line((espos+1):len(line)))
+    read(shortline,*) fpho
+    write(6,'(A,i3)') ' # Hydrophobic = ', fpho
+    
+    line=lines(13)
+    espos = index(line,'=')
+    shortline = adjustl(line((espos+1):len(line)))
+    read(shortline,*) fpol
+    write(6,'(A,i3)') ' # Polar = ', fpol
+    
+    line=lines(14)
+    espos = index(line,'=')
+    shortline = adjustl(line((espos+1):len(line)))
+    read(shortline,*) fchg
+    write(6,'(A,i3)') ' # Charged = ', fchg 
+    
+    line=lines(15)
+    espos = index(line,'=')
+    shortline = adjustl(line((espos+1):len(line)))
+    read(shortline,*) foth
+    write(6,'(A,i3)') ' # Other = ', foth   
+    
+    !!!!! Constraints
+    line=lines(16)
+    espos = index(line,'=')
+    shortline = adjustl(line((espos+1):len(line)))
+	if (shortline=='NONE'.or.shortline=='None'.or.shortline=='none') shortline =""
+    call read_void_site_input(trim(shortline))
+    write(*,*) "Number of single positional constraints: ", void_site_num
+
+    line=lines(17)
+    espos = index(line,'=')
+    shortline = adjustl(line((espos+1):len(line)))
+	if (shortline=='NONE'.or.shortline=='None'.or.shortline=='none') shortline =""
+    call read_restraints_input(trim(shortline), 3)
+
+    line=lines(18)
+    espos = index(line,'=')
+    shortline = adjustl(line((espos+1):len(line)))
+	if (shortline=='NONE'.or.shortline=='None'.or.shortline=='none') shortline =""
+    do p = 1, len_trim(shortline)
+		if (shortline(p:p) == ',') shortline(p:p) = ' '
+	enddo
+    shortline2= shortline
+    n = 0
+	do
+		read(shortline2,*,iostat=iostat) tmp
+		if (iostat /= 0) exit
+		n = n + 1
+		p = index(shortline2,' ')
+		if (p == 0) then
+			shortline2 = ''
+		else
+			shortline2 = shortline2(p+1:)
+		endif
+		shortline2 = adjustl(shortline2)
+		if (len_trim(shortline2) == 0) exit
+    enddo
+    nmr_site_num = n
+    read(shortline,*) (nmr_site_ID(i), i = 1, nmr_site_num)
+    !call read_nmr_site_input(trim(shortline), ' ')
+    write(*, "(A,1X,I0)") "Number of sites in grouped positional constraint:", nmr_site_num
+    write(*, "(A,*(I0, 1X))") "Residue ID in grouped positional constraint:", (nmr_site_ID(i), i = 1, nmr_site_num)   
+    
+    do i = 19, size(lines)
+        line = lines(i)
+		if (line == '') exit   ! Blank line ends block
+		if (line=='NONE'.or.line=='None'.or.line=='none') exit   ! "None" ends block
+		if (line(1:2) == '**') exit  ! New section starts
+		if (index(line, '>=') > 0) then
+            n_morethan = n_morethan + 1
+            read(line(:index(line, '>=')-1), *) aa_morethan(n_morethan)%gtype
+            read(line(index(line, '>=')+2:), *) aa_morethan(n_morethan)%min
+			aa_morethan(n_morethan)%max = gnum
+		elseif (index(line, '<=') > 0) then
+            n_restrictions = n_restrictions + 1
+            read(line(:index(line, '<=')-1), *) aa_restrictions(n_restrictions)%gtype
+            read(line(index(line, '<=')+2:), *) aa_restrictions(n_restrictions)%max
+			aa_restrictions(n_restrictions)%min = 0
+		elseif (index(line, '=0') > 0) then
+            n_restrictions = n_restrictions + 1
+            read(line(:index(line, '=0')-1), *) aa_restrictions(n_restrictions)%gtype
+            aa_restrictions(n_restrictions)%max = 0
+			aa_restrictions(n_restrictions)%min = 0
+		endif
+    enddo
+    !*******************output restrictions*********
+	write(*, "(A,1X,I0)") "Number of AA upper-bound constraints:", n_restrictions
+	do i = 1, n_restrictions
+		write(*, "(A3, ': ', I0)") aa_restrictions(i)%gtype, aa_restrictions(i)%max
+    end do
+    
+    write(*, "(A,1X,I0)") "Number of AA lower-bound constraints:", n_morethan
+	do i = 1, n_morethan
+		write(*, "(A3, ': ', I0)") aa_morethan(i)%gtype, aa_morethan(i)%min
+	end do
+    
 	return
     end subroutine inputfile
 
+    subroutine strip_comment(s)
+		character(len=*), intent(inout) :: s
+		integer :: p
+		p = index(s,'#'); if (p > 0) s = s(:p-1)
+		p = index(s,'!'); if (p > 0) s = s(:p-1)
+	end subroutine strip_comment
+    
     subroutine setparameter
     integer :: i
     
@@ -312,80 +501,13 @@ module input
         enddo
     enddo
     
-    !do i = 1, exclusion_num
-    !    do j = 1, hydrationprop%hnum
-    !        if (hydrationprop%hgtype(j) == exclusion_AA(i)) then
-    !            ! Shift left to remove the item
-    !            do k = j, hydrationprop%hnum - 1
-    !                hydrationprop%hgtype(k) = hydrationprop%hgtype(k+1)
-    !            end do
-    !            hydrationprop%hgtype(hydrationprop%hnum) = "NONE"  ! Clear last entry
-    !            hydrationprop%hnum = hydrationprop%hnum - 1  ! Decrease count
-    !            exit
-    !        end if
-    !    end do
-    !end do
+    ! 2026/1/21 set up RMSD on each direction based on maximum RMSD
+    ! max_X : max_Y : max_Z = 1:1:2.5
+    rmsd_max_x = sqrt(rmsd_max**2/8.25)
+    rmsd_max_y = sqrt(rmsd_max**2/8.25)
+    rmsd_max_z = sqrt(rmsd_max**2 * 6.25/8.25)
     
-    !do i = 1, exclusion_num
-    !    do j = 1, hydrationprop%hnum
-    !        if (hydrationprop%hgtype(j) == exclusion_AA(i)) then
-    !            ! Shift left to remove the item
-    !            do k = j, hydrationprop%hnum - 1
-    !                hydrationprop%hgtype(k) = hydrationprop%hgtype(k+1)
-    !            end do
-    !            hydrationprop%hgtype(hydrationprop%hnum) = "NONE"  ! Clear last entry
-    !            hydrationprop%hnum = hydrationprop%hnum - 1  ! Decrease count
-    !            exit
-    !        end if
-    !    end do
-    !end do
-    !
-    !! Remove from pgtype
-    !do i = 1, exclusion_num
-    !    do j = 1, hydrationprop%pnum
-    !        if (hydrationprop%pgtype(j) == exclusion_AA(i)) then
-    !            do k = j, hydrationprop%pnum - 1
-    !                hydrationprop%pgtype(k) = hydrationprop%pgtype(k+1)
-    !            end do
-    !            hydrationprop%pgtype(hydrationprop%pnum) = "NONE"
-    !            hydrationprop%pnum = hydrationprop%pnum - 1
-    !            exit
-    !        end if
-    !    end do
-    !end do
-    !
-    !! Remove from cgtype
-    !do i = 1, exclusion_num
-    !    do j = 1, hydrationprop%cnum
-    !        if (hydrationprop%cgtype(j) == exclusion_AA(i)) then
-    !            do k = j, hydrationprop%cnum - 1
-    !                hydrationprop%cgtype(k) = hydrationprop%cgtype(k+1)
-    !            end do
-    !            hydrationprop%cgtype(hydrationprop%cnum) = "NONE"
-    !            hydrationprop%cnum = hydrationprop%cnum - 1
-    !            exit
-    !        end if
-    !    end do
-    !end do
-    !
-    !! Remove from ogtype
-    !do i = 1, exclusion_num
-    !    do j = 1, hydrationprop%onum
-    !        if (hydrationprop%ogtype(j) == exclusion_AA(i)) then
-    !            do k = j, hydrationprop%onum - 1
-    !                hydrationprop%ogtype(k) = hydrationprop%ogtype(k+1)
-    !            end do
-    !            hydrationprop%ogtype(hydrationprop%onum) = "NONE"
-    !            hydrationprop%onum = hydrationprop%onum - 1
-    !            exit
-    !        end if
-    !    end do
-    !end do
-    !
-    !write(*,*) hydrationprop
-    
-    
-    end subroutine
+    end subroutine setparameter
     
     subroutine read_nmr_site_input(input, delim)
 		character(len=*), intent(in) :: input, delim
@@ -395,16 +517,31 @@ module input
 		character(len=20), allocatable :: temp_segments(:)
         character(len=20) :: segment
 
-		len_input = len_trim(input)
+		
 		len_delim = len_trim(delim)
 		allocate(segments(len_input / 2 + 1))  ! Over-allocate initially
-
+	
 		temp = trim(input)
+        if (trim(delim) == ' ') then
+			do i = 1, len_trim(temp)
+				if (temp(i:i) == ',') temp(i:i) = ' '   ! optional: allow commas too
+			enddo
+			!do  ! collapse multiple spaces into one
+   !             write(*,*) "check point 5"
+			!	i = index(temp, '  ')
+			!	if (i == 0) exit
+			!	temp = temp(:i-1)//temp(i+1:)
+			!enddo
+		endif
+        len_input = len_trim(input)
+        temp = adjustl(temp)
+        
 		start = 1
 		site_num = 0	 ! residue "1, 4-6, 14" = three sites
 		nmr_site_num = 0 ! one residue = one NMR site
         
 		do while (start <= len_input)
+            
 			ending = index(temp(start:), delim)
 			if (ending == 0) then
 				site_num = site_num + 1
@@ -439,52 +576,46 @@ module input
         return
     end subroutine read_nmr_site_input
     
-    subroutine read_void_site_input(input, delim)
-		character(len=*), intent(in) :: input, delim
-		character(len=20), dimension(:), allocatable :: segments
-		character(len=100) :: temp
-		integer :: start, ending, len_input, len_delim, seg_index, i
-		character(len=20), allocatable :: temp_segments(:)
-        character(len=20) :: segment
+	subroutine read_void_site_input(input)
+		implicit none
+		character(len=*), intent(in) :: input
+		character(len=256) :: s, tok
+		integer :: i, ios, pos
 
-		len_input = len_trim(input)
-		len_delim = len_trim(delim)
-		allocate(segments(len_input / 2 + 1))  ! Over-allocate initially
-
-		temp = trim(input)
-		start = 1
+		s = adjustl(trim(input))
+		if (len_trim(s) == 0) then
+			void_site_num = 0
+			return
+		end if
+		
+		! convert commas to spaces
+		do i = 1, len_trim(s)
+			if (s(i:i) == ',') s(i:i) = ' '
+		end do
 		void_site_num = 0
+		do
+			tok = ''
+			read(s,*,iostat=ios) tok
+			if (ios /= 0) exit
+			if (len_trim(tok) == 0) exit
 
-		do while (start <= len_input)
-			ending = index(temp(start:), delim)
-			if (ending == 0) then
-				void_site_num = void_site_num + 1
-				segments(void_site_num) = temp(start:)
-				exit
-			else
-				void_site_num = void_site_num + 1
-				segments(void_site_num) = temp(start:start + ending - 2)
-				start = start + ending - 1 + len_delim
-			end if
-        end do
+			void_site_num = void_site_num + 1
+			tok = trim(tok)
 
-        allocate(temp_segments(void_site_num))
-		temp_segments = segments(1:void_site_num)
-		call move_alloc(temp_segments, segments)  ! Reassign resized array
-        
-        do i = 1, void_site_num
-			segment = trim(segments(i))
-			pos = index(segment, '-')
+			pos = index(tok,'-')
 			if (pos > 0) then
-				read(segment(1:pos-1), *) void_site_start(i)
-				read(segment(pos+1:), *) void_site_end(i)
+				read(tok(1:pos-1), *) void_site_start(void_site_num)
+				read(tok(pos+1:),   *) void_site_end(void_site_num)
 			else
-				read(segment, *)  void_site_start(i)
-				void_site_end(i) = void_site_start(i)
+				read(tok, *) void_site_start(void_site_num)
+				void_site_end(void_site_num) = void_site_start(void_site_num)
 			end if
-        enddo
-        return
-    end subroutine read_void_site_input
+
+			! remove the token we just read from the front of s
+			s = adjustl(s(len_trim(tok)+1:))
+			if (len_trim(s) == 0) exit
+		end do
+	end subroutine read_void_site_input
     
     subroutine read_restraints_input(input, signal)
 		character(len=*), intent(in) :: input
@@ -494,9 +625,9 @@ module input
 
         res_num = 0
         temp = input
-           
+          
         do while (len_trim(temp) > 0)
-            i = index(temp, ',')   
+            i = index(temp, ' ')   
             if (i == 0) then
 				if (len_trim(temp) > 0) then                        ! avoid spaces
 					res_num = res_num + 1
@@ -528,11 +659,15 @@ module input
 				write(*,*) "Number of avoided AA: ", exclusion_num
 				write(*,*) "Avoided AA: ", exclusion_AA                
             case (3)
+                if (len_trim(input) == 0) then
+					NMR_pool_size = 0
+					return
+				end if
 				do i=1, res_num
 					NMR_AA_pool(i) = AA_list(i)
                 enddo
                 NMR_pool_size = res_num
-				write(*,*) "NMR constrained AA pool: ", NMR_AA_pool
+				write(*,*) "Grouped positional constraint AA pool: ", NMR_AA_pool
 			end select
         return
 	end subroutine read_restraints_input
@@ -2142,21 +2277,31 @@ module database
 	integer						:: ii, ic, ip, ip1, i, j, k, l
     integer						:: res_h_avail_num, res_p_avail_num, res_c_avail_num, res_o_avail_num, clas
 	real						:: ran2
-	character*4					:: restrict_aa, aminoacid_name, ip2, rest_AA(6), current_AA_name 
+	character*4					:: restrict_aa, aminoacid_name, ip2, rest_AA(6), current_AA_name, morethan_aa
     character*4					:: res_h_avail(10), res_p_avail(10), res_c_avail(10), res_o_avail(10)
 	type(groupdetails)			:: group(repeated_unit,gnum)
 	
     ii=1
-    ! count current peptide sequence if they are reach limit of restricted amino acids
+    ! count current peptide sequence if they reach upper limit of restricted amino acids
     do j=1, n_restrictions
 		aa_restrictions(j)%count = 0
+        restrict_aa = aa_restrictions(j)%gtype
 		do i=1, gnum
-            restrict_aa = aa_restrictions(j)%gtype
 			if (group(ii,i)%gtype=="N"//restrict_aa.or.group(ii,i)%gtype==restrict_aa.or.group(ii,i)%gtype =="C"//restrict_aa) then
 				aa_restrictions(j)%count = aa_restrictions(j)%count + 1
 			endif
         enddo
-    enddo    
+    enddo
+     ! Also count current peptide sequence if they reach bottom limit of restricted amino acids
+    do j=1, n_morethan
+		aa_morethan(j)%count = 0
+        restrict_aa = aa_morethan(j)%gtype
+		do i=1, gnum
+			if (group(ii,i)%gtype=="N"//restrict_aa.or.group(ii,i)%gtype==restrict_aa.or.group(ii,i)%gtype =="C"//restrict_aa) then
+				aa_morethan(j)%count = aa_morethan(j)%count + 1
+			endif
+        enddo
+    enddo
           
     do i = 1, nmr_site_num
         if (nmr_site_ID(i) == ic) then  ! looping every nmr site ID to see if it is equal to current random picked site
@@ -2175,7 +2320,7 @@ module database
             goto 99						! Exit the loop earlier if a match is found
         end if
     end do
-    
+40  continue    
     current_AA_name = group(ii,ic)%gtype
     !!*** need to revise this part
     if(current_AA_name=="ALA".or.current_AA_name=="LEU".or.current_AA_name=="VAL".or.current_AA_name=="ILE".or.current_AA_name=="MET".or. &
@@ -2206,8 +2351,6 @@ module database
 	elseif(current_AA_name=="CPRO".or.current_AA_name=="CCYS") then
 		ip=42
 	endif
-
-40  continue
     
     !!!!!!!!!!! Modify available AA !!!!!!!!!!!!!!!!
     ! copy the original hydration property
@@ -2295,7 +2438,7 @@ module database
 	elseif(ip.eq.11) then
 		call ran_gen(ran2,0)
         ip1=int(ran2*res_h_avail_num - 1.0e-3)+1
-        aminoacid_name="N"//hydrationprop%hgtype(ip1)
+        aminoacid_name="N"//res_h_avail(ip1)
 
 	elseif(ip.eq.21) then
 		call ran_gen(ran2,0)
@@ -2335,10 +2478,19 @@ module database
     
     if (current_AA_name == aminoacid_name) goto 40
     
+    do i = 1, n_morethan
+        restrict_aa = aa_morethan(i)%gtype
+        if (current_AA_name=="N"//restrict_aa.or.current_AA_name==restrict_aa.or.current_AA_name=="C"//restrict_aa) then
+            if (aa_morethan(i)%count <= aa_morethan(i)%min) then
+				call pickupsite(0, ic)
+				goto 40
+            endif
+        endif
+    enddo
 99  continue
     
 	return
-    end subroutine mc_choose_aminoacid	
+    end subroutine mc_choose_aminoacid
 
 	subroutine check_restrained_aminoacid(group, ic, aminoacid_name, feedback)
     implicit none
@@ -5130,10 +5282,12 @@ module advancedfunction
 	implicit none
 	integer 			:: restrict_count, non_restrict_count, restrict_locs(40), non_restrict_locs(40), chainID, index
 	integer 			:: iii, i, j, k, num_over, index_non_asn, flag, flag1, flag2, rotanum, feedback, ip, ic
+    integer				:: retry
     type(groupdetails)  :: group(repeated_unit,gnum), temp_group(repeated_unit,gnum),  aa_group(repeated_unit,40)
 	real				:: ran2
 	character*4			:: group_name_1(3), group_name_2(3), aminoacid_name_1, aminoacid_name_2, restrict_aa
 	
+    
     chainID = 1
     
     do iii=1, n_restrictions
@@ -5155,22 +5309,24 @@ module advancedfunction
         
         num_over = restrict_count -  aa_restrictions(iii)%max
         
-		temp_group = group
+		
 		do i=1,num_over
-			!pick a randomly restricted site, and do MC replacement
+            retry= 0    ! retry flag = 0 does not go through replacement, = 1 tried replacement, try again
+25          continue    ! retry continue here
+            temp_group = group
+            !pick a randomly restricted site, and do MC replacement
 			call ran_gen(ran2,0)
 			index=int(ran2*restrict_count-1.0e-3)+1
 			if (index.gt.restrict_count) index = restrict_count ! index is the index of restricted AA in its array
 		
 			ic = restrict_locs(index)							! actual position in peptide sequence
-            
+  
 			call mc_choose_aminoacid(ic, group, aminoacid_name_1)
 			call findrotamer(ic, temp_group, aminoacid_name_1, rotanum, aa_group, ip)
 
 			do j=1, rotanum
             
 				call residue_replace(chainID, ic, group, j, aa_group, temp_group)
-
 				call check_transplant(chainID, ic, temp_group, feedback)
 			
 				if(feedback==1) then
@@ -5185,9 +5341,16 @@ module advancedfunction
 				endif
 			enddo
 			open(20, file="error.txt", access="append")
-				write(20,*) "Unable to replace ", restrict_aa, " at site ", ic, ". Terminating program."
-				close(20)
-			stop
+				if (retry < 3) then
+					write(20,*) "Unable to replace ", restrict_aa, " at site ", ic, " to ", aminoacid_name_1, "Retry again."
+					close(20)
+                    retry = retry + 1
+                    goto 25
+                elseif (retry >= 3) then
+                    write(20,*) "Unable to replace ", restrict_aa, " at site ", ic, " to ", aminoacid_name_1, ". Terminating program."
+					close(20)
+                    stop
+                endif
 			!if we reach this part, then we couldn't replace the ASN with SER
 			!for now, will have program exit since I don't expect this will happen often.
 			!if this is a problem, then will add a solution         
@@ -5372,8 +5535,7 @@ module advancedfunction
 			stop
 		endif
     enddo
-
-    call scmf_nmr_choose_aminoacid(aminoacid_name)
+	if (nmr_site_num > 0) call scmf_nmr_choose_aminoacid(aminoacid_name)
     do i=1, nmr_site_num
         
         call groupinfo(temp_group_1(ii,nmr_site_ID(i))%gtype, group_name_1, flag1) ! 返回nmr site 的AA类型(flag1)
@@ -6084,9 +6246,9 @@ module optimization_techniques
 				endif
 			enddo
 
-			if(m_best==0) goto 10						
+			if(m_best==0) goto 10
 			matrix=0.0; obs=4
-			call entropy_calculation(aminoacid_name,rotanum,matrix,obs,grade,entropy)			
+			call entropy_calculation(aminoacid_name,rotanum,matrix,obs,grade,entropy)
 			Tentropy4individual(chainID,ic)=entropy
 			call backup4sidechain(1, chainID, ic, tgroup, aa_backup)
 		enddo
@@ -6526,7 +6688,7 @@ module optimization_techniques
 			endif
 
 			open(3, file="energydetails.txt",  access="append")
-				write(3,4) step, attempt, score_old, binding_energy_old, entropy_old, score4hydration_old, Pagg_old, "Not-SCMF ", accpt
+				write(3,4) step, attempt, score_old, binding_energy_old, entropy_old,(score4hydration_old+Pagg_old)*propensity_weighting_factor, "Not-SCMF ", accpt
 				write(3,"(<gnum>(a5))") (group(1,j)%gtype, j=1, gnum)
 				!write(3,*) "*******************************"
 			close(3)
@@ -6602,7 +6764,7 @@ module optimization_techniques
 			endif
 
 			open(3, file="energydetails.txt",  access="append")
-				write(3,4) step, attempt, score_old, binding_energy_old, entropy_old, score4hydration_old, Pagg_old, "intra-SCMF ", accpt
+				write(3,4) step, attempt, score_old, binding_energy_old, entropy_old,(score4hydration_old+Pagg_old)*propensity_weighting_factor, "intra-SCMF ", accpt
 				write(3,"(<gnum>(a5))") (group(1,j)%gtype, j=1, gnum)
 				!write(3,*) "*******************************"
 			close(3)
@@ -6638,7 +6800,7 @@ module optimization_techniques
         endif
         !if (accpt=="Accept") exit
 	enddo
-4	format(i7,i7,5f20.13,a15,a15)
+4	format(i7,i7,4f15.4,a15,a15)
 
 	return
 	end subroutine sequence_optimization
@@ -6768,7 +6930,7 @@ module optimization_techniques
 40 		continue
 			
 		open(3, file="energydetails.txt",  access="append")
-		write(3,4) step, attempt, score_old, binding_energy_old, entropy_old, score4hydration_old, Pagg_old, sheet_change, ip2, accpt
+		write(3,4) step, attempt, score_old, binding_energy_old, entropy_old, (score4hydration_old+Pagg_old)*propensity_weighting_factor, sheet_change, accpt
 		write(3,"(<gnum>(a5))") (group(1,j)%gtype, j=1, gnum)
 		!write(3,*) "*******************************"
 		close(3)
@@ -6807,7 +6969,7 @@ module optimization_techniques
         !if (accpt=="Accept") exit
 	enddo
 	
-4	format(i7,i7,5f20.13,a15,i7,a15)
+4	format(i7,i7,4f15.4,a15,a15)
 	return
 	end subroutine sheet_optimization
 
@@ -6894,12 +7056,12 @@ Program ProteinDesign
 	
         call convert_AA_name(group, pep_name)
 		open(5, file="energyprofile.txt", access="append")
-			write(5,6) 0,  " ", pep_name, score_old, binding_energy_old, entropy_old, score4hydration_old, Pagg_old
+			write(5,6) 0," ", pep_name, score_old,(binding_energy_old-entropy_old),(score4hydration_old+Pagg_old)*propensity_weighting_factor, 0.0
 		close(5)
         
-        open(5,file="rmsd.txt",access="append")	! add rmsd header
-			write(5,*) "step", " rmsd_x", " rmsd_y", " rmsd_z", " rmsd"
-		close(5)
+  !      open(5,file="rmsd.txt",access="append")	! add rmsd header
+		!	write(5,*) "step", " rmsd_x", " rmsd_y", " rmsd_z", " rmsd"
+		!close(5)
 		if(score_old.lt.0) energy_min(1)=score_old		
         
         flag4sheet=0 ! sheet move flag, 0 = enters judgement of sheet move, >0, need to reach a setpoint to reset
@@ -6950,17 +7112,17 @@ Program ProteinDesign
             endif				
         endif
         
-        open(5,file="rmsd.txt",access="append")
-            call rmsd_calc(1, group, rmsd_x)
-            call rmsd_calc(2, group, rmsd_y)
-            call rmsd_calc(3, group, rmsd_z)
-            call rmsd_calc(4, group, rmsd)
-            write(5,*) step, rmsd_x, rmsd_y, rmsd_z, rmsd
-        close(5)
+        !open(5,file="rmsd.txt",access="append")
+        !call rmsd_calc(1, group, rmsd_x)
+        !call rmsd_calc(2, group, rmsd_y)
+        !call rmsd_calc(3, group, rmsd_z)
+        call rmsd_calc(4, group, rmsd)
+        !write(5,*) step, rmsd_x, rmsd_y, rmsd_z, rmsd
+        !close(5)
         
         call convert_AA_name(group, pep_name)
 		open(5, file="energyprofile.txt", access="append")
-			write(5,6) step,  " ", pep_name, score_old, binding_energy_old, entropy_old, score4hydration_old, Pagg_old
+			write(5,6) step," ",pep_name, score_old,(binding_energy_old-entropy_old),(score4hydration_old+Pagg_old)*propensity_weighting_factor, rmsd
 		close(5)
         
 
@@ -6984,9 +7146,8 @@ Program ProteinDesign
 			write(5,*) step
 		close(5)
 
-		
 	enddo
-6	format(i5,2a,5f10.4)
+6	format(i5,2a,4f10.4)
 
 end
 	
