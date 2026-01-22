@@ -1,7 +1,5 @@
 # PepAD-User-Friendly-Package
-PepAD: a user-friendly Monte Carlo algorithm for designing amyloid-forming self-assembling peptides
-## Introduction
-  The Peptide Assembly Design (PepAD) is a Monte Carlo algorithm for discovering self-assembling peptides [1-3], which assemble into user-defined reference structures. 
+  The Peptide Assembly Design (PepAD) is a Monte Carlo algorithm for discovering amyloid-forming peptides [1-3], which assemble into user-defined reference structures. 
 
 ## Workflow
   PepAD starts from an initial peptide fibril structure, typically consisting of two stacked β-sheets corresponding to a specific class of cross-β spine[4-5]. At beign, a random sequence is draped upon the backbone (–NH–Cα–CO–), and its binding affinity is evaluated using a score function (Γ<sub>score</sub>). PepAD then explores new sequences using three MC moves—residue mutation, residue exchange, and sheet position perturbation. After each move, the Γ<sub>score</sub> is evaluated for the new configuration, and the new design is accepted or rejected based on Metropolis criterion. This process is iterated over multiple steps, and peptides with the lowest Γ<sub>score</sub> are identified as the best designs.
