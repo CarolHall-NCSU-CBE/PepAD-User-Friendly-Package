@@ -57,30 +57,25 @@ The 'input.txt' contains the necessary parameters for designing a fibril structu
 **Table 1:** Input paremeters for PepAD
 | Item | Description |
 |------|-------------|
-| AA per chain | Total number of amino acids in a single peptide chain |
-| total chains | Total number of peptide chains |
-| total sheets | Total number of β-sheets |
-| initial_structure | Name of the initial structure PDB file |
-| recalculation switch | Switch for restarting PepAD runs:<br>=0 → fresh run from step_start to step_end<br>=1 → restart from where the previous run ends |
-| step start | The starting step number |
-| step end | The ending step number. Thus, total steps = (step_end - step_start) + 1 |
-| seed switch | Switch for employing a random seed:<br>=0 → use random seed based on local time<br>=1 → use provided random seed |
-| random seed | The user-provided random seed when seed_switch = 1 |
-| ekt_seq | Temperature factor $$k_{B}T$$ used in the Metropolis criterion for residue mutation/exchange |
-| sheet switch | Probability of employing a sheet position perturbation move (0–1).<br>=0 → no sheet move<br>=0.6 → 60% chance of sheet move |
-| ekt_sheet | Temperature factor $$k_{B}T$$ used in the Metropolis criterion for sheet position perturbation move |
-| sheetmove interval | Number of steps to only perform residue mutation/exchange moves after a successful sheet position perturbation move |
-| rmsd_max_x, rmsd_max_y, rmsd_max_z | Maximum displacement (absolute coordinates) a β-sheet can shift in x-, y-, or z-direction |
-| dx, dy, dz | Maximum single-step displacement a β-sheet can shift in x-, y-, or z-direction |
-| propensity weighting factor | λ, the weighting factor for the contribution of aggregation propensity in the score function |
-| N_hydrophobic, N_polar, N_charged, N_other | Number of hydrophobic, polar, charged, and other residues in the desired sequence (excluding NMR-constrained residues) |
-| Number of peptides in group (i) | Number of peptide chains in group (i) for energy calculation |
-| chain ID of peptides in sheet (i) | Index numbers of peptide chains in group (i) |
-| NMR constrained sites | Residues on these sites are constrained to the NMR amino acid pool. Example:<br>4, 5-6, 12 → sites 4, 5, 6, and 12 are constrained |
-| Sites with no sequence change move | Residues on these sites are fixed to their initial amino acid throughout the run. Example:<br>1, 16 → amino acids on sites 1 and 16 remain unchanged |
-| Must have amino acids | Sequence must include at least one of each listed amino acid (3-letter code, e.g., ALA, VAL). Enter `None` or leave blank for no restriction |
-| NMR constrained amino acid pool | Define the set of amino acids for the NMR constrained sites (3-letter codes). Enter `None` or leave blank for no constraints |
-| Restrictions on amino acids | Restrict the count of specific amino acids. Use 3-letter code + number. Example: `ASN3` (limit to 3 ASN). Enter `None` or leave blank for no restriction |
+| Number of residues per chain (including caps) | An integer number. Total number of residues, including terminal residues. |
+| Number of chains in total | An integer number. Total number of peptide chains. |
+| Input PDB file name | A string. Name of the initial structure PDB file. |
+| Recalculation | Switch for restarting PepAD runs:<br>`0` # fresh run<br>`1` # restart from last completed step |
+| Group 1 | Indices of peptide chains in group 1.|
+| Group 2 | Indices of peptide chains in group 2.|
+| MC steps | An integer number. Total steps for performing MC moves. |
+| Ekt(sequence) | A real number. The temperature factor kBT is used in the Metropolis criterion for residue mutation/exchange. |
+| Ekt(sheet move) | A real number. The temperature factor kBT is used in the Metropolis criterion for the sheet position perturbation move. |
+| Allowed maximum RMSD (ang) | A real number. The maximum displacement of one β-sheet can shift relative to another β-sheet. |
+| Aggregation propensity weight | A real number. The weighting factor λ adjusts the contribution of aggregation propensity in the score function. |
+| Hydrophobic | Number of hydrophobic residues (G, A, L, V, I, M, F, Y, W). |
+| Polar | Number of polar residues (N, Q, S, T). |
+| Charged | Number of charged residues (R, K, H, E, D). |
+| Other | Number of residues that are not classified as hydrophobic, polar, or charged, (C, P). |
+| Single-site positional constraint | The sites on which amino acids do not change. |
+| Grouped-site positional constraint amino acids pool | A set of amino acids that could only be placed on the grouped positional constraint sites. |
+| Grouped-site positional constraint | The sites on which amino acids can only be selected from the set of amino acids defined previously, without repetition. |
+| Constraints on the number of certain amino acids | Limit the count of specific amino acids. For examples:<br>`MET=0` # No Met<br>`Ala>=2` # The peptide must have at least 2 Ala<br>`Asn<=5` # The peptide must have no more than 5 Asn |
 
 ### Submission Script
 Once the input files are prepared, users can submit the following example script to run PepAD:
