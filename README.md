@@ -25,7 +25,7 @@ The highly negative value of Γ<sub>score</sub> represents that the evaluated pe
 
 ## Usage
 <p align="center">
-  <img width="1778" height="491" alt="image" src="https://github.com/user-attachments/assets/1a67d0c9-ed30-4552-af59-b28f30525024" />
+  <img width="1778" height="491" alt="image" src="https://github.com/user-attachments/assets/ceed678e-b101-4fca-86ea-bc43994cf0d1" />
   </p>
 <p align="center"><b>Fig. 3.</b> A workflow chart describing how to design peptides.</figcaption></p>
 
