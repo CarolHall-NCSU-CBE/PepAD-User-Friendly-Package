@@ -37,7 +37,7 @@ The highly negative value of Γ<sub>score</sub> represents that the evaluated pe
 <p align="center"><b>Fig. 3.</b> A workflow chart describing how to design peptides.</figcaption></p>
 
 
-### Compilation
+### Compile code
 The coding language is Fortran90. Users need to load Intel Fortran Compiler (ifx) for compilation. In the command line interface, navigate to the `/src/`, and use the following command:
  
 >
@@ -48,7 +48,7 @@ The coding language is Fortran90. Users need to load Intel Fortran Compiler (ifx
 
 > **Note:** Code must be compiled in the same directory as `/lib/`, since parameter files are required at runtime. After compilation, the PepAD can be run from any directory.
 
-### Prepare Input Files for PepAD
+### Set up input files
 PepAD requires an `input.txt` file and an `initial_structure.pdb` to start searching. 
 
 #### initial structure
@@ -116,11 +116,9 @@ Once the input files are prepared, users can submit the following example script
 
 - ΔTS<sub>conf</sub>: Conformational entropy
 
-- I<sub>hydr</sub>: Hydrophobic contribution in P<sub>agg</sub>
+- P<sub>agg: Aggregation propensity
 
-- P<sub>agg</sub>-I<sub>hydr</sub>: Aggregation propensity excepts the hydrophobic contribution
-
-- RMSD<sub>x, y, z</sub>: Root Mean Square Displacement (RMSD) of a β-sheet in x, y, or z direction.
+- $$\lambda$$: Aggregation propensity weighting factor
 
 - RMSD: Total Root Mean Square Displacement (RMSD) of a β-sheet.
 
