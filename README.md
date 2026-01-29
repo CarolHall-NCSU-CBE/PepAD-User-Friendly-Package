@@ -1,7 +1,14 @@
 # PepAD-User-Friendly-Package
-  The Peptide Assembly Design (PepAD) is a Monte Carlo algorithm for discovering amyloid-forming peptides [1-3], which assemble into user-defined reference structures. 
+## Introduction  
+ 
+Peptide Assembly Design (PepAD) is a Monte Carlo (MC)–based algorithm for discovering amyloid-forming peptides that self-assemble into user-defined reference structures [1–3]. PepAD designs peptide by optimizing the binding affinity within a predefined fibril backbone, which is composed of two stacked β-sheets.
 
-## Workflow
+PepAD allows users to design peptides with specified sequence length, amino acid composition, and positional or compositional constraints. During the design process, residues on the peptide backbone are modified through MC moves and evaluated using a physics-based score function that quantifies the peptide self-assembly propensity.
+
+To run PepAD, users first need to compile the code in HPC with Intel@ Fortran compiler. Then need to provide an initial fibril structure (PDB format) and a text-based input file that defines parameters and constraints. PepAD outputs peptide sequences with their corresponding scores, as well as structural files for the top-scoring designs, which can be further used in downstream simulations or experiments.
+
+
+## PepAD algorithm
   PepAD starts from an initial peptide fibril structure, typically consisting of two stacked β-sheets corresponding to a specific class of cross-β spine[4-5]. At beign, a random sequence is draped upon the backbone (–NH–Cα–CO–), and its binding affinity is evaluated using a score function (Γ<sub>score</sub>). PepAD then explores new sequences using three MC moves—residue mutation, residue exchange, and sheet position perturbation. After each move, the Γ<sub>score</sub> is evaluated for the new configuration, and the new design is accepted or rejected based on Metropolis criterion. This process is iterated over multiple steps, and peptides with the lowest Γ<sub>score</sub> are identified as the best designs.
 
 <p align="center">
@@ -68,7 +75,7 @@ The 'input.txt' contains the necessary parameters for designing a fibril structu
 | Recalculation | Switch for restarting PepAD runs:<br>`0` # fresh run<br>`1` # restart from last completed step |
 | Group 1 | Indices of peptide chains in group 1.|
 | Group 2 | Indices of peptide chains in group 2.|
-| MC steps | An integer number. Total steps for performing MC moves. |
+| Number of MC moves | An integer number. Total steps for performing MC moves. |
 | Ekt(sequence) | A real number. The temperature factor kBT is used in the Metropolis criterion for residue mutation/exchange. |
 | Ekt(sheet move) | A real number. The temperature factor kBT is used in the Metropolis criterion for the sheet position perturbation move. |
 | Allowed maximum RMSD (ang) | A real number. The maximum displacement of one β-sheet can shift relative to another β-sheet. |
