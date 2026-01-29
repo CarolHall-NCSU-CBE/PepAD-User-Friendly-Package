@@ -89,7 +89,7 @@ The 'input.txt' contains the necessary parameters for designing a fibril structu
 | Grouped-site positional constraint | The sites on which amino acids can only be selected from the set of amino acids defined previously, without repetition. |
 | Constraints on the number of certain amino acids | Limit the count of specific amino acids. For examples:<br>`MET=0` # No Met<br>`Ala>=2` # The peptide must have at least 2 Ala<br>`Asn<=5` # The peptide must have no more than 5 Asn |
 
-### Submission Script
+### Submit a job
 Once the input files are prepared, users can submit the following example script to run PepAD:
 
 >
