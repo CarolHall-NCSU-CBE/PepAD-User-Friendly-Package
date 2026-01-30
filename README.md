@@ -41,7 +41,12 @@ The highly negative value of Γ<sub>score</sub> represents that the evaluated pe
 The coding language is Fortran90. Users need to load Intel Fortran Compiler (ifx) for compilation. In the command line interface, navigate to the `/src/`, and use the following command:
  
 >
-    module load PrgEnv-intel         # load Intel compiler
+
+	# Example compilation using the Intel Fortran compiler on a Linux-based system
+	
+	# Users should modify these commands according to their local environment. 
+
+	module load PrgEnv-intel         # load Intel compiler
 
     ifx -o PepAD main.f90            #  compile PepAD code
 
