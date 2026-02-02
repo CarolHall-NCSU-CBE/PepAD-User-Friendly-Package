@@ -12,6 +12,7 @@ To run PepAD, users first need to compile the code in HPC with Intel@ Fortran co
   PepAD starts from an initial peptide fibril structure, typically consisting of two stacked β-sheets corresponding to a specific class of cross-β spine[4-5]. At beign, a random sequence is draped upon the backbone (–NH–Cα–CO–), and its binding affinity is evaluated using a score function (Γ<sub>score</sub>). PepAD then explores new sequences using three MC moves—residue mutation, residue exchange, and sheet position perturbation. After each move, the Γ<sub>score</sub> is evaluated for the new configuration, and the new design is accepted or rejected based on Metropolis criterion. This process is iterated over multiple steps, and peptides with the lowest Γ<sub>score</sub> are identified as the best designs.
 
 <p align="center">
+	
   <img width="300" alt="Flow chart of PepAD algorithm" src="https://github.com/user-attachments/assets/572abb95-0b87-435f-b154-17b3910b86e4">
   </p>
 <p align="center"><b>Fig. 1.</b> Simplified flow chart describing the PepAD algorithm.</figcaption></p>
@@ -153,21 +154,22 @@ Once PepAD outputs are generated, user can submit the following example script t
 output:
 >
 	---10 unique peptides with best score (energy profile)---
-	 step Sequence  Score  E_bind  S_bind  I_hydrophobic  I_propensity  G_bind  Pagg  rmsd_x  rmsd_y  rmsd_z  rmsd  Counts
-	 3917  VWKVVGD -20.17  -22.94   -3.06          -1.29          1.44  -19.88  0.15    0.20    0.00    0.74  0.76      22
-	 3911  VWKVVGE -20.03  -23.51   -3.45          -1.11          1.10  -20.06 -0.01    0.20    0.00    0.74  0.76      30
-	 6816  VWKVMGD -19.97  -23.96   -4.21          -1.31          1.42  -19.75  0.11    0.37    0.09    0.83  0.92      43
-	 4006  KWVVVGD -19.73  -23.41   -3.86          -1.29          1.38  -19.55  0.09    0.20    0.00    0.60  0.63      17
-	 6836  VWKVMGE -19.71  -24.34   -4.53          -1.13          1.08  -19.81 -0.05    0.37    0.09    0.83  0.92      23
-	 1887  KWMVVGD -19.38  -23.28   -4.00          -1.31          1.36  -19.27  0.05    0.01    0.00    0.80  0.80      22
-	 5064  KWMVVGE -19.33  -24.09   -4.55          -1.13          1.02  -19.54 -0.11    0.33    0.06    0.68  0.76       8
-	 1895  KWVVMGD -19.10  -23.82   -4.82          -1.31          1.36  -19.00  0.05    0.01    0.00    0.80  0.80      30
-	 3918  KWVVVGE -19.03  -23.74   -4.57          -1.11          1.04  -19.17 -0.07    0.20    0.00    0.74  0.76      15
-	 1131  KWIIDGG -18.86  -22.63   -3.65          -1.23          1.17  -18.98 -0.06    0.02    0.00    0.64  0.64      24
+ step Sequence  Score  G_bind  Pagg  rmsd  Counts
+  823  IFKVMGD -19.09  -19.04  0.05  0.10       1
+  802  VWKVMGE -18.87  -18.97 -0.10  0.10       5
+ 3630  VIKIVGD -18.79  -18.97 -0.18  0.17      11
+ 3631  VIKIMGD -18.60  -18.86 -0.25  0.17       6
+  707  KIVIVGD -18.50  -18.79 -0.29  0.10       5
+  829  VFKVEGM -18.36  -18.53 -0.17  0.10       2
+ 2058  KIMIVGD -18.36  -18.72 -0.37  0.22      12
+  828  IFKVEGM -18.30  -18.45 -0.16  0.10       3
+ 2083  VIKIMGE -18.28  -18.85 -0.57  0.22      13
+  711  KVIIVGD -18.18  -18.47 -0.29  0.10       3
+
 
 
 <p align="center"> 
-  <img width="800" alt="step_evolution" src="https://github.com/user-attachments/assets/9f3abf04-6600-43bc-95ac-8cab8fa2f0a0" />
+  <img width="800" alt="step_evolution" src="https://github.com/user-attachments/assets/bc84be81-9804-4243-8260-5ed780031e7e" />
   </p>
 <p align="center"><b>Fig. 5. The Γ<sub>score</sub> and RMSD evolution in a 10,000-step PepAD run of designing 7-mer antiparallel peptides.</b>  .</figcaption></p>
 
