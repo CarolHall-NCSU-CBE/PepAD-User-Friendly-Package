@@ -32,7 +32,7 @@ The highly negative value of Γ<sub>score</sub> represents that the evaluated pe
 
 ## Usage
 <p align="center">
-  <img width="1778" height="491" alt="image" src="https://github.com/user-attachments/assets/ceed678e-b101-4fca-86ea-bc43994cf0d1" />
+  <img width="1778" height="491" alt="image" src="https://github.com/user-attachments/assets/9fe5fec4-7abc-4b22-81e6-e7443452672b" />
   </p>
 <p align="center"><b>Fig. 3.</b> A workflow chart describing how to design peptides.</figcaption></p>
 
@@ -64,10 +64,11 @@ Users must provide an initial structure PDB file for PepAD. The PDB file format 
 (b) Build artificial amyloid backbones using the peptide-building tool provided in this package, or prepare with other molecular modelling tools (UCSF Chimera or Packmol) (see Fig. 4, bottom).
 
 <p align="center"> 
-  <img width="450" alt="image" src="https://github.com/user-attachments/assets/3059ea8b-0e86-44dd-858b-50d21276b000" />
-  <img width="450" alt="image" src="https://github.com/user-attachments/assets/e5b3ac63-57e5-465e-ac81-ac454022c324" />
+  <img width="450" alt="image" src="https://github.com/user-attachments/assets/e6c6a3dd-9f5e-4f17-b85f-c81f36759425" />
+  <img width="450" alt="image" src="https://github.com/user-attachments/assets/1311ca29-03ca-4b8c-8014-9b195bbd81c7" />
+
   </p>
-<p align="center"><b>Fig. 4. (Top) A 7-mer fibril structure built using crystal structure of peptide GNNQQNY (PDB ID: 2omm) and molecular dynamics simulation. (Bottom) A 14-mer fibril strucutre built using peptide-building tool in PepAD package.</b></figcaption></p>
+<p align="center"><b>Fig. 4. (a) comp-1.pdb: A 7-mer fibril structure built using crystal structure of peptide GNNQQNY (PDB ID: 2omm) and molecular dynamics simulation . (b) comp-2.pdb: A 14-mer fibril strucutre built using peptide-building tool in PepAD package.</b></figcaption></p>
 
 #### input.txt
 The 'input.txt' contains the necessary parameters for designing a fibril structure.
@@ -115,13 +116,13 @@ Once the input files are prepared, users can submit the following example script
 #### terms
 - Γ<sub>score</sub>: PepAD score function
 
-- ΔG<sub>bind</sub>: Binding free energy
+- ΔG<sub>binding</sub>: Binding free energy
 
-- ΔE<sub>bind</sub>: Binding energy
+- ΔE<sub>binding</sub>: Binding energy
 
-- ΔTS<sub>conf</sub>: Conformational entropy
+- ΔTS<sub>conf</sub>: Configuration entropy
 
-- P<sub>agg: Aggregation propensity
+- P<sub>aggregation: Aggregation propensity
 
 - $$\lambda$$: Aggregation propensity weighting factor
 
