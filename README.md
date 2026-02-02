@@ -153,23 +153,23 @@ Once PepAD outputs are generated, user can submit the following example script t
 
 output:
 >
-	---10 unique peptides with best score (energy profile)---
- step Sequence  Score  G_bind  Pagg  rmsd  Counts
-  823  IFKVMGD -19.09  -19.04  0.05  0.10       1
-  802  VWKVMGE -18.87  -18.97 -0.10  0.10       5
- 3630  VIKIVGD -18.79  -18.97 -0.18  0.17      11
- 3631  VIKIMGD -18.60  -18.86 -0.25  0.17       6
-  707  KIVIVGD -18.50  -18.79 -0.29  0.10       5
-  829  VFKVEGM -18.36  -18.53 -0.17  0.10       2
- 2058  KIMIVGD -18.36  -18.72 -0.37  0.22      12
-  828  IFKVEGM -18.30  -18.45 -0.16  0.10       3
- 2083  VIKIMGE -18.28  -18.85 -0.57  0.22      13
-  711  KVIIVGD -18.18  -18.47 -0.29  0.10       3
-
-
+```text
+--- 10 unique peptides with best score (energy profile) ---
+ step  Sequence   Score   G_bind   Pagg   rmsd  Counts
+  823  IFKVMGD   -19.09  -19.04   0.05   0.10       1
+  802  VWKVMGE   -18.87  -18.97  -0.10   0.10       5
+ 3630  VIKIVGD   -18.79  -18.97  -0.18   0.17      11
+ 3631  VIKIMGD   -18.60  -18.86  -0.25   0.17       6
+  707  KIVIVGD   -18.50  -18.79  -0.29   0.10       5
+  829  VFKVEGM   -18.36  -18.53  -0.17   0.10       2
+ 2058  KIMIVGD   -18.36  -18.72  -0.37   0.22      12
+  828  IFKVEGM   -18.30  -18.45  -0.16   0.10       3
+ 2083  VIKIMGE   -18.28  -18.85  -0.57   0.22      13
+  711  KVIIVGD   -18.18  -18.47  -0.29   0.10       3
+```
 
 <p align="center"> 
-  <img width="800" alt="step_evolution" src="https://github.com/user-attachments/assets/bc84be81-9804-4243-8260-5ed780031e7e" />
+  <img width="800" alt="step_evolution" src="https://github.com/user-attachments/assets/15786422-7758-4cfb-a3e5-2ff3c10b5856" />
   </p>
 <p align="center"><b>Fig. 5. The Γ<sub>score</sub> and RMSD evolution in a 10,000-step PepAD run of designing 7-mer antiparallel peptides.</b>  .</figcaption></p>
 
