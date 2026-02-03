@@ -1,7 +1,7 @@
 ### Initial structure info
-Number of residues per chain (including caps) = 7
+Number of residues per chain (including caps) = 16
 Number of chains in total = 8
-Input PDB file name = comp1.pdb
+Input PDB file name = comp2.pdb
 Recalculation = 0
 Group 1 = 1 3 5 7
 Group 2 = 2 4 6 8
@@ -14,16 +14,14 @@ Allowed maximum RMSD (ang) = 3.0
 Aggregation propensity weight = 2.0
 
 ### Compositions (Number of residues excepted sites with positional constraints)
-Hydrophobic = 5
-Polar       = 0
-Charged     = 2
+Hydrophobic = 7
+Polar       = 7
+Charged     = 0
 Other       = 0
 
 ### Constraints on amino acid position (e.g. sites use: 4  5-6  12; amino acids use three capital letters)
-Single positional constraint sites             = 
+Single positional constraint sites             = 1 16
 Grouped positional constraint amino acids pool = 
 Grouped positional constraint sites            = 
 
 ### Constraints on the number of single amino acid (e.g. each amino acid takes a line, like ALA>=2)
-
-

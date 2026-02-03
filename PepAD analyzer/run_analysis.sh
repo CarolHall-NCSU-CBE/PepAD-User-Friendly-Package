@@ -6,4 +6,4 @@ conda activate pepad_analysis
 # --score_rolling [i]: smooth the score plot with a rolling average over "i" steps.
 # --rmsd_rolling [i]: smooth the rmsd plot with a rolling average over "i" steps.
 
-python pepad_analyzer.py --top 10 --plot both --score_rolling 100 --rmsd_rolling 100
+python pepad_analyzer.py --top 100 --plot both --score_rolling 100 --rmsd_rolling 100

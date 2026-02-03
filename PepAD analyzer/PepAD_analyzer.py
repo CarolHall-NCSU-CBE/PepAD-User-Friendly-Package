@@ -1,7 +1,7 @@
 #!/usr/bin/env python
 # coding: utf-8
 
-# In[16]:
+# In[14]:
 
 
 import numpy as np
@@ -13,67 +13,52 @@ from matplotlib.ticker import MultipleLocator
 import argparse
 
 
-# In[17]:
+# In[15]:
 
+
+def rhs(line):
+    return line.split("=", 1)[1].strip()
 
 input_signal = True
 try:
-    with open('input.txt', 'r') as file:
-        lines = file.readlines()  # Read all lines into a list
-
-        numbers = lines[1].strip().split()
-        line = list(map(float, numbers))
-        gnum, pep_num, sheet_num = line
-
-        numbers = lines[3].strip().split()
-        pep_name = numbers[0]
-
-        numbers = lines[5].strip().split()
-        line = list(map(int, numbers))
-        start, end = line
-
-        numbers = lines[7].strip().split()
-        line = list(map(float, numbers))
-        seed_switch, rand_seed, ekt_seq = line
+    sheet_num  = 2
+    start = 1
+    sheetmove = 0.6
+    with open('input.txt', 'r') as f:
+        lines = [line.strip() for line in f if line.strip() and not line.lstrip().startswith("#")]
         
-        numbers = lines[9].strip().split()
-        line = list(map(float, numbers))
-        sheetmove, ekt_sheet, interval = line # sheet move on > 0, off = 0
-        
-        numbers = lines[11].strip().split()
-        line = list(map(float, numbers))
-        rmsdx, rmsdy, rmsdz, dx, dy, dz = line # sheet move conditions
+        gnum        = int(rhs(lines[0]))
+        pep_num     = int(rhs(lines[1]))
+        pep_name    = rhs(lines[2])
 
-        numbers = lines[13].strip().split()
-        line = list(map(float, numbers))
-        lam = line[0]
+        end         = int(rhs(lines[6]))
+        ekt_seq     = float(rhs(lines[7]))
+        ekt_sheet   = float(rhs(lines[8]))
 
-        numbers = lines[15].strip().split()
-        line = list(map(int, numbers))
-        hydrophobic, polar, charged, other = line
+        lam         = float(rhs(lines[10]))
+
+        hydrophobic = int(rhs(lines[11]))
+        polar       = int(rhs(lines[12]))
+        charged     = int(rhs(lines[13]))
+        other       = int(rhs(lines[14]))
+      
         
 except Exception as input_err:
     print(f"An error occurred: {input_err}")
     input_signal = False
+    
 
 
-# In[18]:
+# In[16]:
 
 
 # assgin headers and read energy profile
-headers=["step","Sequence","Score","E_bind","S_bind","I_hydrophobic","I_propensity"]
+headers=["step","Sequence","Score","G_bind","Pagg","rmsd"]
 df = pd.read_csv('energyprofile.txt', sep=r'\s+', header=None, names=headers)
-df_rmsd = pd.read_csv('rmsd.txt', sep=r'\s+')
-
-# calculate free energy and Pagg
-df["G_bind"]=df["E_bind"]-df["S_bind"]
-df["Pagg"]=df["I_hydrophobic"]+df["I_propensity"]
-
-# Merge the two dataframes on the 'step' column
-df = pd.merge(df, df_rmsd, on='step', how='outer')
-
-# Fill NaN values with zero
 df = df.fillna(0)
+
+
+# In[18]:
 
 
 if __name__ == "__main__":
@@ -82,7 +67,7 @@ if __name__ == "__main__":
     parser.add_argument("--plot", choices=["score", "rmsd", "both", "none"], default="both", help="select: score, rmsd, both, none")
     parser.add_argument("--score_rolling",type=int, default=0, help="score rolling average range, need int > 0")
     parser.add_argument("--rmsd_rolling", type=int, default=0, help="rmsd rolling average range, need int > 0")
-        
+    
     args = parser.parse_args()
 
     best_unique_pep = args.top
@@ -208,15 +193,6 @@ with open ( filename,'w') as f:
     f.write(df_min_unique.to_string(index=False, float_format='%.2f'))
     f.write("\n\n")
     
-
-
-
-
-
-# In[ ]:
-
-
-
 
 
 # In[ ]:
