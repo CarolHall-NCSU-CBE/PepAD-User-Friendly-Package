@@ -161,7 +161,7 @@ module input
 	contains
 	subroutine inputfile
 	implicit none
-	integer						:: i,j,n,pos,iostat, line_count, espos, tmp, p
+	integer						:: i,j,n,pos,iostat, line_count, espos, tmp, p, eq_value
     !real						:: max_rmsd
     character(len=256), allocatable :: lines(:)
     character(len=256)			:: line
@@ -393,11 +393,17 @@ module input
             read(line(:index(line, '<=')-1), *) aa_restrictions(n_restrictions)%gtype
             read(line(index(line, '<=')+2:), *) aa_restrictions(n_restrictions)%max
 			aa_restrictions(n_restrictions)%min = 0
-		elseif (index(line, '=0') > 0) then
+		elseif (index(line, '=') > 0) then
+			read(line(index(line, '=')+1:), *) eq_value
+			if (eq_value < 0 .or. eq_value > gnum) stop "ERROR: invalid exact amino acid count constraint."
             n_restrictions = n_restrictions + 1
-            read(line(:index(line, '=0')-1), *) aa_restrictions(n_restrictions)%gtype
-            aa_restrictions(n_restrictions)%max = 0
+            read(line(:index(line, '=')-1), *) aa_restrictions(n_restrictions)%gtype
+            aa_restrictions(n_restrictions)%max = eq_value
 			aa_restrictions(n_restrictions)%min = 0
+            n_morethan = n_morethan + 1
+            aa_morethan(n_morethan)%gtype = aa_restrictions(n_restrictions)%gtype
+            aa_morethan(n_morethan)%min = eq_value
+			aa_morethan(n_morethan)%max = gnum
 		endif
     enddo
     !*******************output restrictions*********
@@ -504,9 +510,9 @@ module input
     
     ! 2026/5/08 isotropic RMSD
     ! max_X : max_Y : max_Z = 1:1:1
-    rmsd_max_x = sqrt(rmsd_max**2/8.25)
-    rmsd_max_y = sqrt(rmsd_max**2/8.25)
-    rmsd_max_z = sqrt(rmsd_max**2/8.25)
+    rmsd_max_x = sqrt(rmsd_max*rmsd_max/3.0)
+    rmsd_max_y = sqrt(rmsd_max*rmsd_max/3.0)
+    rmsd_max_z = sqrt(rmsd_max*rmsd_max/3.0)
     
     end subroutine setparameter
     
@@ -6197,7 +6203,7 @@ module optimization_techniques
 			open(20, file="error.txt", access="append")
 				write(20,*) "Unable to apply single-site constraint at site ", ic, " to ", aminoacid_name
 			close(20)
-			stop "ERROR: unable to apply single-site constraint at site ", ic, " to ", aminoacid_name
+			stop "ERROR: unable to apply single-site constraint at site "
 		endif
 	enddo
 
