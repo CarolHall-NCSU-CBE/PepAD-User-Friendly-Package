@@ -171,10 +171,10 @@ output:
 <p align="center"> 
   <img width="800" alt="step_evolution" src="https://github.com/user-attachments/assets/15786422-7758-4cfb-a3e5-2ff3c10b5856" />
   </p>
-<p align="center"><b>Fig. 5. The Γ<sub>score</sub> and RMSD evolution in a 10,000-step PepAD run of designing 7-mer antiparallel peptides.</b>  .</figcaption></p>
+<p align="center"><b>Fig. 5. The Γ<sub>score</sub> and RMSD evolution in a 10,000-step PepAD run of designing 7-mer antiparallel peptides</b>.</figcaption></p>
 
 ### Initial Structure Builder
-We provide a supplemental **initial structure builder** to build two β-sheet fibril backbones suitable for PepAD. The builder can create the β-cross spine in one of the eight steric zipper classes defined by Sawaya and Eisenberg [4].  
+We provide a supplemental **initial structure builder** to build two β-sheet fibril backbones suitable for PepAD. The builder can create the β-cross spine in one of the eight steric zipper classes [4].  
 #### Requirements
 - Python 3 
 - [Biopython](https://biopython.org/) — for storing peptide structures [12]  
