@@ -25,11 +25,11 @@ To run PepAD, users first need to compile the code in HPC with Intel@ Fortran co
 <p align="center"><b>Fig. 2.</b>  MC moves in PepAD.</figcaption></p>
 
 ### Score Function
-In PepAD, after each MC move, a score function Γ<sub>score</sub> is used to quantify the binding affinity of the new sequence Γ<sub>score</sub> contains (i) a binding free energy term ΔG<sub>bind</sub> and (ii) an aggregation propensity term P<sub>agg</sub>. A weighting factor $$\lambda$$ is used to balance the contribution of ΔG<sub>bind</sub> and P<sub>agg</sub> to the Γ<sub>score</sub>.
+In PepAD, after each MC move, a score function Γ<sub>score</sub> is used to quantify the binding affinity of the new sequence Γ<sub>score</sub> contains (i) a binding free energy term ΔG<sub>binding</sub> and (ii) an aggregation propensity term P<sub>aggregation</sub>. A weighting factor $$\lambda$$ is used to balance the contribution of ΔG<sub>binding</sub> and P<sub>aggregation</sub> to the Γ<sub>score</sub>.
 
-$$ Γ_{score} = ΔG_{bind} - \lambda \times P_{agg} $$
+$$ Γ_{score} = ΔG_{binding} - \lambda \times P_{aggregation} $$
 
-The highly negative value of Γ<sub>score</sub> represents that the evaluated peptide sequence has a strong binding affinity at a given configuration. ΔG<sub>bind</sub> is calculated using the molecular mechanics-generalized Born surface area (MMGBSA) method [6–8]. P<sub>agg</sub> accounts for the intrinsic aggregation propensity of a sequence based on the Zyggregator method proposed by Dobson and Vendruscolo [9–11].
+The highly negative value of Γ<sub>score</sub> represents that the evaluated peptide sequence has a strong binding affinity at a given configuration. ΔG<sub>binding</sub> is calculated using the molecular mechanics-generalized Born surface area (MMGBSA) method [6–8]. P<sub>aggregation</sub> accounts for the intrinsic aggregation propensity of a sequence based on the Zyggregator method proposed by Dobson and Vendruscolo [9–11].
 
 ## Usage
 <p align="center">
@@ -101,8 +101,6 @@ Once the input files are prepared, users can submit the following example script
 
 >
 	#!/bin/bash
-
-    mkdir -p pdbfiles
     
     /path_to_PepAD/src/PepAD
 
@@ -110,8 +108,8 @@ Once the input files are prepared, users can submit the following example script
 **Table 2:** PepAD output files 
 |File extension| Description|
 |----------------|------------|
-|`Energy profile`| Records Steps, Sequences, Γ<sub>score</sub>, ΔG<sub>bind</sub>, $$\lambda \times P_{agg}$$, and RMSD |
-|`Energy details`| Records Steps, Trials, Sequences, Γ<sub>score</sub>, ΔG<sub>bind</sub>, ΔE<sub>bind</sub>, ΔTS<sub>conf</sub>, $$\lambda \times P_{agg}$$, MC moves, and Trial results|
+|`Energy profile`| Records Steps, Sequences, Γ<sub>score</sub>, ΔG<sub>binding</sub>, $$\lambda \times P_{aggregation}$$, and RMSD |
+|`Energy details`| Records Steps, Trials, Sequences, Γ<sub>score</sub>, ΔG<sub>binding</sub>, ΔE<sub>binding</sub>, ΔTS<sub>conf</sub>, $$\lambda \times P_{aggregation}$$, MC moves, and Trial results|
 |`Minimal energy`| Records Steps, Trials, Γ<sub>score</sub>, and Sequences with minimal Γ<sub>score</sub> along the search|
 |`PDB files`     | PDB files for peptides with minimal scores during the evolution|
 #### terms
