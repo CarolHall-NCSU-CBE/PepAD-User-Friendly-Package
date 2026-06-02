@@ -2,14 +2,14 @@
 Number of residues per chain (including caps) = 16
 Number of chains in total = 8
 Input PDB file name = comp2.pdb
-Recalculation = 0
+Restart = 0
 Group 1 = 1 3 5 7
 Group 2 = 2 4 6 8
 
 ### MC info
 Number of MC moves = 10000
-Ekt(sequence) = 1
-Ekt(sheet move) = 0.6
+kBT(sequence) = 1
+kBT(sheet move) = 0.6
 Allowed maximum RMSD (ang) = 3.0
 Aggregation propensity weight = 2.0
 

@@ -6,7 +6,7 @@
 #BSUB -e stderr.%J
 #BSUB -q hall
 
-mkdir -p pdbfiles
+
 ./../src/PepAD
 
 
