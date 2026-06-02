@@ -17,11 +17,14 @@ To run PepAD, users first need to compile the code in HPC with Intel@ Fortran co
 <p align="center"><b>Fig. 1.</b> Simplified flow chart describing the PepAD algorithm.</figcaption></p>
 
 ### Monte-Carlo Move  
-  Three types of MC moves are applied to search for new self-assembling peptides: residue mutation, residue exchange, and sheet position perturbation. (1) Residue mutation: a random amino acid in the sequence (for all peptides) is mutated to another amino acid of same hydration type, (e.g. ALA is mutated to VAL (hydrophobic), SER is mutated to ASN (polar), or ARG is mutated to LYS (charged)); (2) Residue exchange: two random residues in the sequence are exchanged. (3) Sheet position perturbation move: the position of one β-sheet shifts in a random direction with a random displacement, while the position of another β-sheet is fixed.
-<p align="center"> 
-  <img width="500" alt="image" src="https://github.com/user-attachments/assets/e44bc028-d5a0-4896-b5cc-6f442344231e" />
-  </p>
-<p align="center"><b>Fig. 2.</b>  MC moves in PepAD.</figcaption></p>
+Three types of MC moves (Fig. 1 Perform one MC move) are applied to search for new self-assembling peptides: residue mutation, residue exchange, and sheet position perturbation. 
+
+(1) Residue mutation: a random amino acid in the sequence (for all peptides) is mutated to another amino acid of same hydration type, (e.g. ALA is mutated to VAL (hydrophobic), SER is mutated to ASN (polar), or ARG is mutated to LYS (charged)); 
+
+(2) Residue exchange: two random residues in the sequence are exchanged. 
+
+(3) Sheet position perturbation move: the position of one β-sheet shifts in a random direction with a random displacement, while the position of another β-sheet is fixed.
+
 
 ### Score Function
 In PepAD, after each MC move, a score function Γ<sub>score</sub> is used to quantify the binding affinity of the new sequence Γ<sub>score</sub> contains (i) a binding free energy term ΔG<sub>binding</sub> and (ii) an aggregation propensity term P<sub>aggregation</sub>. A weighting factor $$\lambda$$ is used to balance the contribution of ΔG<sub>binding</sub> and P<sub>aggregation</sub> to the Γ<sub>score</sub>.
@@ -32,9 +35,9 @@ The highly negative value of Γ<sub>score</sub> represents that the evaluated pe
 
 ## Usage
 <p align="center">
-  <img width="1778" height="491" alt="image" src="https://github.com/user-attachments/assets/9fe5fec4-7abc-4b22-81e6-e7443452672b" />
+  <img width="1500" height="491" alt="image" src="https://github.com/user-attachments/assets/9fe5fec4-7abc-4b22-81e6-e7443452672b" />
   </p>
-<p align="center"><b>Fig. 3.</b> A workflow chart describing how to design peptides.</figcaption></p>
+<p align="center"><b>Fig. 2.</b> A workflow chart describing how to design peptides.</figcaption></p>
 
 
 ### Compile code
@@ -59,12 +62,18 @@ PepAD requires an `input.txt` file and an `initial_structure.pdb` to start searc
 #### initial structure
 Users must provide an initial structure PDB file for PepAD. The PDB file format must match that in `/example/`. The structure usually consists of inidividual peptides in a configuration of cross-β spine. Two recommended approaches for preparing the initial structure are as follows: 
 
-(a) Search for existing amyloid fibril structures in the Protein Data Bank ([RCSB PDB: Homepage](https://www.rcsb.org/)). Users need to modify the format of the PDB file to match PepAD's required input format (see Fig. 4, top).
+(a) Search for existing amyloid fibril structures in the Protein Data Bank ([RCSB PDB: Homepage](https://www.rcsb.org/)). For example, as shown in Fig 3, the Sup35 prion segment GNNQQNY structure (PDB ID: 2OMM) is replicated to generate a larger Class-1 cross-β fibril model. The resulting structure was relaxed using explicit-solvent atomistic MD simulation to remove atomic overlaps. The relaxed structure can be further used as the initial structure for PepAD. Users also need to modify the format of the PDB file to match PepAD's required input format (see Fig. 3, top).
 
-(b) Build artificial amyloid backbones using the peptide-building tool provided in this package, or prepare with other molecular modelling tools (UCSF Chimera or Packmol) (see Fig. 4, bottom).
+<p align="center">
+  <img width="650" alt="image" src="https://github.com/user-attachments/assets/c476b3f8-90dd-411e-837f-1fc97d476770" />
+  </p>
+<p align="center"><b>Fig. 3.</b> Prepare initial structure using existing fibril structure from Protein Data Bank.</figcaption></p>
+
+
+(b) Build artificial amyloid backbones using the peptide-building tool provided in this package, or prepare with other molecular modelling tools (UCSF Chimera or Packmol) (see Fig. 3, bottom).
 
 <p align="center"> 
-  <img width="450" alt="image" src="https://github.com/user-attachments/assets/e6c6a3dd-9f5e-4f17-b85f-c81f36759425" />
+  
   <img width="450" alt="image" src="https://github.com/user-attachments/assets/1311ca29-03ca-4b8c-8014-9b195bbd81c7" />
 
   </p>
