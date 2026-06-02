@@ -62,9 +62,10 @@ module constant
 	integer					:: atom_num
 
 	integer, parameter		:: num4pdbsave=10
-	integer, parameter		:: maximum_nmr_site_num=5
+	integer, parameter		:: maximum_nmr_site_num=10
 	integer, parameter		:: maximum_void_site_num=30
-	integer					:: void_site_start(maximum_void_site_num), void_site_end(maximum_void_site_num)
+	integer					:: void_site(maximum_void_site_num)
+	character*4				:: void_site_fixed_name(maximum_void_site_num)
 	integer					:: void_site_num
 	integer					:: nmr_site_num, nmr_site_ID(maximum_nmr_site_num)
     integer					:: restraint_num, exclusion_num, NMR_pool_size
@@ -160,7 +161,7 @@ module input
 	contains
 	subroutine inputfile
 	implicit none
-	integer						:: i,j,n,pos,iostat, line_count, espos, tmp, p
+	integer						:: i,j,n,pos,iostat, line_count, espos, tmp, p, eq_value
     !real						:: max_rmsd
     character(len=256), allocatable :: lines(:)
     character(len=256)			:: line
@@ -172,9 +173,9 @@ module input
     nstep_start=1               ! PepAD starting step, always = 1
     num4category=2	            ! number of sheets, always = 2
     sheetmove_interval=200      ! perform only sequence move between two successful sheet move
-    displacement_factor_x=0.05 
-    displacement_factor_y=0.05
-    displacement_factor_z=0.1
+    displacement_factor_x=0.06 
+    displacement_factor_y=0.06
+    displacement_factor_z=0.06
     seed_switch=0
     allocate (selfassembly(num4category))
     !!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!
@@ -392,11 +393,17 @@ module input
             read(line(:index(line, '<=')-1), *) aa_restrictions(n_restrictions)%gtype
             read(line(index(line, '<=')+2:), *) aa_restrictions(n_restrictions)%max
 			aa_restrictions(n_restrictions)%min = 0
-		elseif (index(line, '=0') > 0) then
+		elseif (index(line, '=') > 0) then
+			read(line(index(line, '=')+1:), *) eq_value
+			if (eq_value < 0 .or. eq_value > gnum) stop "ERROR: invalid exact amino acid count constraint."
             n_restrictions = n_restrictions + 1
-            read(line(:index(line, '=0')-1), *) aa_restrictions(n_restrictions)%gtype
-            aa_restrictions(n_restrictions)%max = 0
+            read(line(:index(line, '=')-1), *) aa_restrictions(n_restrictions)%gtype
+            aa_restrictions(n_restrictions)%max = eq_value
 			aa_restrictions(n_restrictions)%min = 0
+            n_morethan = n_morethan + 1
+            aa_morethan(n_morethan)%gtype = aa_restrictions(n_restrictions)%gtype
+            aa_morethan(n_morethan)%min = eq_value
+			aa_morethan(n_morethan)%max = gnum
 		endif
     enddo
     !*******************output restrictions*********
@@ -501,11 +508,11 @@ module input
         enddo
     enddo
     
-    ! 2026/1/21 set up RMSD on each direction based on maximum RMSD
-    ! max_X : max_Y : max_Z = 1:1:2.5
-    rmsd_max_x = sqrt(rmsd_max**2/8.25)
-    rmsd_max_y = sqrt(rmsd_max**2/8.25)
-    rmsd_max_z = sqrt(rmsd_max**2 * 6.25/8.25)
+    ! 2026/5/08 isotropic RMSD
+    ! max_X : max_Y : max_Z = 1:1:1
+    rmsd_max_x = sqrt(rmsd_max*rmsd_max/3.0)
+    rmsd_max_y = sqrt(rmsd_max*rmsd_max/3.0)
+    rmsd_max_z = sqrt(rmsd_max*rmsd_max/3.0)
     
     end subroutine setparameter
     
@@ -526,12 +533,6 @@ module input
 			do i = 1, len_trim(temp)
 				if (temp(i:i) == ',') temp(i:i) = ' '   ! optional: allow commas too
 			enddo
-			!do  ! collapse multiple spaces into one
-   !             write(*,*) "check point 5"
-			!	i = index(temp, '  ')
-			!	if (i == 0) exit
-			!	temp = temp(:i-1)//temp(i+1:)
-			!enddo
 		endif
         len_input = len_trim(input)
         temp = adjustl(temp)
@@ -579,12 +580,14 @@ module input
 	subroutine read_void_site_input(input)
 		implicit none
 		character(len=*), intent(in) :: input
-		character(len=256) :: s, tok
-		integer :: i, ios, pos
+		character(len=256) :: s, tok, right_part
+		integer :: i, ios, pos, pos_dash, site_start, site_end
 
 		s = adjustl(trim(input))
+		void_site_num = 0
+		void_site = 0
+		void_site_fixed_name = ''
 		if (len_trim(s) == 0) then
-			void_site_num = 0
 			return
 		end if
 		
@@ -592,30 +595,78 @@ module input
 		do i = 1, len_trim(s)
 			if (s(i:i) == ',') s(i:i) = ' '
 		end do
-		void_site_num = 0
 		do
 			tok = ''
 			read(s,*,iostat=ios) tok
 			if (ios /= 0) exit
 			if (len_trim(tok) == 0) exit
 
-			void_site_num = void_site_num + 1
 			tok = trim(tok)
 
-			pos = index(tok,'-')
+			pos = index(tok,':')
+			pos_dash = index(tok,'-')
 			if (pos > 0) then
-				read(tok(1:pos-1), *) void_site_start(void_site_num)
-				read(tok(pos+1:),   *) void_site_end(void_site_num)
+				read(tok(1:pos-1), *) site_start
+				right_part = adjustl(tok(pos+1:))
+				if (site_start < 1 .or. site_start > gnum) then
+					stop "ERROR: invalid single positional constraint site."
+				endif
+				if (len_trim(right_part) < 3 .or. len_trim(right_part) > 4) then
+					stop "ERROR: invalid fixed residue name in single positional constraint."
+				endif
+				void_site_num = void_site_num + 1
+				if (void_site_num > maximum_void_site_num) stop "ERROR: too many single positional constraints."
+				void_site(void_site_num) = site_start
+				void_site_fixed_name(void_site_num) = adjustl(right_part)
+				call normalize_void_site_fixed_name(void_site(void_site_num), void_site_fixed_name(void_site_num))
+                write(*,"(a,i4,2a)") "site",void_site(void_site_num)," will be fixed as ",void_site_fixed_name(void_site_num)
+			elseif (pos_dash > 0) then
+				read(tok(1:pos_dash-1), *) site_start
+				read(tok(pos_dash+1:), *) site_end
+				if (site_start < 1 .or. site_end > gnum .or. site_start > site_end) then
+					stop "ERROR: invalid single positional constraint site."
+				endif
+				do i = site_start, site_end
+					void_site_num = void_site_num + 1
+					if (void_site_num > maximum_void_site_num) stop "ERROR: too many single positional constraints."
+					void_site(void_site_num) = i
+				enddo
 			else
-				read(tok, *) void_site_start(void_site_num)
-				void_site_end(void_site_num) = void_site_start(void_site_num)
-			end if
+				read(tok, *) site_start
+				if (site_start < 1 .or. site_start > gnum) then
+					stop "ERROR: invalid single positional constraint site."
+				endif
+				void_site_num = void_site_num + 1
+				if (void_site_num > maximum_void_site_num) stop "ERROR: too many single positional constraints."
+				void_site(void_site_num) = site_start
+			endif
 
 			! remove the token we just read from the front of s
 			s = adjustl(s(len_trim(tok)+1:))
 			if (len_trim(s) == 0) exit
 		end do
 	end subroutine read_void_site_input
+
+	subroutine normalize_void_site_fixed_name(site_id, residue_name)
+		implicit none
+		integer, intent(in) :: site_id
+		character*4, intent(inout) :: residue_name
+		integer :: i, ich
+
+		residue_name = adjustl(residue_name)
+		do i = 1, len_trim(residue_name)
+			ich = iachar(residue_name(i:i))
+			if (ich >= iachar('a') .and. ich <= iachar('z')) residue_name(i:i) = achar(ich - 32)
+		end do
+
+		if (residue_name /= "ACE" .and. residue_name /= "NME" .and. residue_name /= "NHE" .and. len_trim(residue_name) == 3) then
+			if (site_id == 1) then
+				residue_name = "N" // residue_name(1:3)
+			elseif (site_id == gnum) then
+				residue_name = "C" // residue_name(1:3)
+			endif
+		endif
+	end subroutine normalize_void_site_fixed_name
     
     subroutine read_restraints_input(input, signal)
 		character(len=*), intent(in) :: input
@@ -625,7 +676,9 @@ module input
 
         res_num = 0
         temp = input
-          
+		do i = 1, len_trim(temp)
+			if (temp(i:i) == ',') temp(i:i) = ' '
+		enddo
         do while (len_trim(temp) > 0)
             i = index(temp, ' ')   
             if (i == 0) then
@@ -668,6 +721,7 @@ module input
                 enddo
                 NMR_pool_size = res_num
 				write(*,*) "Grouped positional constraint AA pool: ", NMR_AA_pool
+                
 			end select
         return
 	end subroutine read_restraints_input
@@ -768,7 +822,7 @@ module pdbfile
 			if(ic.ne.flag) then
 				flag=ic
 				do i=1, void_site_num
-					if(ic.ge.void_site_start(i).and.ic.le.void_site_end(i)) then
+					if(ic == void_site(i)) then
 						goto 10
 					endif
 				enddo
@@ -1204,6 +1258,44 @@ module database
 	use randomgenerator
 	use mathfunction
 
+	integer, parameter				:: max_library_cache_entries=160
+	integer, parameter				:: max_forcefield_atoms=120
+	integer, parameter				:: max_atomlink_atoms=120
+	integer, parameter				:: max_atomlink_per_atom=4
+
+	type forcefield_cache_entry
+		character*4					:: gtype=''
+		integer						:: atom_count=0
+		character*4					:: igraph(max_forcefield_atoms)
+		real						:: charge(max_forcefield_atoms), epsion(max_forcefield_atoms)
+		real						:: r(max_forcefield_atoms), rborn(max_forcefield_atoms)
+		real						:: fs(max_forcefield_atoms), dielecons(max_forcefield_atoms)
+		integer						:: atomid(max_forcefield_atoms)
+		logical						:: loaded=.false.
+	end type
+
+	type atomlink_cache_entry
+		character*4					:: gtype=''
+		integer						:: natom=0
+		integer						:: linknum(max_atomlink_atoms)
+		integer						:: linkindex(max_atomlink_atoms,max_atomlink_per_atom)
+		logical						:: loaded=.false.
+	end type
+
+	type dihedral_cache_entry
+		character*4					:: gtype=''
+		integer						:: dihedral_num=0
+		type(dihedralparameters)	:: dihedral
+		logical						:: loaded=.false.
+	end type
+
+	type(forcefield_cache_entry), save	:: forcefield_cache(max_library_cache_entries)
+	type(atomlink_cache_entry), save	:: atomlink_cache(max_library_cache_entries)
+	type(dihedral_cache_entry), save	:: dihedral_cache(max_library_cache_entries)
+	integer, save						:: forcefield_cache_count=0
+	integer, save						:: atomlink_cache_count=0
+	integer, save						:: dihedral_cache_count=0
+
 	contains
 	subroutine pickupsite(length,ic)
 	implicit none
@@ -1223,7 +1315,140 @@ module database
 	
 	return
 	end subroutine pickupsite   
-	
+
+	subroutine ensure_forcefield_cache(gtype, cache_id)
+    ! 2026/04/16 cache forcefield parameters
+	! For every mutation: call energy_parameter -> call ensure_forcefield_cache
+    !
+    ! ensure_forcefield_cache first checks whether that residue type is already cached:
+	!	If cached: it returns immediately, with no open and no close
+	!	If not cached yet: it opens the file once, reads it once, closes it once, and stores it in memory
+	!
+    ! So the new behavior is:
+	!	one open/read/close per residue type, not per residue evaluation
+	!
+    ! That means:
+	!	old version: ALA file may be opened hundreds or thousands of times
+	!	new version: ALA file should be opened only the first time ALA is encountered
+	! functions:
+	!	cache check
+	!	one-time open/read/close
+	!	energy_parameter calling the cache helper in main_v1.37.f90 (line 2139)
+    
+	implicit none
+	integer							:: cache_id, status
+	real							:: charge, epsion, r, rborn, fs, dielecons
+	character*4						:: gtype, lbres, igraph
+	integer							:: atomid
+
+    ! loop all loaded residue check if it is loaded
+	do cache_id=1, forcefield_cache_count
+		if(forcefield_cache(cache_id)%loaded.and.forcefield_cache(cache_id)%gtype==gtype) return
+	enddo
+
+	forcefield_cache_count=forcefield_cache_count+1
+	if(forcefield_cache_count.gt.max_library_cache_entries) stop "ERROR: forcefield cache is full."
+	cache_id=forcefield_cache_count
+	forcefield_cache(cache_id)%gtype=gtype
+	forcefield_cache(cache_id)%atom_count=0
+	forcefield_cache(cache_id)%igraph='    '
+	forcefield_cache(cache_id)%charge=0.0
+	forcefield_cache(cache_id)%epsion=0.0
+	forcefield_cache(cache_id)%r=0.0
+	forcefield_cache(cache_id)%rborn=0.0
+	forcefield_cache(cache_id)%fs=0.0
+	forcefield_cache(cache_id)%dielecons=0.0
+	forcefield_cache(cache_id)%atomid=0
+
+	open(10, file=trim(mydir)//'lib/ForceField/'//trim(adjustl(trim(gtype))), status="old")
+	read(10, *)
+	do while(.true.)
+		read(10, 20, iostat=status) lbres, igraph, charge, epsion, r, rborn, fs, dielecons, atomid
+		if(status.ne.0) exit
+		forcefield_cache(cache_id)%atom_count=forcefield_cache(cache_id)%atom_count+1
+		forcefield_cache(cache_id)%igraph(forcefield_cache(cache_id)%atom_count)=igraph
+		forcefield_cache(cache_id)%charge(forcefield_cache(cache_id)%atom_count)=charge
+		forcefield_cache(cache_id)%epsion(forcefield_cache(cache_id)%atom_count)=epsion
+		forcefield_cache(cache_id)%r(forcefield_cache(cache_id)%atom_count)=r
+		forcefield_cache(cache_id)%rborn(forcefield_cache(cache_id)%atom_count)=rborn
+		forcefield_cache(cache_id)%fs(forcefield_cache(cache_id)%atom_count)=fs
+		forcefield_cache(cache_id)%dielecons(forcefield_cache(cache_id)%atom_count)=dielecons
+		forcefield_cache(cache_id)%atomid(forcefield_cache(cache_id)%atom_count)=atomid
+	enddo
+	close(10)
+	forcefield_cache(cache_id)%loaded=.true.
+
+20	format(2a4, 6e16.8, i8)
+	return
+	end subroutine ensure_forcefield_cache
+
+	subroutine ensure_atomlink_cache(gtype, cache_id)
+	implicit none
+	integer							:: cache_id, status, id, linknum, k
+	integer							:: linkindex(max_atomlink_per_atom)
+	character*4						:: gtype
+
+	do cache_id=1, atomlink_cache_count
+		if(atomlink_cache(cache_id)%loaded.and.atomlink_cache(cache_id)%gtype==gtype) return
+	enddo
+
+	atomlink_cache_count=atomlink_cache_count+1
+	if(atomlink_cache_count.gt.max_library_cache_entries) stop "ERROR: atomlink cache is full."
+	cache_id=atomlink_cache_count
+	atomlink_cache(cache_id)%gtype=gtype
+	atomlink_cache(cache_id)%natom=0
+	atomlink_cache(cache_id)%linknum=0
+	atomlink_cache(cache_id)%linkindex=0
+
+	open(10, file=trim(mydir)//'lib/Atomlink/'//trim(adjustl(trim(gtype))), status="old")
+	do while(.true.)
+		read(10, 20, iostat=status) id, linknum, (linkindex(k), k=1, linknum)
+		if(status.ne.0) exit
+		atomlink_cache(cache_id)%linknum(id)=linknum
+		do k=1, linknum
+			atomlink_cache(cache_id)%linkindex(id,k)=linkindex(k)
+		enddo
+		atomlink_cache(cache_id)%natom=max(atomlink_cache(cache_id)%natom, id)
+	enddo
+	close(10)
+	atomlink_cache(cache_id)%loaded=.true.
+
+20	format(i6, i7, 4i3)
+	return
+	end subroutine ensure_atomlink_cache
+
+	subroutine ensure_dihedral_cache(gtype, cache_id)
+	implicit none
+	integer							:: cache_id, i, j
+	character*4						:: gtype
+
+	do cache_id=1, dihedral_cache_count
+		if(dihedral_cache(cache_id)%loaded.and.dihedral_cache(cache_id)%gtype==gtype) return
+	enddo
+
+	dihedral_cache_count=dihedral_cache_count+1
+	if(dihedral_cache_count.gt.max_library_cache_entries) stop "ERROR: dihedral cache is full."
+	cache_id=dihedral_cache_count
+	dihedral_cache(cache_id)%gtype=gtype
+	dihedral_cache(cache_id)%dihedral_num=0
+
+	open(10, file=trim(mydir)//'lib/DihedralAngle/'//trim(gtype), status="old")
+		read(10, "(i8)") dihedral_cache(cache_id)%dihedral_num
+		do i=1, dihedral_cache(cache_id)%dihedral_num
+			read(10,"(5i8)") dihedral_cache(cache_id)%dihedral%iph(i), dihedral_cache(cache_id)%dihedral%jph(i), &
+							dihedral_cache(cache_id)%dihedral%kph(i), dihedral_cache(cache_id)%dihedral%lph(i), &
+							dihedral_cache(cache_id)%dihedral%multiply(i)
+			do j=1, dihedral_cache(cache_id)%dihedral%multiply(i)
+				read(10,"(3e16.8)") dihedral_cache(cache_id)%dihedral%pk(i,j), dihedral_cache(cache_id)%dihedral%pn(i,j), &
+								 dihedral_cache(cache_id)%dihedral%phase(i,j)
+			enddo
+		enddo
+	close(10)
+	dihedral_cache(cache_id)%loaded=.true.
+
+	return
+	end subroutine ensure_dihedral_cache
+
 	subroutine rotamerlib
 	implicit none
 	integer							:: status, grade, rotanum, anum, num, i, j, k
@@ -1347,6 +1572,7 @@ module database
 	type(index4sidechain)				:: index(60)
 	type(conformer4sidechain)			:: Iclass(6), Tclass(6)
 	
+	ip=0
 	if(name_original=="GLY".or.name_original=="NGLY".or.name_original=="CGLY") then
 		ip=1
 	elseif(name_original=="LEU".or.name_original=="NLEU".or.name_original=="CLEU") then
@@ -1400,6 +1626,14 @@ module database
 		ip=22
 	elseif(name_original=="NHE") then
 		ip=23        
+	endif
+
+	if(ip==0) then
+		open(10, file="error.txt", access="append")
+			write(10,*) "findrotamer: unsupported residue name = ", name_original
+		close(10)
+		write(*,*) "findrotamer error: unsupported residue name =", name_original
+		stop
 	endif
 	
 	do ii=1, repeated_unit	
@@ -1973,111 +2207,112 @@ module database
 	
 	subroutine energy_parameter(group, group_para)
 	implicit none
-	integer							:: i, j, k, status, atomid
-	real							:: charge, epsion, r, rborn, fs, dielecons
-	character*4						:: lbres, igraph
+	integer							:: i, j, k, cache_id
+	character*4						:: igraph
 	type(groupdetails)				:: group(repeated_unit,gnum)
 	type(energyparameters)			:: group_para(repeated_unit,gnum)
-    
-	! declaring Tgroup_para as a two-dimensional allocatable array of type (energy parameters). T指临时
-	type(energyparameters), dimension(:,:), allocatable :: Tgroup_para	
 
-	allocate(Tgroup_para(repeated_unit,gnum))
-    
 	do i=1, repeated_unit
 		do j=1, gnum
-			open(10, file=trim(mydir)//'lib/ForceField/'//trim(adjustl(trim(group(i,j)%gtype))), status="old")
-			read(10, *)
-			do while(.true.)
-				read(10, 20, iostat=status) lbres, igraph, charge, epsion, r, rborn, fs, dielecons, atomid
-				if(status.ne.0) goto 30
-				do k=1, group(i,j)%cnum1
-					if(group(i,j)%atype1(k)==igraph) then
-						Tgroup_para(i,j)%charge1(k)=charge
-						Tgroup_para(i,j)%epsion1(k)=epsion
-						Tgroup_para(i,j)%r1(k)=r
-						Tgroup_para(i,j)%rborn1(k)=rborn
-						Tgroup_para(i,j)%fs1(k)=fs
-						Tgroup_para(i,j)%dielecons1(k)=dielecons
-						Tgroup_para(i,j)%atomid1(k)=atomid                    
-                        
-						goto 40
-					endif
-				enddo
-				do k=1, group(i,j)%cnum2
-					if(group(i,j)%atype2(k)==igraph) then
-						Tgroup_para(i,j)%charge2(k)=charge
-						Tgroup_para(i,j)%epsion2(k)=epsion
-						Tgroup_para(i,j)%r2(k)=r
-						Tgroup_para(i,j)%rborn2(k)=rborn
-						Tgroup_para(i,j)%fs2(k)=fs
-						Tgroup_para(i,j)%dielecons2(k)=dielecons
-						Tgroup_para(i,j)%atomid2(k)=atomid
-						goto 40
-					endif
-				enddo
-				do k=1, group(i,j)%cnum3
-					if(group(i,j)%atype3(k)==igraph) then
-						Tgroup_para(i,j)%charge3(k)=charge
-						Tgroup_para(i,j)%epsion3(k)=epsion
-						Tgroup_para(i,j)%r3(k)=r
-						Tgroup_para(i,j)%rborn3(k)=rborn
-						Tgroup_para(i,j)%fs3(k)=fs
-						Tgroup_para(i,j)%dielecons3(k)=dielecons
-						Tgroup_para(i,j)%atomid3(k)=atomid
-						goto 40
-					endif
-				enddo
-40				continue
+			group_para(i,j)%atomid1=0; group_para(i,j)%atomid2=0; group_para(i,j)%atomid3=0
+			group_para(i,j)%charge1=0.0; group_para(i,j)%charge2=0.0; group_para(i,j)%charge3=0.0
+			group_para(i,j)%epsion1=0.0; group_para(i,j)%epsion2=0.0; group_para(i,j)%epsion3=0.0
+			group_para(i,j)%r1=0.0; group_para(i,j)%r2=0.0; group_para(i,j)%r3=0.0
+			group_para(i,j)%rborn1=0.0; group_para(i,j)%rborn2=0.0; group_para(i,j)%rborn3=0.0
+			group_para(i,j)%fs1=0.0; group_para(i,j)%fs2=0.0; group_para(i,j)%fs3=0.0
+			group_para(i,j)%dielecons1=0.0; group_para(i,j)%dielecons2=0.0; group_para(i,j)%dielecons3=0.0
+			call ensure_forcefield_cache(group(i,j)%gtype, cache_id)
+			do k=1, forcefield_cache(cache_id)%atom_count
+				igraph=forcefield_cache(cache_id)%igraph(k)
+				call fill_energy_parameter_from_cache(group(i,j), group_para(i,j), igraph, cache_id, k)
 			enddo
-30			continue
-			close(10)
-
-20	format(2a4, 6e16.8, i8)
 		enddo
     enddo
-    
-    
 
-
-            
 	do i=1, repeated_unit
 		do j=1, gnum
 			do k=1, group(i,j)%cnum1
-                
-				if(Tgroup_para(i,j)%dielecons1(k)<=0.1) then
+				if(group_para(i,j)%dielecons1(k)<=0.1) then
 					open(10, file="error.txt", access="append")
-						write(10,*) group(i,j)%gtype, i, j, "cluster 1 has wrong force field parameter", Tgroup_para(i,j)%dielecons1(k), "in the LIB!"
+						write(10,*) group(i,j)%gtype, i, j, "cluster 1 atom", k, group(i,j)%atype1(k), &
+							"has wrong force field parameter", group_para(i,j)%dielecons1(k), "in the LIB!"
 						write(10,*) "Please check whether the atom type of PDB file matches the atom type of Force Field LIB or not!"
 					close(10)
 					stop
 				endif
 			enddo
 			do k=1, group(i,j)%cnum2
-				if(Tgroup_para(i,j)%dielecons2(k)<=0.1) then
+				if(group_para(i,j)%dielecons2(k)<=0.1) then
 					open(10, file="error.txt", access="append")
-						write(10,*) group(i,j)%gtype, i, j, "cluster 2 has wrong force field parameter", Tgroup_para(i,j)%dielecons1(k), "in the LIB!"
+						write(10,*) group(i,j)%gtype, i, j, "cluster 2 atom", k, group(i,j)%atype2(k), &
+							"has wrong force field parameter", group_para(i,j)%dielecons2(k), "in the LIB!"
 						write(10,*) "Please check whether the atom type of PDB file matches the atom type of Force Field LIB or not!"
 					close(10)
 					stop
 				endif
 			enddo
 			do k=1, group(i,j)%cnum3
-				if(Tgroup_para(i,j)%dielecons3(k)<=0.1) then
+				if(group_para(i,j)%dielecons3(k)<=0.1) then
 					open(10, file="error.txt", access="append")
-						write(10,*) group(i,j)%gtype, i, j, "cluster 3 has wrong force field parameter", Tgroup_para(i,j)%dielecons1(k), "in the LIB!"
+						write(10,*) group(i,j)%gtype, i, j, "cluster 3 atom", k, group(i,j)%atype3(k), &
+							"has wrong force field parameter", group_para(i,j)%dielecons3(k), "in the LIB!"
 						write(10,*) "Please check whether the atom type of PDB file matches the atom type of Force Field LIB or not!"
 					close(10)
 					stop
 				endif
 			enddo
 		enddo
-	enddo	
-	group_para=Tgroup_para
-	deallocate(Tgroup_para)
-	
+	enddo
+
 	return
 	end subroutine energy_parameter
+
+	subroutine fill_energy_parameter_from_cache(group_residue, para_residue, igraph, cache_id, entry_id)
+	implicit none
+	integer							:: cache_id, entry_id, k
+	character*4						:: igraph
+	type(groupdetails)				:: group_residue
+	type(energyparameters)			:: para_residue
+
+	do k=1, group_residue%cnum1
+		if(group_residue%atype1(k)==igraph) then
+			para_residue%charge1(k)=forcefield_cache(cache_id)%charge(entry_id)
+			para_residue%epsion1(k)=forcefield_cache(cache_id)%epsion(entry_id)
+			para_residue%r1(k)=forcefield_cache(cache_id)%r(entry_id)
+			para_residue%rborn1(k)=forcefield_cache(cache_id)%rborn(entry_id)
+			para_residue%fs1(k)=forcefield_cache(cache_id)%fs(entry_id)
+			para_residue%dielecons1(k)=forcefield_cache(cache_id)%dielecons(entry_id)
+			para_residue%atomid1(k)=forcefield_cache(cache_id)%atomid(entry_id)
+			return
+		endif
+	enddo
+	do k=1, group_residue%cnum2
+		if(group_residue%atype2(k)==igraph) then
+			para_residue%charge2(k)=forcefield_cache(cache_id)%charge(entry_id)
+			para_residue%epsion2(k)=forcefield_cache(cache_id)%epsion(entry_id)
+			para_residue%r2(k)=forcefield_cache(cache_id)%r(entry_id)
+			para_residue%rborn2(k)=forcefield_cache(cache_id)%rborn(entry_id)
+			para_residue%fs2(k)=forcefield_cache(cache_id)%fs(entry_id)
+			para_residue%dielecons2(k)=forcefield_cache(cache_id)%dielecons(entry_id)
+			para_residue%atomid2(k)=forcefield_cache(cache_id)%atomid(entry_id)
+			return
+		endif
+	enddo
+	do k=1, group_residue%cnum3
+		if(group_residue%atype3(k)==igraph) then
+			para_residue%charge3(k)=forcefield_cache(cache_id)%charge(entry_id)
+			para_residue%epsion3(k)=forcefield_cache(cache_id)%epsion(entry_id)
+			para_residue%r3(k)=forcefield_cache(cache_id)%r(entry_id)
+			para_residue%rborn3(k)=forcefield_cache(cache_id)%rborn(entry_id)
+			para_residue%fs3(k)=forcefield_cache(cache_id)%fs(entry_id)
+			para_residue%dielecons3(k)=forcefield_cache(cache_id)%dielecons(entry_id)
+			para_residue%atomid3(k)=forcefield_cache(cache_id)%atomid(entry_id)
+			return
+		endif
+	enddo
+
+	return
+	end subroutine fill_energy_parameter_from_cache
 
 	
 	subroutine atom_links(group, numex, inb, numex4, inb4)
@@ -2087,38 +2322,34 @@ module database
 		integer				:: linkindex(4)
 	end type
 
-	integer							:: categoryID, i, ii, ic, j, k, status, i1, j1, i2, j2, atomid, natom
-	integer							:: id, linknum, linkindex(4)
+	integer							:: categoryID, i, ii, ic, j, k, i1, j1, i2, j2, atomid, natom, cache_id
 	integer							:: ipres, numex(repeated_unit*atom_num), inb(repeated_unit*atom_num,20), numex4(repeated_unit*atom_num), inb4(repeated_unit*atom_num,60)
 
 	type(groupdetails)				:: group(repeated_unit,gnum)
 	type(atomlink)					:: atom(repeated_unit*atom_num)									
 
+	do i=1, repeated_unit*atom_num
+		atom(i)%linknum=0
+		atom(i)%linkindex=0
+	enddo
 	natom=0
 	do categoryID=1, num4category
 		do i=1, selfassembly(categoryID)%num4peptides ! sheet中peptides个数
 			ii=selfassembly(categoryID)%peptideID(i) !peptide编号
 			do ic=1, gnum
 				ipres=natom
-                
-				open(10, file=trim(mydir)//'lib/Atomlink/'//trim(adjustl(trim(group(ii,ic)%gtype))), status="old")
-                
-				do while(.true.)
-					read(10, 20, iostat=status) id, linknum, (linkindex(k), k=1, linknum)
-					if(status.ne.0) goto 30
-					atomid=ipres+id
-					atom(atomid)%linknum=linknum
-					do k=1, linknum
-						atom(atomid)%linkindex(k)=ipres+linkindex(k)
+				call ensure_atomlink_cache(group(ii,ic)%gtype, cache_id)
+				do j=1, atomlink_cache(cache_id)%natom
+					atomid=ipres+j
+					atom(atomid)%linknum=atomlink_cache(cache_id)%linknum(j)
+					do k=1, atom(atomid)%linknum
+						atom(atomid)%linkindex(k)=ipres+atomlink_cache(cache_id)%linkindex(j,k)
 					enddo
-				enddo			
-30				continue
-				close(10)
-				natom=atomid
+				enddo
+				natom=ipres+atomlink_cache(cache_id)%natom
 			enddo
 		enddo
 	enddo
-20  format(i6, i7, 4i3)	
 
 	do i1=1, natom
 		numex(i1)=0
@@ -2168,29 +2399,26 @@ module database
 		integer				:: linkindex(4)
 	end type
 	
-	integer							:: chainID, i, ii, j, k, status, i1, j1, i2, j2, atomid, natom
-	integer							:: ic, id, linknum, linkindex(4)
+	integer							:: chainID, i, ii, j, k, i1, j1, i2, j2, natom, cache_id
+	integer							:: ic
 	integer							:: S_numex(60), S_inb(60,20), S_numex4(60), S_inb4(60,60)
 	type(groupdetails)				:: group(repeated_unit,gnum)
 	type(atomlink)					:: atom(50)
 
 	ii=chainID
-    
-	open(10, file=trim(mydir)//'lib/Atomlink/'//trim(adjustl(trim(group(ii,ic)%gtype))), status="old")
-    
-	do while(.true.)
-		read(10, 20, iostat=status) id, linknum, (linkindex(j), j=1, linknum)
-		if(status.ne.0) goto 30
-		atomid=id
-		atom(atomid)%linknum=linknum
-		do j=1, linknum
-			atom(atomid)%linkindex(j)=linkindex(j)
+
+	do i=1, 50
+		atom(i)%linknum=0
+		atom(i)%linkindex=0
+	enddo
+	call ensure_atomlink_cache(group(ii,ic)%gtype, cache_id)
+	do i=1, atomlink_cache(cache_id)%natom
+		atom(i)%linknum=atomlink_cache(cache_id)%linknum(i)
+		do j=1, atom(i)%linknum
+			atom(i)%linkindex(j)=atomlink_cache(cache_id)%linkindex(i,j)
 		enddo
 	enddo
-30	continue
-	close(10)
-	natom=atomid
-20  format(i6, i7, 4i3)
+	natom=atomlink_cache(cache_id)%natom
 
 	do i1=1, natom
 		S_numex(i1)=0
@@ -3274,19 +3502,13 @@ module database
 	
 	subroutine dihedralangle_reading(gtype, dihedral_num, dihedral)
 	implicit none
-	integer								:: dihedral_num, i, j
+	integer								:: dihedral_num, cache_id
 	character*4							:: gtype
 	type(dihedralparameters)			:: dihedral	
 
-	open(10, file=trim(mydir)//'lib/DihedralAngle/'//trim(gtype), status="old")
-		read(10, "(i8)") dihedral_num
-		do i=1, dihedral_num
-			read(10,"(5i8)") dihedral%iph(i), dihedral%jph(i), dihedral%kph(i), dihedral%lph(i), dihedral%multiply(i)
-			do j=1, dihedral%multiply(i)
-				read(10,"(3e16.8)") dihedral%pk(i,j), dihedral%pn(i,j), dihedral%phase(i,j)
-			enddo
-		enddo
-	close(10)
+	call ensure_dihedral_cache(gtype, cache_id)
+	dihedral_num=dihedral_cache(cache_id)%dihedral_num
+	dihedral=dihedral_cache(cache_id)%dihedral
 	
 	return
     end subroutine dihedralangle_reading	
@@ -3347,54 +3569,7 @@ module database
 
     return
     end subroutine convert_AA_name
-
-!	subroutine groupRES_1(ic, group, g_residue)
-!	implicit none
-!	integer							:: ic, chainID, i
-
-!	type(groupdetails)				:: group(repeated_unit,gnum)
-!	type(RES4chain)					:: g_residue	
-
-!	chainID=1
-!	g_residue%num=0
-!	if(group(chainID,ic)%gtype=="ALA".or.group(chainID,ic)%gtype=="LEU".or.group(chainID,ic)%gtype=="VAL".or.group(chainID,ic)%gtype=="ILE".or.group(chainID,ic)%gtype=="MET".or. &
-!	   group(chainID,ic)%gtype=="PHE".or.group(chainID,ic)%gtype=="TYR".or.group(chainID,ic)%gtype=="TRP".or.group(chainID,ic)%gtype=="GLY".or.group(chainID,ic)%gtype=="NALA".or.group(chainID,ic)%gtype=="NLEU".or. &
-!	   group(chainID,ic)%gtype=="NVAL".or.group(chainID,ic)%gtype=="NILE".or.group(chainID,ic)%gtype=="NMET".or.group(chainID,ic)%gtype=="NPHE".or.group(chainID,ic)%gtype=="NTYR".or. &
-!	   group(chainID,ic)%gtype=="NTRP".or.group(chainID,ic)%gtype=="NGLY".or.group(chainID,ic)%gtype=="CALA".or.group(chainID,ic)%gtype=="CLEU".or.group(chainID,ic)%gtype=="CVAL".or.group(chainID,ic)%gtype=="CILE".or. &
-!	   group(chainID,ic)%gtype=="CMET".or.group(chainID,ic)%gtype=="CPHE".or.group(chainID,ic)%gtype=="CTYR".or.group(chainID,ic)%gtype=="CTRP".or.group(chainID,ic)%gtype=="CGLY") then
-!	   	do i=1,gnum
-!			if(group(chainID,i)%gtype=="ALA".or.group(chainID,i)%gtype=="LEU".or.group(chainID,i)%gtype=="VAL".or.group(chainID,i)%gtype=="ILE".or.group(chainID,i)%gtype=="MET".or. &
-!			   group(chainID,i)%gtype=="PHE".or.group(chainID,i)%gtype=="TYR".or.group(chainID,i)%gtype=="TRP".or.group(chainID,i)%gtype=="GLY".or.group(chainID,i)%gtype=="NALA".or.group(chainID,i)%gtype=="NLEU".or. &
-!			   group(chainID,i)%gtype=="NVAL".or.group(chainID,i)%gtype=="NILE".or.group(chainID,i)%gtype=="NMET".or.group(chainID,i)%gtype=="NPHE".or.group(chainID,i)%gtype=="NTYR".or. &
-!			   group(chainID,i)%gtype=="NTRP".or.group(chainID,i)%gtype=="NGLY".or.group(chainID,i)%gtype=="CALA".or.group(chainID,i)%gtype=="CLEU".or.group(chainID,i)%gtype=="CVAL".or.group(chainID,i)%gtype=="CILE".or. &
-!			   group(chainID,i)%gtype=="CMET".or.group(chainID,i)%gtype=="CPHE".or.group(chainID,i)%gtype=="CTYR".or.group(chainID,i)%gtype=="CTRP".or.group(chainID,i)%gtype=="CGLY") then
-!				g_residue%num=g_residue%num+1
-!				g_residue%IDs(g_residue%num)=i
-!			endif
-!		enddo
-!	elseif(group(chainID,ic)%gtype=="GLU".or.group(chainID,ic)%gtype=="ASP".or.group(chainID,ic)%gtype=="ARG".or.group(chainID,ic)%gtype=="LYS".or.group(chainID,ic)%gtype=="ASN".or. &
-!		   group(chainID,ic)%gtype=="GLN".or.group(chainID,ic)%gtype=="SER".or.group(chainID,ic)%gtype=="THR".or.group(chainID,ic)%gtype=="HIE".or.group(chainID,ic)%gtype=="NGLU".or. &
-!		   group(chainID,ic)%gtype=="NASP".or.group(chainID,ic)%gtype=="NARG".or.group(chainID,ic)%gtype=="NLYS".or.group(chainID,ic)%gtype=="NASN".or.group(chainID,ic)%gtype=="NGLN".or. &
-!		   group(chainID,ic)%gtype=="NSER".or.group(chainID,ic)%gtype=="NTHR".or.group(chainID,ic)%gtype=="NHIE".or.group(chainID,ic)%gtype=="CGLU".or.group(chainID,ic)%gtype=="CASP".or. &
-!		   group(chainID,ic)%gtype=="CARG".or.group(chainID,ic)%gtype=="CLYS".or.group(chainID,ic)%gtype=="CASN".or.group(chainID,ic)%gtype=="CGLN".or.group(chainID,ic)%gtype=="CSER".or. &
-!		   group(chainID,ic)%gtype=="CTHR".or.group(chainID,ic)%gtype=="CHIE") then
-!		do i=1,gnum
-!			if(group(chainID,i)%gtype=="GLU".or.group(chainID,i)%gtype=="ASP".or.group(chainID,i)%gtype=="ARG".or.group(chainID,i)%gtype=="LYS".or.group(chainID,i)%gtype=="ASN".or. &
-!			   group(chainID,i)%gtype=="GLN".or.group(chainID,i)%gtype=="SER".or.group(chainID,i)%gtype=="THR".or.group(chainID,i)%gtype=="HIE".or.group(chainID,i)%gtype=="NGLU".or. &
-!			   group(chainID,i)%gtype=="NASP".or.group(chainID,i)%gtype=="NARG".or.group(chainID,i)%gtype=="NLYS".or.group(chainID,i)%gtype=="NASN".or.group(chainID,i)%gtype=="NGLN".or. &
-!			   group(chainID,i)%gtype=="NSER".or.group(chainID,i)%gtype=="NTHR".or.group(chainID,i)%gtype=="NHIE".or.group(chainID,i)%gtype=="CGLU".or.group(chainID,i)%gtype=="CASP".or. &
-!			   group(chainID,i)%gtype=="CARG".or.group(chainID,i)%gtype=="CLYS".or.group(chainID,i)%gtype=="CASN".or.group(chainID,i)%gtype=="CGLN".or.group(chainID,i)%gtype=="CSER".or. &
-!			   group(chainID,i)%gtype=="CTHR".or.group(chainID,i)%gtype=="CHIE") then
-!				g_residue%num=g_residue%num+1
-!				g_residue%IDs(g_residue%num)=i
-!			endif
-!		enddo
-!	endif
-	
-!	return
-!	end subroutine groupRES_1
-
-	
+    
 end module database
 
 !!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!
@@ -3408,7 +3583,7 @@ module transplant
 	contains
 	subroutine residue_replace(chainID, ic, group, ip, aa_group, temp_group)
 	implicit none
-	integer								:: chainID, ic, ip, ii, j, k, flag
+	integer								:: chainID, ic, ip, ii, j, k, l, flag, ha2_pos
 	type(groupdetails)					:: group(repeated_unit,gnum), temp_group(repeated_unit,gnum), aa_group(repeated_unit,40)
 
 	temp_group=group
@@ -3616,43 +3791,39 @@ module transplant
 			enddo			
 		elseif(aa_group(ii,ip)%gtype=="GLY".or.aa_group(ii,ip)%gtype=="NGLY".or.aa_group(ii,ip)%gtype=="CGLY") then
 			temp_group(ii,ic)%gtype=aa_group(ii,ip)%gtype
+			ha2_pos=0
 			do j=1, aa_group(ii,ip)%cnum1
 				if(aa_group(ii,ip)%atype1(j)=="HA2") then
-					temp_group(ii,ic)%cnum1=temp_group(ii,ic)%cnum1+1
-					do k=(temp_group(ii,ic)%cnum1-1), 1, -1
-						if(temp_group(ii,ic)%atype1(k)=="CA") then
-							temp_group(ii,ic)%atype1(k+1)=aa_group(ii,ip)%atype1(j)
-							temp_group(ii,ic)%coo1((k+1),1)=aa_group(ii,ip)%coo1(j,1)
-							temp_group(ii,ic)%coo1((k+1),2)=aa_group(ii,ip)%coo1(j,2)
-							temp_group(ii,ic)%coo1((k+1),3)=aa_group(ii,ip)%coo1(j,3)
+					do k=1, temp_group(ii,ic)%cnum1
+						if(temp_group(ii,ic)%atype1(k)=="HA") then
+							temp_group(ii,ic)%atype1(k)="HA2"
+							temp_group(ii,ic)%coo1(k,1)=aa_group(ii,ip)%coo1(j,1)
+							temp_group(ii,ic)%coo1(k,2)=aa_group(ii,ip)%coo1(j,2)
+							temp_group(ii,ic)%coo1(k,3)=aa_group(ii,ip)%coo1(j,3)
+							ha2_pos=k
 							goto 30
-						else
-							temp_group(ii,ic)%atype1(k+1)=temp_group(ii,ic)%atype1(k)
-							temp_group(ii,ic)%coo1((k+1),1)=temp_group(ii,ic)%coo1(k,1)
-							temp_group(ii,ic)%coo1((k+1),2)=temp_group(ii,ic)%coo1(k,2)
-							temp_group(ii,ic)%coo1((k+1),3)=temp_group(ii,ic)%coo1(k,3)	
-						endif
-					enddo										
-				elseif(aa_group(ii,ip)%atype1(j)=="HA3") then
-					temp_group(ii,ic)%cnum1=temp_group(ii,ic)%cnum1+1
-					do k=(temp_group(ii,ic)%cnum1-1), 1, -1
-						if(temp_group(ii,ic)%atype1(k)=="HA2") then
-							temp_group(ii,ic)%atype1(k+1)=aa_group(ii,ip)%atype1(j)
-							temp_group(ii,ic)%coo1((k+1),1)=aa_group(ii,ip)%coo1(j,1)
-							temp_group(ii,ic)%coo1((k+1),2)=aa_group(ii,ip)%coo1(j,2)
-							temp_group(ii,ic)%coo1((k+1),3)=aa_group(ii,ip)%coo1(j,3)
-							goto 30
-						else
-							temp_group(ii,ic)%atype1(k+1)=temp_group(ii,ic)%atype1(k)
-							temp_group(ii,ic)%coo1((k+1),1)=temp_group(ii,ic)%coo1(k,1)
-							temp_group(ii,ic)%coo1((k+1),2)=temp_group(ii,ic)%coo1(k,2)
-							temp_group(ii,ic)%coo1((k+1),3)=temp_group(ii,ic)%coo1(k,3)	
 						endif
 					enddo
 				endif					
 30				continue
 			enddo
-			temp_group(ii,ic)%cnum1=temp_group(ii,ic)%cnum1-1
+			do j=1, aa_group(ii,ip)%cnum1
+				if(aa_group(ii,ip)%atype1(j)=="HA3".and.ha2_pos.gt.0) then
+					temp_group(ii,ic)%cnum1=temp_group(ii,ic)%cnum1+1
+					do l=temp_group(ii,ic)%cnum1, ha2_pos+2, -1
+						temp_group(ii,ic)%atype1(l)=temp_group(ii,ic)%atype1(l-1)
+						temp_group(ii,ic)%coo1(l,1)=temp_group(ii,ic)%coo1(l-1,1)
+						temp_group(ii,ic)%coo1(l,2)=temp_group(ii,ic)%coo1(l-1,2)
+						temp_group(ii,ic)%coo1(l,3)=temp_group(ii,ic)%coo1(l-1,3)
+					enddo
+					temp_group(ii,ic)%atype1(ha2_pos+1)="HA3"
+					temp_group(ii,ic)%coo1(ha2_pos+1,1)=aa_group(ii,ip)%coo1(j,1)
+					temp_group(ii,ic)%coo1(ha2_pos+1,2)=aa_group(ii,ip)%coo1(j,2)
+					temp_group(ii,ic)%coo1(ha2_pos+1,3)=aa_group(ii,ip)%coo1(j,3)
+					goto 31
+				endif
+31				continue
+			enddo
 			temp_group(ii,ic)%cnum2=aa_group(ii,ip)%cnum2
 		else
 			temp_group(ii,ic)%gtype=aa_group(ii,ip)%gtype		
@@ -5276,8 +5447,7 @@ module advancedfunction
 	use energy_calculation
 
     contains
-    
-    
+
     subroutine replace_extra_restricted_aa(group, temp_group)
 	implicit none
 	integer 			:: restrict_count, non_restrict_count, restrict_locs(40), non_restrict_locs(40), chainID, index
@@ -5379,7 +5549,7 @@ module advancedfunction
 	ii=1
 	do ic=1, gnum
 		do j=1,void_site_num
-			if(ic.ge.void_site_start(j).and.ic.le.void_site_end(j)) then 
+			if(ic == void_site(j)) then
 				goto 15
 			endif
         enddo
@@ -5571,6 +5741,7 @@ module advancedfunction
 	integer								:: chainID, i, j, k, ic, account_num, flag, stage, trial_count
 	integer								:: S_numex(60), S_inb(60,20), S_numex4(60), S_inb4(60, 60)
 	integer								:: dihedral_num	
+	integer, parameter					:: max_sidechain_grade=6
 	real								:: delta_chi, cos_angle, sin_angle, error, t
 	real								:: CA(3), rotaxis_x, rotaxis_y, rotaxis_z, rotaxis(3), m(3,3), Tmember(15,3)
 	real(kind=16)                       :: h2_denominator, h3_denominator, Tenergy_min, Tenergy
@@ -5581,19 +5752,28 @@ module advancedfunction
 	type(conformer4sidechain)			:: Iclass(6), Tclass(6), class_old(6), class_new(6), class_min(6)
 	type(dihedralparameters)			:: dihedral	
 	
-	real(kind=16), dimension(:), allocatable 	:: energy_forward, energy_backward
-	real(kind=16), dimension(:,:), allocatable 	:: gradient_old, gradient_new, Hessian_old, Hessian_new
-	real(kind=16), dimension(:,:), allocatable   :: H2, H3, H31
-	real(kind=16), dimension(:,:), allocatable	:: d, y, s, Tchi
+	real(kind=16)						:: energy_forward(max_sidechain_grade), energy_backward(max_sidechain_grade)
+	real(kind=16)						:: gradient_old(max_sidechain_grade,1), gradient_new(max_sidechain_grade,1)
+	real(kind=16)						:: Hessian_old(max_sidechain_grade,max_sidechain_grade), Hessian_new(max_sidechain_grade,max_sidechain_grade)
+	real(kind=16)						:: H2(max_sidechain_grade,max_sidechain_grade), H3(max_sidechain_grade,max_sidechain_grade), H31(max_sidechain_grade,1)
+	real(kind=16)						:: d(max_sidechain_grade,1), y(max_sidechain_grade,1), s(max_sidechain_grade,1), Tchi(max_sidechain_grade,1)
 
 	call sidechain_category(chainID, ic, group, Iclass, grade, grade_num, index, monitor) ! find AA's side-chain info
 	call dihedralangle_reading(group(chainID,ic)%gtype, dihedral_num, dihedral)			  ! find AA's dihedral angle info
 
-	allocate(energy_forward(grade)); allocate(energy_backward(grade))
-	allocate(gradient_old(grade,1)); allocate(gradient_new(grade,1))
-	allocate(Hessian_old(grade,grade)); allocate(Hessian_new(grade,grade))
-	allocate(H2(grade,grade)); allocate(H3(grade,grade)); allocate(H31(grade,1))
-	allocate(d(grade,1)); allocate(y(grade,1)); allocate(s(grade,1))
+	energy_forward=0.0_16
+	energy_backward=0.0_16
+	gradient_old=0.0_16
+	gradient_new=0.0_16
+	Hessian_old=0.0_16
+	Hessian_new=0.0_16
+	H2=0.0_16
+	H3=0.0_16
+	H31=0.0_16
+	d=0.0_16
+	y=0.0_16
+	s=0.0_16
+	Tchi=0.0_16
 
 	Tgroup=group
 	do i=1, Tgroup(chainID,ic)%cnum1
@@ -5601,7 +5781,7 @@ module advancedfunction
 			CA(1)=Tgroup(chainID,ic)%coo1(i,1); CA(2)=Tgroup(chainID,ic)%coo1(i,2); CA(3)=Tgroup(chainID,ic)%coo1(i,3)
 		endif
 	enddo
-	s=0.0
+	s=0.0_16
 	class_new=Iclass
 
 30	continue
@@ -5725,7 +5905,6 @@ module advancedfunction
 		gradient_old=gradient_new
 		d=-matmul(Hessian_old, gradient_old)
 		
-		allocate(Tchi(grade,1))
 		trial_count=0
 		do while(.true.)
 			class_old=Iclass
@@ -5817,7 +5996,6 @@ module advancedfunction
 			t=delta_chi
 		enddo
 10		continue
-		deallocate(Tchi)
 		if(stage==0) then
 			if(account_num.gt.20) goto 20
 		elseif(stage==1) then
@@ -5957,12 +6135,6 @@ module advancedfunction
 
 	Iclass=class_min
 
-	deallocate(energy_forward); deallocate(energy_backward)
-	deallocate(gradient_old); deallocate(gradient_new)
-	deallocate(Hessian_old); deallocate(Hessian_new)
-	deallocate(H2); deallocate(H3); deallocate(H31)	
-	deallocate(d); deallocate(y); deallocate(s)
-	
 	do i=1, group(chainID,ic)%cnum2
 		group(chainID,ic)%coo2(i,1)=Iclass(index(i)%class_No)%member(index(i)%member_No,1)
 		group(chainID,ic)%coo2(i,2)=Iclass(index(i)%class_No)%member(index(i)%member_No,2)
@@ -5990,7 +6162,54 @@ module optimization_techniques
 	use energy_calculation
 	use advancedfunction	
 
+	type(groupdetails), allocatable, save			:: opt_temp_group(:,:), opt_aa_group(:,:)
+	type(energyparameters), allocatable, save		:: opt_group_para(:,:)
+	integer, allocatable, save						:: opt_numex(:), opt_numex4(:), opt_inb(:,:), opt_inb4(:,:)
+
 	contains
+	subroutine ensure_optimization_workspace()
+	implicit none
+
+	if(.not.allocated(opt_temp_group)) allocate(opt_temp_group(repeated_unit,gnum))
+	if(.not.allocated(opt_aa_group)) allocate(opt_aa_group(repeated_unit,40))
+	if(.not.allocated(opt_group_para)) allocate(opt_group_para(repeated_unit,gnum))
+	if(.not.allocated(opt_numex)) allocate(opt_numex(repeated_unit*atom_num))
+	if(.not.allocated(opt_numex4)) allocate(opt_numex4(repeated_unit*atom_num))
+	if(.not.allocated(opt_inb)) allocate(opt_inb(repeated_unit*atom_num,20))
+	if(.not.allocated(opt_inb4)) allocate(opt_inb4(repeated_unit*atom_num,60))
+
+	return
+	end subroutine ensure_optimization_workspace
+
+	subroutine replace_single_site_aa(group)
+	implicit none
+	integer							:: i, ic, feedback
+	character*4						:: aminoacid_name, cur_aminoacid_name
+	type(groupdetails)				:: group(repeated_unit,gnum), temp_group(repeated_unit,gnum)
+
+	do i=1, void_site_num
+		if(len_trim(void_site_fixed_name(i)) == 0) cycle
+		ic = void_site(i)
+		aminoacid_name = void_site_fixed_name(i)
+		cur_aminoacid_name = group(1,ic)%gtype
+		if((cur_aminoacid_name==aminoacid_name).or.(cur_aminoacid_name=="ACE").or.(cur_aminoacid_name=="NME")) cycle
+
+		call sequence_mutation_nonthermal(ic, group, aminoacid_name, temp_group, feedback)
+		if(feedback == 1) then
+			group = temp_group
+		else
+			open(20, file="error.txt", access="append")
+				write(20,*) "Unable to apply single-site constraint at site ", ic, " to ", aminoacid_name
+			close(20)
+			stop "ERROR: unable to apply single-site constraint at site "
+		endif
+	enddo
+
+	original_group = group
+
+	return
+	end subroutine replace_single_site_aa
+
 	subroutine MC_technique_sequence(score_old, energy_old, entropy_old, score4hydration_old, Pagg_old, group, entropy4individual, score_new, energy_new, entropy_new, score4hydration_new, Pagg_new, tgroup, Tentropy4individual, feedback)
 	implicit none
 	integer							:: feedback
@@ -6086,14 +6305,9 @@ module optimization_techniques
 
 	type(groupdetails)				:: aa_backup
 	type(groupdetails)				:: group(repeated_unit,gnum), tgroup(repeated_unit,gnum)
-	type(groupdetails), dimension(:,:), allocatable &
-									:: temp_group, aa_group
-	type(energyparameters), dimension(:,:), allocatable &
-									:: tgroup_para
 
-
-	allocate(aa_group(repeated_unit,40))
-	call findrotamer(ic, group, aminoacid_name, rotanum, aa_group, ip)
+	call ensure_optimization_workspace()
+	call findrotamer(ic, group, aminoacid_name, rotanum, opt_aa_group, ip)
 	
 	flag=0
 	if(aminoacid_name=="GLY".or.aminoacid_name=="ALA".or.aminoacid_name=="PRO".or. &
@@ -6101,29 +6315,26 @@ module optimization_techniques
 	   aminoacid_name=="CGLY".or.aminoacid_name=="CALA".or.aminoacid_name=="CPRO".or. &
 	   aminoacid_name=="NME".or.aminoacid_name=="NHE".or.aminoacid_name=="ACE") then	
 
-		allocate(temp_group(repeated_unit,gnum))
-		allocate(tgroup_para(repeated_unit,gnum))
-
 		tgroup=group
 		do chainID=1, repeated_unit
 				
 			m_best=0
 			vdw_energy_min=500.0
 			do m=1, rotanum
-				call residue_replace(chainID, ic, tgroup, m, aa_group, temp_group)
+				call residue_replace(chainID, ic, tgroup, m, opt_aa_group, opt_temp_group)
 
 				if(m==1) then
-					call energy_parameter(temp_group, tgroup_para)
-					call atom_links4sidechain(chainID, ic, temp_group, S_numex, S_inb, S_numex4, S_inb4)
+					call energy_parameter(opt_temp_group, opt_group_para)
+					call atom_links4sidechain(chainID, ic, opt_temp_group, S_numex, S_inb, S_numex4, S_inb4)
 				endif
 
-				call check_transplant(chainID, ic, temp_group, feedback)
+				call check_transplant(chainID, ic, opt_temp_group, feedback)
 
 				if(feedback==1) then
-					call vdwenergy(chainID, ic, temp_group, tgroup_para, vdw_energy)
+					call vdwenergy(chainID, ic, opt_temp_group, opt_group_para, vdw_energy)
 					if(vdw_energy.lt.vdw_energy_min) then
 						vdw_energy_min=vdw_energy
-						call backup4sidechain(0, chainID, ic, temp_group, aa_backup)
+						call backup4sidechain(0, chainID, ic, opt_temp_group, aa_backup)
 						m_best=m
 					endif
 				endif
@@ -6135,13 +6346,8 @@ module optimization_techniques
 
 		flag=1
 10		continue
-		deallocate(tgroup_para)
-		deallocate(temp_group)
 
 	else
-		allocate(temp_group(repeated_unit,gnum))
-		allocate(tgroup_para(repeated_unit,gnum))
-
 		tgroup=group
         vdw_energy_min=1000000000.0*gnum
         
@@ -6150,21 +6356,21 @@ module optimization_techniques
 			m_best=0            
 			score_min=500.0
 			do m=1, rotanum
-				call residue_replace(chainID, ic, tgroup, m, aa_group, temp_group)
+				call residue_replace(chainID, ic, tgroup, m, opt_aa_group, opt_temp_group)
 				if(m==1) then
-					call energy_parameter(temp_group, tgroup_para)
-					call atom_links4sidechain(chainID, ic, temp_group, S_numex, S_inb, S_numex4, S_inb4)
-					call atom_links(temp_group, W_numex, W_inb, W_numex4, W_inb4)
+					call energy_parameter(opt_temp_group, opt_group_para)
+					call atom_links4sidechain(chainID, ic, opt_temp_group, S_numex, S_inb, S_numex4, S_inb4)
+					call atom_links(opt_temp_group, W_numex, W_inb, W_numex4, W_inb4)
 				endif
 					
 				stage=0
-				call sidechain_optimization(stage, chainID, ic, temp_group, tgroup_para, S_numex, S_inb, S_numex4, S_inb4, Dihedral4entropy)
+				call sidechain_optimization(stage, chainID, ic, opt_temp_group, opt_group_para, S_numex, S_inb, S_numex4, S_inb4, Dihedral4entropy)
 
 				if(stage==1) then
-					call bindingenergy_noentropy(temp_group, tgroup_para, W_numex, W_inb, W_numex4, W_inb4, score, binding_energy, vdw_energy, score4hydration, Pagg)
+					call bindingenergy_noentropy(opt_temp_group, opt_group_para, W_numex, W_inb, W_numex4, W_inb4, score, binding_energy, vdw_energy, score4hydration, Pagg)
 					if((score.lt.score_min) .and. (vdw_energy.lt.vdw_energy_min)) then
 						score_min=score
-						call backup4sidechain(0, chainID, ic, temp_group, aa_backup)
+						call backup4sidechain(0, chainID, ic, opt_temp_group, aa_backup)
 						m_best=m
 					endif
 				endif
@@ -6176,10 +6382,7 @@ module optimization_techniques
 
 		flag=1
 20		continue
-		deallocate(tgroup_para)
-		deallocate(temp_group)
 	endif
-	deallocate(aa_group)
 	
 	return
 	end subroutine sequence_mutation_nonthermal
@@ -6202,13 +6405,9 @@ module optimization_techniques
 
 	type(groupdetails)				:: aa_backup
 	type(groupdetails)				:: group(repeated_unit,gnum), tgroup(repeated_unit,gnum)
-	type(groupdetails), dimension(:,:), allocatable &
-									:: temp_group, aa_group
-	type(energyparameters), dimension(:,:), allocatable &
-									:: tgroup_para
 
-	allocate(aa_group(repeated_unit,40))
-	call findrotamer(ic, group, aminoacid_name, rotanum, aa_group, ip)
+	call ensure_optimization_workspace()
+	call findrotamer(ic, group, aminoacid_name, rotanum, opt_aa_group, ip)
 	grade=aa_lib(ip)%grade
 	
 	flag=0
@@ -6217,9 +6416,6 @@ module optimization_techniques
 	   aminoacid_name=="CGLY".or.aminoacid_name=="CALA".or.aminoacid_name=="CPRO".or. &
 	   aminoacid_name=="NME".or.aminoacid_name=="NHE".or.aminoacid_name=="ACE") then	
 
-		allocate(temp_group(repeated_unit,gnum))
-		allocate(tgroup_para(repeated_unit,gnum))
-
 		tgroup=group
 		Tentropy4individual=entropy4individual
 		do chainID=1, repeated_unit
@@ -6227,20 +6423,20 @@ module optimization_techniques
 			m_best=0
 			vdw_energy_min=500.0
 			do m=1, rotanum
-				call residue_replace(chainID, ic, tgroup, m, aa_group, temp_group)
+				call residue_replace(chainID, ic, tgroup, m, opt_aa_group, opt_temp_group)
 
 				if(m==1) then
-					call energy_parameter(temp_group, tgroup_para)
-					call atom_links4sidechain(chainID, ic, temp_group, S_numex, S_inb, S_numex4, S_inb4)
+					call energy_parameter(opt_temp_group, opt_group_para)
+					call atom_links4sidechain(chainID, ic, opt_temp_group, S_numex, S_inb, S_numex4, S_inb4)
 				endif
 
-				call check_transplant(chainID, ic, temp_group, feedback)
+				call check_transplant(chainID, ic, opt_temp_group, feedback)
 
 				if(feedback==1) then
-					call vdwenergy(chainID, ic, temp_group, tgroup_para, vdw_energy)
+					call vdwenergy(chainID, ic, opt_temp_group, opt_group_para, vdw_energy)
 					if(vdw_energy.lt.vdw_energy_min) then
 						vdw_energy_min=vdw_energy
-						call backup4sidechain(0, chainID, ic, temp_group, aa_backup)
+						call backup4sidechain(0, chainID, ic, opt_temp_group, aa_backup)
 						m_best=m
 					endif
 				endif
@@ -6255,13 +6451,8 @@ module optimization_techniques
 		
 		flag=1
 10		continue
-		deallocate(tgroup_para)
-		deallocate(temp_group)
 											
 	else
-		allocate(temp_group(repeated_unit,gnum))
-		allocate(tgroup_para(repeated_unit,gnum))
-
 		tgroup=group
 		Tentropy4individual=entropy4individual
         vdw_energy_min=1000000000.0*gnum
@@ -6272,15 +6463,15 @@ module optimization_techniques
 			obs=0
 			matrix=0.0
 			do m=1, rotanum
-				call residue_replace(chainID, ic, tgroup, m, aa_group, temp_group)
+				call residue_replace(chainID, ic, tgroup, m, opt_aa_group, opt_temp_group)
 				if(m==1) then
-					call energy_parameter(temp_group, tgroup_para)
-					call atom_links4sidechain(chainID, ic, temp_group, S_numex, S_inb, S_numex4, S_inb4)
-					call atom_links(temp_group, W_numex, W_inb, W_numex4, W_inb4)
+					call energy_parameter(opt_temp_group, opt_group_para)
+					call atom_links4sidechain(chainID, ic, opt_temp_group, S_numex, S_inb, S_numex4, S_inb4)
+					call atom_links(opt_temp_group, W_numex, W_inb, W_numex4, W_inb4)
 				endif
 					
 				stage=0
-				call sidechain_optimization(stage, chainID, ic, temp_group, tgroup_para, S_numex, S_inb, S_numex4, S_inb4, Dihedral4entropy)
+				call sidechain_optimization(stage, chainID, ic, opt_temp_group, opt_group_para, S_numex, S_inb, S_numex4, S_inb4, Dihedral4entropy)
 						
 				if(stage==1) then
 					obs=obs+1
@@ -6288,10 +6479,10 @@ module optimization_techniques
 						matrix(obs,j)=Dihedral4entropy(j) ! why not pick the matrix with low
 					enddo
 						
-					call bindingenergy_noentropy(temp_group, tgroup_para, W_numex, W_inb, W_numex4, W_inb4, score, binding_energy, vdw_energy, score4hydration, Pagg)
+					call bindingenergy_noentropy(opt_temp_group, opt_group_para, W_numex, W_inb, W_numex4, W_inb4, score, binding_energy, vdw_energy, score4hydration, Pagg)
 					if((score.lt.score_min) .and. (vdw_energy.lt.vdw_energy_min)) then !.and. vdw.lt.vdw_min
 						score_min=score
-						call backup4sidechain(0, chainID, ic, temp_group, aa_backup)
+						call backup4sidechain(0, chainID, ic, opt_temp_group, aa_backup)
 						m_best=m
 					endif
 				endif
@@ -6305,10 +6496,7 @@ module optimization_techniques
 		
 		flag=1
 20		continue
-		deallocate(tgroup_para)
-		deallocate(temp_group)
 	endif
-	deallocate(aa_group)
 
 	return
 	end subroutine sequence_mutation
@@ -6328,14 +6516,9 @@ module optimization_techniques
 
 	type(groupdetails)				:: aa_backup
 	type(groupdetails)				:: group(repeated_unit,gnum), tgroup(repeated_unit,gnum)
-	type(groupdetails), dimension(:,:), allocatable &
-									:: temp_group, aa_group
-	type(energyparameters), dimension(:,:), allocatable &
-									:: tgroup_para
 
-
-	allocate(aa_group(repeated_unit,40))
-	call findrotamer(ic, group, aminoacid_name, rotanum, aa_group, ip)
+	call ensure_optimization_workspace()
+	call findrotamer(ic, group, aminoacid_name, rotanum, opt_aa_group, ip)
 	
 	flag=0
 	if(aminoacid_name=="GLY".or.aminoacid_name=="ALA".or.aminoacid_name=="PRO".or. &
@@ -6343,26 +6526,23 @@ module optimization_techniques
 	   aminoacid_name=="CGLY".or.aminoacid_name=="CALA".or.aminoacid_name=="CPRO".or. &
 	   aminoacid_name=="NME".or.aminoacid_name=="NHE".or.aminoacid_name=="ACE") then	
 
-		allocate(temp_group(repeated_unit,gnum))
-		allocate(tgroup_para(repeated_unit,gnum))
-
 		tgroup=group
 		m_best=0
 		vdw_energy_min=500.0
 		do m=1, rotanum
-			call residue_replace(chainID, ic, tgroup, m, aa_group, temp_group)
+			call residue_replace(chainID, ic, tgroup, m, opt_aa_group, opt_temp_group)
 
 			if(m==1) then
-				call energy_parameter(temp_group, tgroup_para)
-				call atom_links4sidechain(chainID, ic, temp_group, S_numex, S_inb, S_numex4, S_inb4)
+				call energy_parameter(opt_temp_group, opt_group_para)
+				call atom_links4sidechain(chainID, ic, opt_temp_group, S_numex, S_inb, S_numex4, S_inb4)
 			endif
-			call check_transplant(chainID, ic, temp_group, feedback)
+			call check_transplant(chainID, ic, opt_temp_group, feedback)
 
 			if(feedback==1) then
-				call vdwenergy(chainID, ic, temp_group, tgroup_para, vdw_energy)
+				call vdwenergy(chainID, ic, opt_temp_group, opt_group_para, vdw_energy)
 				if(vdw_energy.lt.vdw_energy_min) then
 					vdw_energy_min=vdw_energy
-					call backup4sidechain(0, chainID, ic, temp_group, aa_backup)
+					call backup4sidechain(0, chainID, ic, opt_temp_group, aa_backup)
 					m_best=m
 				endif
 			endif
@@ -6373,33 +6553,28 @@ module optimization_techniques
 
 		flag=1
 10		continue
-		deallocate(tgroup_para)
-		deallocate(temp_group)
 
 	else
-		allocate(temp_group(repeated_unit,gnum))
-		allocate(tgroup_para(repeated_unit,gnum))
-
 		tgroup=group
 		m_best=0
         vdw_energy_min=1000000000.0*gnum
 		score_min=500.0
 		do m=1, rotanum
-			call residue_replace(chainID, ic, tgroup, m, aa_group, temp_group)
+			call residue_replace(chainID, ic, tgroup, m, opt_aa_group, opt_temp_group)
 			if(m==1) then
-				call energy_parameter(temp_group, tgroup_para)
-				call atom_links4sidechain(chainID, ic, temp_group, S_numex, S_inb, S_numex4, S_inb4)
-				call atom_links(temp_group, W_numex, W_inb, W_numex4, W_inb4)
+				call energy_parameter(opt_temp_group, opt_group_para)
+				call atom_links4sidechain(chainID, ic, opt_temp_group, S_numex, S_inb, S_numex4, S_inb4)
+				call atom_links(opt_temp_group, W_numex, W_inb, W_numex4, W_inb4)
 			endif
 					
 			stage=0
-			call sidechain_optimization(stage, chainID, ic, temp_group, tgroup_para, S_numex, S_inb, S_numex4, S_inb4, Dihedral4entropy)
+			call sidechain_optimization(stage, chainID, ic, opt_temp_group, opt_group_para, S_numex, S_inb, S_numex4, S_inb4, Dihedral4entropy)
 
 			if(stage==1) then
-				call bindingenergy_noentropy(temp_group, tgroup_para, W_numex, W_inb, W_numex4, W_inb4, score, binding_energy, vdw_energy, score4hydration, Pagg)
+				call bindingenergy_noentropy(opt_temp_group, opt_group_para, W_numex, W_inb, W_numex4, W_inb4, score, binding_energy, vdw_energy, score4hydration, Pagg)
                 if(score.lt.score_min .and. vdw_energy.lt.vdw_energy_min) then
 					score_min=score
-					call backup4sidechain(0, chainID, ic, temp_group, aa_backup)
+					call backup4sidechain(0, chainID, ic, opt_temp_group, aa_backup)
 					m_best=m
 				endif
 			endif
@@ -6410,10 +6585,7 @@ module optimization_techniques
 
 		flag=1
 20		continue
-		deallocate(tgroup_para)
-		deallocate(temp_group)
 	endif
-	deallocate(aa_group)
 	
 	return
 	
@@ -6474,11 +6646,8 @@ module optimization_techniques
 	character*4						:: aminoacid_name
 
 	type(groupdetails)				:: group(repeated_unit,gnum)
-	type(groupdetails), dimension(:,:), allocatable &
-									:: temp_group, aa_group
-	type(energyparameters), dimension(:,:), allocatable &
-									:: tgroup_para
 
+	call ensure_optimization_workspace()
 	entropy4individual=0.0
 	do ii=1, repeated_unit
 		do ic=1,gnum
@@ -6493,25 +6662,21 @@ module optimization_techniques
 				call entropy_calculation(aminoacid_name,rotanum,matrix,obs,grade,entropy)
 				entropy4individual(ii,ic)=entropy
 			else
-				allocate(aa_group(repeated_unit,40))
-				call findrotamer(ic, group, aminoacid_name, rotanum, aa_group, ip)
+				call findrotamer(ic, group, aminoacid_name, rotanum, opt_aa_group, ip)
 				grade=aa_lib(ip)%grade
-
-				allocate(temp_group(repeated_unit,gnum))
-				allocate(tgroup_para(repeated_unit,gnum))
 
 				obs=0
 				matrix=0.0
 				do m=1, rotanum
-					call residue_replace(ii, ic, group, m, aa_group, temp_group)
+					call residue_replace(ii, ic, group, m, opt_aa_group, opt_temp_group)
 					if(m==1) then
-						call energy_parameter(temp_group, tgroup_para)
-						call atom_links4sidechain(ii, ic, temp_group, S_numex, S_inb, S_numex4, S_inb4)
-						call atom_links(temp_group, W_numex, W_inb, W_numex4, W_inb4)
+						call energy_parameter(opt_temp_group, opt_group_para)
+						call atom_links4sidechain(ii, ic, opt_temp_group, S_numex, S_inb, S_numex4, S_inb4)
+						call atom_links(opt_temp_group, W_numex, W_inb, W_numex4, W_inb4)
 					endif
 
 					stage=0
-					call sidechain_optimization(stage, ii, ic, temp_group, tgroup_para, S_numex, S_inb, S_numex4, S_inb4, Dihedral4entropy)
+					call sidechain_optimization(stage, ii, ic, opt_temp_group, opt_group_para, S_numex, S_inb, S_numex4, S_inb4, Dihedral4entropy)
 
 					if(stage==1) then
 						obs=obs+1
@@ -6523,10 +6688,6 @@ module optimization_techniques
 
 				call entropy_calculation(aminoacid_name,rotanum,matrix,obs,grade,entropy)
 				entropy4individual(ii,ic)=entropy
-		
-				deallocate(tgroup_para)
-				deallocate(temp_group)
-				deallocate(aa_group)
 			endif		
 		enddo
 	enddo
@@ -6646,6 +6807,7 @@ module optimization_techniques
 	integer, dimension(:,:), allocatable &
 									:: W_inb, W_inb4
 	
+	call ensure_optimization_workspace()
     feedback_2=0
     feedback_3=0
     !penalty=0
@@ -6662,20 +6824,12 @@ module optimization_techniques
 			call sequence_mutation(ic_1, group, entropy4individual, aminoacid_name_1, tgroup, Tentropy4individual, feedback_1)
 
 			if(feedback_1==1) then
-				allocate(group_para(repeated_unit,gnum))
-				allocate(W_numex(repeated_unit*atom_num)); allocate(W_numex4(repeated_unit*atom_num))
-				allocate(W_inb(repeated_unit*atom_num,20)); allocate(W_inb4(repeated_unit*atom_num,60))
-				
-				call atom_links(tgroup, W_numex, W_inb, W_numex4, W_inb4)
-				call energy_parameter(tgroup, group_para)
+				call atom_links(tgroup, opt_numex, opt_inb, opt_numex4, opt_inb4)
+				call energy_parameter(tgroup, opt_group_para)
 
-				call bindingenergy(tgroup, group_para, Tentropy4individual, W_numex, W_inb, W_numex4, W_inb4, score_new, binding_energy_new, entropy_new, score4hydration_new, Pagg_new)
+				call bindingenergy(tgroup, opt_group_para, Tentropy4individual, opt_numex, opt_inb, opt_numex4, opt_inb4, score_new, binding_energy_new, entropy_new, score4hydration_new, Pagg_new)
                 !MC 方法 判断是否接受新的变化 如果分数更低就接受，如果分数变高，取随机数和exp(-E/kT)比较，是否接受
 				call MC_technique_sequence(score_old, binding_energy_old, entropy_old, score4hydration_old, Pagg_old, group, entropy4individual, score_new, binding_energy_new, entropy_new, score4hydration_new, Pagg_new, tgroup, Tentropy4individual, feedback_3)
-
-				deallocate(W_inb); deallocate(W_inb4)
-				deallocate(W_numex); deallocate(W_numex4)
-				deallocate(group_para)
 			endif
 			
 			if(feedback_3==1) then
@@ -6739,19 +6893,11 @@ module optimization_techniques
 				call sequence_mutation(ic_2, temp_group, temp_entropy4individual, aminoacid_name_2, tgroup, Tentropy4individual, feedback_2)
 
 				if(feedback_2==1) then
-					allocate(group_para(repeated_unit,gnum))
-					allocate(W_numex(repeated_unit*atom_num)); allocate(W_numex4(repeated_unit*atom_num))
-					allocate(W_inb(repeated_unit*atom_num,20)); allocate(W_inb4(repeated_unit*atom_num,60))
-					
-					call atom_links(tgroup, W_numex, W_inb, W_numex4, W_inb4)
-					call energy_parameter(tgroup, group_para)
+					call atom_links(tgroup, opt_numex, opt_inb, opt_numex4, opt_inb4)
+					call energy_parameter(tgroup, opt_group_para)
 		
-					call bindingenergy(tgroup, group_para, Tentropy4individual, W_numex, W_inb, W_numex4, W_inb4, score_new, binding_energy_new, entropy_new, score4hydration_new, Pagg_new)
+					call bindingenergy(tgroup, opt_group_para, Tentropy4individual, opt_numex, opt_inb, opt_numex4, opt_inb4, score_new, binding_energy_new, entropy_new, score4hydration_new, Pagg_new)
 					call MC_technique_sequence(score_old, binding_energy_old, entropy_old, score4hydration_old, Pagg_old, group, entropy4individual, score_new, binding_energy_new, entropy_new, score4hydration_new, Pagg_new, tgroup, Tentropy4individual, feedback_3)
-
-					deallocate(W_inb); deallocate(W_inb4)
-					deallocate(W_numex); deallocate(W_numex4)
-					deallocate(group_para)
 				endif
 			endif
 
@@ -6827,6 +6973,8 @@ module optimization_techniques
 	integer, dimension(:), allocatable :: W_numex, W_numex4
 	integer, dimension(:,:), allocatable :: W_inb, W_inb4
 
+	call ensure_optimization_workspace()
+
 !*********************************************************************************
 !Here ip1 decides whether the sheet moves in +x, -x, +y, -y, +z and -z direction 
 !ip1=1 moves sheet in x and -x
@@ -6880,7 +7028,7 @@ module optimization_techniques
 !Rotamer repacking
 		do ic_1=1, gnum
 			do j=1, void_site_num
-				if(ic_1.ge.void_site_start(j).and.ic_1.le.void_site_end(j)) then 
+				if(ic_1 == void_site(j)) then
 				goto 15
 			endif
 			enddo
@@ -6896,24 +7044,16 @@ module optimization_techniques
 15			continue
 		enddo
 !********************************************				
-		allocate(group_para(repeated_unit,gnum))
-		allocate(W_numex(repeated_unit*atom_num)); allocate(W_numex4(repeated_unit*atom_num))
-		allocate(W_inb(repeated_unit*atom_num,20)); allocate(W_inb4(repeated_unit*atom_num,60))
-				
-		call atom_links(temp_group, W_numex, W_inb, W_numex4, W_inb4)
-		call energy_parameter(temp_group, group_para)
+		call atom_links(temp_group, opt_numex, opt_inb, opt_numex4, opt_inb4)
+		call energy_parameter(temp_group, opt_group_para)
 		
-        call bindingenergy(temp_group, group_para, temp_entropy4individual, W_numex, W_inb, W_numex4, W_inb4, score_new, binding_energy_new, entropy_new, score4hydration_new, Pagg_new)
+        call bindingenergy(temp_group, opt_group_para, temp_entropy4individual, opt_numex, opt_inb, opt_numex4, opt_inb4, score_new, binding_energy_new, entropy_new, score4hydration_new, Pagg_new)
 		call MC_technique_sheet(score_old, binding_energy_old, entropy_old, score4hydration_old, Pagg_old, Tgroup, entropy4individual, score_new, binding_energy_new, entropy_new, score4hydration_new, Pagg_new, temp_group, temp_entropy4individual, feedback_2)
 
 		if(feedback_2==1) then
 			flag4sheet=1
 		endif
 			
-		deallocate(W_inb); deallocate(W_inb4)
-		deallocate(W_numex); deallocate(W_numex4)
-		deallocate(group_para)
-	
 		group=Tgroup
 			
 !If no rotamer combinations were found print previous peptide information otherwise print new peptide information	
@@ -7016,11 +7156,13 @@ Program ProteinDesign
     allocate(group(repeated_unit,gnum))
     
     call init_random_seed()
+    call execute_command_line('mkdir pdbfiles')
 	call readpdb(group) ! 读取peptide的坐标，种类等等
 	call rotamerlib  
     
 	if(recalcu_switch==0) then
 		allocate(temp_group(repeated_unit,gnum))
+		call replace_single_site_aa(group)
 		call scmf_substitution(group, sub_circle, temp_group)
 		if(sub_circle.ne.0) then
 			group=temp_group
@@ -7112,13 +7254,7 @@ Program ProteinDesign
             endif				
         endif
         
-        !open(5,file="rmsd.txt",access="append")
-        !call rmsd_calc(1, group, rmsd_x)
-        !call rmsd_calc(2, group, rmsd_y)
-        !call rmsd_calc(3, group, rmsd_z)
         call rmsd_calc(4, group, rmsd)
-        !write(5,*) step, rmsd_x, rmsd_y, rmsd_z, rmsd
-        !close(5)
         
         call convert_AA_name(group, pep_name)
 		open(5, file="energyprofile.txt", access="append")
