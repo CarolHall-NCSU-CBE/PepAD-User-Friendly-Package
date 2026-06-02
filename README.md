@@ -132,7 +132,7 @@ Once the input files are prepared, users can submit the following example script
 
 - ΔTS<sub>conf</sub>: Configuration entropy, unit: kcal/mol
 
-- P<sub>:aggregation</sub>: Aggregation propensity, unit: kcal/mol
+- P<sub>aggregation</sub>: Aggregation propensity, unit: kcal/mol
 
 - $$\lambda$$: Aggregation propensity weighting factor, unit: 1
 
