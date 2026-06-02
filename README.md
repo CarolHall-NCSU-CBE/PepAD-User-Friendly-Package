@@ -105,7 +105,7 @@ The 'input.txt' contains the necessary parameters for designing a fibril structu
 | Constraints | Single-site positional constraint | Sequence sites where residues remain unchanged entire PepAD run. Terminal caps should also be specified here if capped peptides are used. Users may also specify a specific amino acid at a constrained site at the beginning of the run.  Examples: <br>`1 3 16`<br> `= 4:LEU`<br> `1:ACE 16:NME`<br> |
 | Constraints | Grouped-site positional constraint amino acid pool | Amino acids that are allowed to be placed on the sites of grouped-site positional constraint. |
 | Constraints | Grouped-site positional constraint | Sequence sites that are collectively assigned amino acids from the grouped-site amino acid pool without repetition. |
-| Constraints | Constraints on the number of certain amino acids | Compositional constraints on number of selected amino acids. Examples: <br>`MET=0`<br> `ALA>=2`<br> `ASN<=5`<br> |
+| Constraints | Constraints on the number of certain amino acids | Compositional constraints on number of selected amino acids. Examples: <br>`MET=0`<br> `ALA>=2`<br> `ASN<=5`<br> `PHE=1`<br> |
 
 ### Execute
 Once the input files are prepared, users can submit the following example script to run PepAD:
