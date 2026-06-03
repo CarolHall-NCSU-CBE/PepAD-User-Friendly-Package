@@ -1,15 +1,9 @@
 name: buildpep
 channels:
   - conda-forge
-  - bioconda
   - defaults
 dependencies:
   - numpy
   - pandas
-  - scipy
-  - matplotlib
-  - biopython
-  - pip
-  - pip:
-      - PeptideBuilder
-      - hydride
+
+
