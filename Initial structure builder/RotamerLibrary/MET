@@ -1,0 +1,17 @@
+ATOM     21  N   MET A   4      -0.189   0.084   0.498
+ATOM     22  H   MET A   4      -0.715  -0.668   0.997
+ATOM     23  CA  MET A   4      -0.929   0.864  -0.484
+ATOM     24  HA  MET A   4      -0.585   1.907  -0.429
+ATOM     25  CB  MET A   4      -0.687   0.332  -1.898
+ATOM     26  HB2 MET A   4      -1.202   0.985  -2.617
+ATOM     27  HB3 MET A   4       0.389   0.394  -2.122
+ATOM     28  CG  MET A   4      -1.152  -1.099  -2.111
+ATOM     29  HG2 MET A   4      -0.636  -1.757  -1.395
+ATOM     30  HG3 MET A   4      -2.229  -1.166  -1.892
+ATOM     31  SD  MET A   4      -0.850  -1.689  -3.785
+ATOM     32  CE  MET A   4       0.919  -1.965  -3.733
+ATOM     33  HE1 MET A   4       1.138  -2.829  -3.088
+ATOM     34  HE2 MET A   4       1.290  -2.165  -4.749
+ATOM     35  HE3 MET A   4       1.419  -1.073  -3.329
+ATOM     36  C   MET A   4      -2.430   0.834  -0.147
+ATOM     37  O   MET A   4      -3.062   1.851  -0.175

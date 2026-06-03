@@ -1,0 +1,17 @@
+ATOM     21  N   GLN A   4      -0.233  -0.427  -0.947
+ATOM     22  H   GLN A   4      -0.225  -1.396  -0.707
+ATOM     23  CA  GLN A   4       0.550   0.551  -0.201
+ATOM     24  HA  GLN A   4      -0.001   1.500  -0.131
+ATOM     25  CB  GLN A   4       0.908   0.072   1.207
+ATOM     26  HB2 GLN A   4       1.436   0.880   1.735
+ATOM     27  HB3 GLN A   4      -0.021  -0.121   1.764
+ATOM     28  CG  GLN A   4       1.770  -1.180   1.237
+ATOM     29  HG2 GLN A   4       1.246  -1.993   0.714
+ATOM     30  HG3 GLN A   4       2.703  -0.991   0.686
+ATOM     31  CD  GLN A   4       2.104  -1.623   2.647
+ATOM     32  OE1 GLN A   4       1.426  -1.248   3.604
+ATOM     33  NE2 GLN A   4       3.152  -2.428   2.780
+ATOM     34 HE21 GLN A   4       3.420  -2.755   3.686
+ATOM     35 HE22 GLN A   4       3.673  -2.707   1.974
+ATOM     36  C   GLN A   4       1.748   0.726  -1.060
+ATOM     37  O   GLN A   4       2.026  -0.184  -1.903
