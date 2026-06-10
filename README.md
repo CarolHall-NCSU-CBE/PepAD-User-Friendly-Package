@@ -185,10 +185,10 @@ output:
 ### Initial Structure Builder
 We provide a supplemental **initial structure builder** to build two β-sheet fibril backbones suitable for PepAD. The builder can create the β-cross spine in one of the eight steric zipper classes [4].  
 #### Requirements
-- Python 3 
-- [Biopython](https://biopython.org/) — for storing peptide structures [12]  
-- [PeptideBuilder](https://github.com/mtien/PeptideBuilder) — for constructing peptides in parallel or antiparallel β-strand configuration [13]  
-- [Hydride](https://github.com/biotite-dev/hydride) — for adding hydrogens at chemically reasonable positions [14]
+- Python 3
+- "RotamerLibrary" in the code working directory
+- [PeptideBuilder](https://github.com/mtien/PeptideBuilder) — for constructing peptides in parallel or antiparallel β-strand configuration [12]  
+- [Hydride](https://github.com/biotite-dev/hydride) — for adding hydrogens at chemically reasonable positions [13]
 
 A `YAML` file is included for creating a `conda` environment with the required packages.
 
@@ -244,10 +244,8 @@ output:
 
 [11]	A.P. Pawar, K.F. DuBay, J. Zurdo, F. Chiti, M. Vendruscolo, C.M. Dobson, Prediction of “Aggregation-prone” and “Aggregation-susceptible” Regions in Proteins Associated with Neurodegenerative Diseases, J. Mol. Biol. 350 (2005) 379–392. https://doi.org/10.1016/j.jmb.2005.04.016.
 
-[12]	P.J.A. Cock, T. Antao, J.T. Chang, B.A. Chapman, C.J. Cox, A. Dalke, I. Friedberg, T. Hamelryck, F. Kauff, B. Wilczynski, M.J.L. de Hoon, Biopython: freely available Python tools for computational molecular biology and bioinformatics, Bioinformatics 25 (2009) 1422–1423. https://doi.org/10.1093/bioinformatics/btp163.
+[12]	M.Z. Tien, D.K. Sydykova, A.G. Meyer, C.O. Wilke, PeptideBuilder: A simple Python library to generate model peptides, PeerJ 1 (2013) e80. https://doi.org/10.7717/peerj.80.
 
-[13]	M.Z. Tien, D.K. Sydykova, A.G. Meyer, C.O. Wilke, PeptideBuilder: A simple Python library to generate model peptides, PeerJ 1 (2013) e80. https://doi.org/10.7717/peerj.80.
-
-[14]	P. Kunzmann, J.M. Anter, K. Hamacher, Adding hydrogen atoms to molecular models via fragment superimposition, Algorithms Mol. Biol. 17 (2022) 7. https://doi.org/10.1186/s13015-022-00215-x.
+[13]	P. Kunzmann, J.M. Anter, K. Hamacher, Adding hydrogen atoms to molecular models via fragment superimposition, Algorithms Mol. Biol. 17 (2022) 7. https://doi.org/10.1186/s13015-022-00215-x.
 
 
