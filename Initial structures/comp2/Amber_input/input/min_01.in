@@ -1,0 +1,10 @@
+minimize, implicit solvent
+ &cntrl
+  imin=1, maxcyc=4000, ncyc=1000,
+  igb=8, gbsa=3, surften=0.007,
+  cut=1000.0, ntb=0, ntp=0,
+  ntx=1, ntwr=100, ntpr=50,
+  ntc=2, ntf=2,
+  ntxo=2, ioutfm=1,
+ /
+

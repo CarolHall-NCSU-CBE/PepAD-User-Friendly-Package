@@ -1,0 +1,11 @@
+minimize with restraint 100
+ &cntrl
+  imin=1, maxcyc=2000, ncyc=500,
+  cut=8.0, ntb=1, ntp=0,
+  ntc=2, ntf=2,
+  ntxo=2, ioutfm=1,
+  ntr=1,
+  restraint_wt=100.0,
+  restraintmask=':1-168',
+ /
+

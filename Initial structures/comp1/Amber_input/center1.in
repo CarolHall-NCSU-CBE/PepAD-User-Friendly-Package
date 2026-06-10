@@ -1,0 +1,5 @@
+trajin prod_1.rst7
+center :1-168 mass origin
+image origin center familiar
+trajout prod_1.rst7 restrt
+

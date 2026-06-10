@@ -1,0 +1,11 @@
+minimize with backbone restraint 10
+ &cntrl
+  imin=1, maxcyc=10000, ncyc=1000,
+  cut=8.0, ntb=1, ntp=0,
+  ntc=2, ntf=2,
+  ntxo=2, ioutfm=1,
+  ntr=1,
+  restraint_wt=10.0,
+  restraintmask='@CA,N,C',
+ /
+

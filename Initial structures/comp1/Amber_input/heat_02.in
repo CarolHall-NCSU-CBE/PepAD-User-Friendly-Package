@@ -1,0 +1,16 @@
+heat NVT 1 ns restraint 100
+ &cntrl
+  imin=0, irest=0, ntx=1, ig=-1,
+  nstlim=1000000, dt=0.001,
+  ntc=2, ntf=2,
+  cut=8.0,
+  ntt=3, tautp=1.0, gamma_ln=1.0,
+  ntb=1, ntp=0,
+  tempi=100.0, temp0=298.15,
+  ntpr=100, ntwx=100, ntwr=10000,
+  ntxo=2, ioutfm=1,
+  ntr=1,
+  restraint_wt=100.0,
+  restraintmask=':1-168',
+ /
+

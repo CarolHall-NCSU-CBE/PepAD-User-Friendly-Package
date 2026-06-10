@@ -1,0 +1,172 @@
+tolerance 2.0
+output KLVFFAEini_12x2.pdb
+filetype pdb
+
+structure KLVFFAE.pdb
+chain A
+number 1
+center
+fixed     0.0     0.0     0.0     0.0     0.0     0.0
+end structure
+
+structure KLVFFAE.pdb
+chain A
+number 1
+center
+fixed     4.8     0.4     -2.04     3.1415926     0.0     0.0
+end structure
+
+structure KLVFFAE.pdb
+chain A
+number 1
+center
+fixed     9.6     0.0     0.0     0.0     0.0     0.0
+end structure
+
+structure KLVFFAE.pdb
+chain A
+number 1
+center
+fixed     14.399999999999999     0.4     -2.04     3.1415926     0.0     0.0
+end structure
+
+structure KLVFFAE.pdb
+chain A
+number 1
+center
+fixed     19.2     0.0     0.0     0.0     0.0     0.0
+end structure
+
+structure KLVFFAE.pdb
+chain A
+number 1
+center
+fixed     24.0     0.4     -2.04     3.1415926     0.0     0.0
+end structure
+
+structure KLVFFAE.pdb
+chain A
+number 1
+center
+fixed     28.799999999999997     0.0     0.0     0.0     0.0     0.0
+end structure
+
+structure KLVFFAE.pdb
+chain A
+number 1
+center
+fixed     33.6     0.4     -2.04     3.1415926     0.0     0.0
+end structure
+
+structure KLVFFAE.pdb
+chain A
+number 1
+center
+fixed     38.4     0.0     0.0     0.0     0.0     0.0
+end structure
+
+structure KLVFFAE.pdb
+chain A
+number 1
+center
+fixed     43.199999999999996     0.4     -2.04     3.1415926     0.0     0.0
+end structure
+
+structure KLVFFAE.pdb
+chain A
+number 1
+center
+fixed     48.0     0.0     0.0     0.0     0.0     0.0
+end structure
+
+structure KLVFFAE.pdb
+chain A
+number 1
+center
+fixed     52.8     0.4     -2.04     3.1415926     0.0     0.0
+end structure
+
+structure KLVFFAE.pdb
+chain B
+number 1
+center
+fixed     2.4     11.5     0.0     0.0     0.0     3.1415926
+end structure
+
+structure KLVFFAE.pdb
+chain B
+number 1
+center
+fixed     7.199999999999999     11.1     -2.04     3.1415926     0.0     3.1415926
+end structure
+
+structure KLVFFAE.pdb
+chain B
+number 1
+center
+fixed     12.0     11.5     0.0     0.0     0.0     3.1415926
+end structure
+
+structure KLVFFAE.pdb
+chain B
+number 1
+center
+fixed     16.799999999999997     11.1     -2.04     3.1415926     0.0     3.1415926
+end structure
+
+structure KLVFFAE.pdb
+chain B
+number 1
+center
+fixed     21.599999999999998     11.5     0.0     0.0     0.0     3.1415926
+end structure
+
+structure KLVFFAE.pdb
+chain B
+number 1
+center
+fixed     26.4     11.1     -2.04     3.1415926     0.0     3.1415926
+end structure
+
+structure KLVFFAE.pdb
+chain B
+number 1
+center
+fixed     31.199999999999996     11.5     0.0     0.0     0.0     3.1415926
+end structure
+
+structure KLVFFAE.pdb
+chain B
+number 1
+center
+fixed     36.0     11.1     -2.04     3.1415926     0.0     3.1415926
+end structure
+
+structure KLVFFAE.pdb
+chain B
+number 1
+center
+fixed     40.8     11.5     0.0     0.0     0.0     3.1415926
+end structure
+
+structure KLVFFAE.pdb
+chain B
+number 1
+center
+fixed     45.599999999999994     11.1     -2.04     3.1415926     0.0     3.1415926
+end structure
+
+structure KLVFFAE.pdb
+chain B
+number 1
+center
+fixed     50.4     11.5     0.0     0.0     0.0     3.1415926
+end structure
+
+structure KLVFFAE.pdb
+chain B
+number 1
+center
+fixed     55.199999999999996     11.1     -2.04     3.1415926     0.0     3.1415926
+end structure
+

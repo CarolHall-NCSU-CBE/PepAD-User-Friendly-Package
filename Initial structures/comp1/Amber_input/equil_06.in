@@ -1,0 +1,16 @@
+equil NPT 1 ns backbone restraint 10
+ &cntrl
+  imin=0, irest=0, ntx=1, ig=-1,
+  nstlim=1000000, dt=0.001,
+  ntc=2, ntf=2, 
+  cut=8.0,
+  ntb=2, ntp=1,
+  temp0=298.15, ntt=3, tautp=1.0, gamma_ln=1.0,
+  barostat=2, taup = 0.5,
+  ntpr=500, ntwx=500, ntwr=10000,
+  ntxo=2, ioutfm=1,
+  ntr=1,
+  restraint_wt=10.0,
+  restraintmask='@CA,N,C',
+  /
+
