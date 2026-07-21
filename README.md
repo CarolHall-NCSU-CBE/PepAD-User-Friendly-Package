@@ -30,10 +30,7 @@ Monte Carlo moves:
 
 After each move, PepAD evaluates
 
-$$
-\Gamma_{\mathrm{score}} = \Delta G_{\mathrm{binding}}
-- \lambda P_{\mathrm{aggregation}}.
-$$
+$$ Γ_{score} = ΔG_{binding} - \lambda \times P_{aggregation} $$
 
 More-negative scores indicate stronger predicted binding at the evaluated
 configuration. The binding term is calculated with an MM/GBSA-based model
