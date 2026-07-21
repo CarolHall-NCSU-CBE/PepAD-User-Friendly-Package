@@ -1,251 +1,344 @@
-# PepAD-User-Friendly-Package
-## Introduction  
- 
-Peptide Assembly Design (PepAD) is a Monte Carlo (MC)–based algorithm for discovering amyloid-forming peptides that self-assemble into user-defined reference structures [1–3]. PepAD designs peptide by optimizing the binding affinity within a predefined fibril backbone, which is composed of two stacked β-sheets.
+# PepAD
 
-PepAD allows users to design peptides with specified sequence length, amino acid composition, and positional or compositional constraints. During the design process, residues on the peptide backbone are modified through MC moves. The new sequence is evaluated using a physics-based score function that quantifies the peptide self-assembly propensity.
+Peptide Assembly Design (PepAD) is a Monte Carlo sequence-design program for
+discovering peptides predicted to self-assemble on a user-supplied amyloid fibril
+backbone. PepAD explores peptide sequences and sheet arrangements, evaluates each
+trial with a physics-based score, and reports low-scoring designs for downstream
+simulation or experimental study.
 
-To run PepAD, users first need to compile the code in HPC with Intel@ Fortran compiler. Then need to provide an initial fibril structure (PDB format) and a text-based input file that defines parameters and constraints. PepAD outputs peptide sequences with their corresponding scores, as well as structural files for the top-scoring designs, which can be further used in downstream simulations or experiments.
+**Current version: v1.42.** The input format changed in v1.42 from a fixed,
+position-dependent form to named `FLAG = value` entries. Old v1.37 inputs are not
+compatible with v1.42. The v1.37 source, documentation, analyzer, and examples are
+preserved in [`archive/v1.37`](archive/v1.37).
 
+## What PepAD does
 
-## PepAD algorithm
-  PepAD starts from an initial peptide fibril structure, typically consisting of two stacked β-sheets corresponding to a specific class of cross-β spine[4-5]. At beign, a random sequence is draped upon the backbone (–NH–Cα–CO–), and its binding affinity is evaluated using a score function (Γ<sub>score</sub>). PepAD then explores new sequences using three MC moves—residue mutation, residue exchange, and sheet position perturbation. After each move, the Γ<sub>score</sub> is evaluated for the new configuration, and the new design is accepted or rejected based on Metropolis criterion. This process is iterated over multiple steps, and peptides with the lowest Γ<sub>score</sub> are identified as the best designs.
+PepAD begins with a fibril model, usually two stacked beta sheets in one of the
+cross-beta steric-zipper classes. A sequence is placed on the fixed peptide
+backbone and optimized through three Monte Carlo moves:
 
-<p align="center">
-  <img width="450" alt="image" src="https://github.com/user-attachments/assets/b0a786f8-a65d-48dd-a610-cdfaaca9e7fb" />
-  </p>
-<p align="center"><b>Fig. 1.</b> Simplified flow chart describing the PepAD algorithm.</figcaption></p>
+1. **Residue mutation** replaces a residue with another residue from the same
+   hydration category.
+2. **Residue exchange** swaps two positions in the sequence.
+3. **Sheet position perturbation** translates one beta sheet while the other
+   sheet remains fixed.
 
-### Monte-Carlo Move  
-Three types of MC moves (Fig. 1 Perform one MC move) are applied to search for new self-assembling peptides: residue mutation, residue exchange, and sheet position perturbation. 
+After each move, PepAD evaluates
 
-(1) Residue mutation: a random amino acid in the sequence (for all peptides) is mutated to another amino acid of same hydration type, (e.g. ALA is mutated to VAL (hydrophobic), SER is mutated to ASN (polar), or ARG is mutated to LYS (charged)); 
+$$
+\Gamma_{\mathrm{score}} = \Delta G_{\mathrm{binding}}
+- \lambda P_{\mathrm{aggregation}}.
+$$
 
-(2) Residue exchange: two random residues in the sequence are exchanged. 
+More-negative scores indicate stronger predicted binding at the evaluated
+configuration. The binding term is calculated with an MM/GBSA-based model, and
+the aggregation term follows the Zyggregator approach.
 
-(3) Sheet position perturbation move: the position of one β-sheet shifts in a random direction with a random displacement, while the position of another β-sheet is fixed.
+## Repository layout
 
+| Path | Contents |
+| --- | --- |
+| [`src/main.f90`](src/main.f90) | Current PepAD v1.42 source |
+| [`src/input.example.txt`](src/input.example.txt) | Annotated v1.42 input template |
+| `src/lib/` | Runtime force-field and rotamer data |
+| [`examples/`](examples/) | Location for v1.42 examples |
+| [`Initial structures/`](Initial%20structures/) | Prepared fibril backbones and supporting files |
+| [`Initial structure builder/`](Initial%20structure%20builder/) | Optional Python tool for building fibril backbones |
+| [`archive/v1.37/`](archive/v1.37/) | Complete legacy v1.37 material |
 
-### Score Function
-In PepAD, after each MC move, a score function Γ<sub>score</sub> is used to quantify the binding affinity of the new sequence Γ<sub>score</sub> contains (i) a binding free energy term ΔG<sub>binding</sub> and (ii) an aggregation propensity term P<sub>aggregation</sub>. A weighting factor $$\lambda$$ is used to balance the contribution of ΔG<sub>binding</sub> and P<sub>aggregation</sub> to the Γ<sub>score</sub>.
+The repository root tracks the current release. Version-specific historical
+files belong in `archive/`; do not place old source files beside `src/main.f90`.
 
-$$ Γ_{score} = ΔG_{binding} - \lambda \times P_{aggregation} $$
+## Quick start
 
-The highly negative value of Γ<sub>score</sub> represents that the evaluated peptide sequence has a strong binding affinity at a given configuration. ΔG<sub>binding</sub> is calculated using the molecular mechanics-generalized Born surface area (MMGBSA) method [6–8]. P<sub>aggregation</sub> accounts for the intrinsic aggregation propensity of a sequence based on the Zyggregator method proposed by Dobson and Vendruscolo [9–11].
+### 1. Compile PepAD
 
-## Usage
-<p align="center">
- <img width="1200"  alt="image" src="https://github.com/user-attachments/assets/982d5573-7dac-4381-a9ce-651992b16658" />
- </p>
-<p align="center"><b>Fig. 2.</b> A workflow chart describing how to design peptides.</figcaption></p>
+PepAD is written in Fortran 90 and is intended for an HPC environment with an
+Intel Fortran compiler. From `src/`, compile the program beside the `lib/`
+directory:
 
-
-### Compile code
-The coding language is Fortran90. Users need to load Intel Fortran Compiler (ifx) for compilation. In the command line interface, navigate to the `/src/`, and use the following command:
- 
->
-
-	# Example compilation using the Intel Fortran compiler on a Linux-based system
-	
-	# Users should modify these commands according to their local environment. 
-
-	module load PrgEnv-intel         # load Intel compiler
-
-    ifx -o PepAD main.f90            #  compile PepAD code
-
-
-> **Note:** Code must be compiled in the same directory as `/lib/`, since parameter files are required at runtime. After compilation, the PepAD can be run from any directory.
-
-### Set up input files
-PepAD requires two files
-
-(1) `initial structure PDB` file
-
-(2) `input.txt` file 
-
-#### initial structure
-Users must provide an initial structure PDB file for PepAD. The PDB file format must match that in `/example/`. The structure usually consists of inidividual peptides in a configuration of cross-β spine. Two recommended approaches for preparing the initial structure are as follows: 
-
-(a) Search for existing amyloid fibril structures in the Protein Data Bank ([RCSB PDB: Homepage](https://www.rcsb.org/)) (Fig 3). For example, the Sup35 prion segment GNNQQNY structure (PDB ID: 2OMM) is replicated to generate a larger Class-1 cross-β fibril model. The resulting structure was relaxed using explicit-solvent atomistic MD simulation to remove atomic overlaps. The relaxed structure can be further used as the initial structure for PepAD. Users also need to modify the format of the PDB file to match PepAD's required input format (see Fig. 3, top).
-
-<p align="center">
-  <img width="650" alt="image" src="https://github.com/user-attachments/assets/c476b3f8-90dd-411e-837f-1fc97d476770" />
-  </p>
-<p align="center"><b>Fig. 3.</b> Prepare initial structure using existing fibril structure from Protein Data Bank.</figcaption></p>
-
-
-(b) Build artificial amyloid backbones using molecular modeling tools such as UCSF Chimera and Packmol (Fig. 4). For example, Aβ(16–22) KLVFFAE was built with UCSF Chimera, packed into a two-layer Class-8 antiparallel β-sheet fibril using Packmol, and relaxed by explicit-solvent MD simulation. To reduce PepAD computational cost, the middle eight peptides were extracted from the relaxed fibril and saved as comp1.pdb. The amyloid backbone can also be generated using the Initial Structure Builder provided in this package.
-
-<p align="center"> 
-  <img width="800" alt="image" src="https://github.com/user-attachments/assets/3b1b6026-a947-4a42-98e6-0e8600c831d6" />
-  </p>
-<p align="center"><b>Fig. 4.</b> Prepare initial structure using molecular modeling tool.</figcaption></p>
-
-
-#### input.txt
-The 'input.txt' contains the necessary parameters for designing a fibril structure.
-**Table 1:** Input paremeters for PepAD
-|  Panel |  Item | Description |
-|--------|-------|-------------|
-| Initial structure info | Number of residues per chain (including caps) | Total number of residues per peptide chain, including terminal caps if present. |
-| Initial structure info | Number of chains in total | Total number of peptide chains in the initial structure PDB file. |
-| Initial structure info | Input PDB file name | Name of the initial structure PDB file. |
-| Initial structure info | Restart | Run mode selection: <br>`0` = fresh run<br> `1` = restart from the last completed step<br> |
-| Initial structure info | Group 1 | Indices of peptide chains assigned to group 1 for binding free energy calculation. |
-| Initial structure info | Group 2 | Indices of peptide chains assigned to group 2 for binding free energy calculation. |
-| MC info | Number of MC moves | Integer. Total number of MC steps. |
-| MC info | kBT(sequence) | Temperature factor `kBT` used in the Metropolis criterion for residue mutation and residue exchange moves. |
-| MC info | kBT(sheet move) | Temperature factor `kBT` used in the Metropolis criterion for sheet position perturbation moves. |
-| MC info | Allowed maximum RMSD (Å) | Maximum allowed displacement of one β-sheet relative to the other β-sheet during sheet position perturbation. |
-| MC info | Aggregation propensity weight | Weighting factor `λ` that controls the contribution of aggregation propensity to the score function. |
-| Compositions | Hydrophobic | Number of hydrophobic residues participating in sequence-change moves: `GLY`, `ALA`, `LEU`, `VAL`, `ILE`, `MET`, `PHE`, `TYR`, and `TRP`. |
-| Compositions | Polar | Number of polar residues participating in sequence-change moves: `ASN`, `GLN`, `SER`, `THR`, and `HIE`. |
-| Compositions | Charged | Number of charged residues participating in sequence-change moves: `ARG`, `LYS`, `GLU`, and `ASP`. |
-| Compositions | Other | Number of residues participating in sequence-change moves that are not classified as hydrophobic, polar, or charged: `CYS` and `PRO`. |
-| Constraints | Single-site positional constraint | Sequence sites where residues remain unchanged entire PepAD run. Terminal caps should also be specified here if capped peptides are used. Users may also specify a specific amino acid at a constrained site at the beginning of the run.  Examples: <br>`1 3 16`<br> `= 4:LEU`<br> `1:ACE 16:NME`<br> |
-| Constraints | Grouped-site positional constraint amino acid pool | Amino acids that are allowed to be placed on the sites of grouped-site positional constraint. |
-| Constraints | Grouped-site positional constraint | Sequence sites that are collectively assigned amino acids from the grouped-site amino acid pool without repetition. |
-| Constraints | Constraints on the number of certain amino acids | Compositional constraints on number of selected amino acids. Examples: <br>`MET=0`<br> `ALA>=2`<br> `ASN<=5`<br> `PHE=1`<br> |
-
-### Execute
-Once the input files are prepared, users can submit the following example script to run PepAD:
-
->
-	#!/bin/bash
-    
-    /path_to_PepAD/src/PepAD
-
-### Analyze output files
-**Table 2:** PepAD output files 
-|File extension| Description|
-|----------------|------------|
-|`Energy profile`| Records Steps, Sequences, Γ<sub>score</sub>, ΔG<sub>binding</sub>, $$\lambda \times P_{aggregation}$$, and RMSD |
-|`Energy details`| Records Steps, Trials, Sequences, Γ<sub>score</sub>, ΔG<sub>binding</sub>, ΔE<sub>binding</sub>, ΔTS<sub>conf</sub>, $$\lambda \times P_{aggregation}$$, MC moves, and Trial results|
-|`Minimal energy`| Records Steps, Trials, Γ<sub>score</sub>, and Sequences with minimal Γ<sub>score</sub> along the search|
-|`PDB files`     | PDB files for peptides with minimal scores during the evolution|
-#### terms
-- Γ<sub>score</sub>: PepAD score function, unit: kcal/mol
-
-- ΔG<sub>binding</sub>: Binding free energy, unit: kcal/mol
-
-- ΔE<sub>binding</sub>: Binding energy, unit: kcal/mol
-
-- ΔTS<sub>conf</sub>: Configuration entropy, unit: kcal/mol
-
-- P<sub>aggregation</sub>: Aggregation propensity, unit: kcal/mol
-
-- $$\lambda$$: Aggregation propensity weighting factor, unit: 1
-
-- RMSD: Total Root Mean Square Displacement (RMSD) of a β-sheet, unit: Angstrom.
-
-### PepAD Analysis Code
-The analysis code ranks the peptides from the lowest score, removes duplicates, and plots score versus steps and sheet RMSD versus step. This code is not required for peptide design, but it offers a convenient approach to identifying promising peptides.
-#### Requirements
-- Python 3
-- [NumPy](https://numpy.org/)
-- [Pandas](https://pandas.pydata.org/)
-- [Matplotlib](https://matplotlib.org/)
-
-A `YAML` file is included for creating a `conda` environment with the required packages.
-
-#### Arguments
-- `--top [n]` : Report *n* unique peptides with the lowest scores ranked in order.  
-- `--plot [score|rmsd|both|none]` : Plot score vs step, RMSD vs step, both, or disable plots.  
-- `--score_rolling [i]` : Smooth the score plot using a rolling average over *i* steps.  
-- `--rmsd_rolling [i]` : Smooth the RMSD plot using a rolling average over *i* steps.  
-
-#### Example
-Once PepAD outputs are generated, user can submit the following example script to run PepAD analysis:
->
-	conda activate pepad_analysis
-	python pepad_analyzer.py --top 10 --plot both --score_rolling 100 --rmsd_rolling 100
-
-output:
->
-```text
---- 10 unique peptides with best score (energy profile) ---
- step  Sequence   Score   G_bind   Pagg   rmsd  Counts
-  823  IFKVMGD   -19.09  -19.04   0.05   0.10       1
-  802  VWKVMGE   -18.87  -18.97  -0.10   0.10       5
- 3630  VIKIVGD   -18.79  -18.97  -0.18   0.17      11
- 3631  VIKIMGD   -18.60  -18.86  -0.25   0.17       6
-  707  KIVIVGD   -18.50  -18.79  -0.29   0.10       5
-  829  VFKVEGM   -18.36  -18.53  -0.17   0.10       2
- 2058  KIMIVGD   -18.36  -18.72  -0.37   0.22      12
-  828  IFKVEGM   -18.30  -18.45  -0.16   0.10       3
- 2083  VIKIMGE   -18.28  -18.85  -0.57   0.22      13
-  711  KVIIVGD   -18.18  -18.47  -0.29   0.10       3
+```bash
+module load PrgEnv-intel
+cd src
+ifx -O2 -o PepAD main.f90
 ```
 
-<p align="center"> 
-  <img width="800" alt="step_evolution" src="https://github.com/user-attachments/assets/15786422-7758-4cfb-a3e5-2ff3c10b5856" />
-  </p>
-<p align="center"><b>Fig. 5. The Γ<sub>score</sub> and RMSD evolution in a 10,000-step PepAD run of designing 7-mer antiparallel peptides</b>.</figcaption></p>
+Older Intel environments may use `ifort` instead of `ifx`. The executable finds
+its parameter library relative to its own location, so keep `PepAD` in `src/`
+beside `lib/` unless both are deployed together.
 
-### Initial Structure Builder
-We provide a supplemental **initial structure builder** to build two β-sheet fibril backbones suitable for PepAD. The builder can create the β-cross spine in one of the eight steric zipper classes [4].  
-#### Requirements
-- Python 3
-- "RotamerLibrary" in the code working directory
-- [PeptideBuilder](https://github.com/mtien/PeptideBuilder) — for constructing peptides in parallel or antiparallel β-strand configuration [12]  
-- [Hydride](https://github.com/biotite-dev/hydride) — for adding hydrogens at chemically reasonable positions [13]
+To list all supported v1.42 input flags and defaults:
 
-A `YAML` file is included for creating a `conda` environment with the required packages.
+```bash
+./PepAD --help
+```
 
-#### Arguments
-- `-seq`: Peptide sequence in upper case one-letter code. (required)
-- `-c`: Fibril class, an integer from 1 to 8, corresponding to the 8 classes of steric zipper. (required)
-- `-sh`: One β-sheet shifts along the x-axis by a space of -1, 0, or 1 residue.
-- `-n`: Number of strands per sheet.
-- `-p`: Terminal patch (caps). "0" = no patches, "1" =  patch with ACE and NME, "2" = patch with ACE and NHE.
-- `-r`: Residue packing mode. "e" = even-numbered residues inside, "o" = odd-numbered residues inside".
-- `-f`: Output PDB file format. "0" = PepAD format and "1" = AMBER format.
-- `-d1`: Strand-strand distance (Å).
-- `-d2`: Sheet-sheet distance (Å).
-- `-d3`: One β-sheet shifts along the y-axis (fibril axis) by a distance (Å).
-- `-o`: Output file name.
-#### Example
-User can submit the following example script to run build an initial structure:
->
-	conda activate buildpep
-	python Initial_structure_builder.py -seq "GNNQQNY" \
-    -c "1" -sh "-1" -n "4" -p "2" -r "e" -f "1" \
-    -d1 "4.8" -d2 "10" -d3 "2.4" -o "pep2"
+### 2. Prepare a run directory
 
-output:
-<p align="center"> 
-  <img width="800" alt="step_evolution" src="https://github.com/user-attachments/assets/2c485625-af0e-4c3f-8a94-31fa2de56725" />
-  </p>
-<p align="center"><b>Fig. 6. A 7-mer parallel peptide backbone generated by the initial structure builder.</b>  .</figcaption></p>
+Each run needs:
 
+- an initial fibril structure in PDB format; and
+- a text file named exactly `input.txt`.
 
+Copy [`src/input.example.txt`](src/input.example.txt) into the run directory,
+rename it to `input.txt`, and edit it for the selected PDB structure:
 
+```bash
+cd /path/to/PepAD-User-Friendly-Package
+mkdir my_run
+cp src/input.example.txt my_run/input.txt
+cp "Initial structures/comp1/comp1.pdb" my_run/
+cd my_run
+```
 
-## Reference:
-[1] S. Sarma, T.R. Sudarshan, V. Nguyen, A.S. Robang, X. Xiao, J.V. Le, M.E. Helmicki, A.K. Paravastu, C.K. Hall, Design of parallel 𝛽-sheet nanofibrils using Monte Carlo search, coarse-grained simulations, and experimental testing, Protein Science 33 (2024) e5102. https://doi.org/10.1002/pro.5102.
+### 3. Run PepAD
 
-[2] X. Xiao, A.S. Robang, S. Sarma, J.V. Le, M.E. Helmicki, M.J. Lambert, R. Guerrero-Ferreira, J. Arboleda-Echavarria, A.K. Paravastu, C.K. Hall, Sequence patterns and signatures: Computational and experimental discovery of amyloid-forming peptides, PNAS Nexus 1 (2022) pgac263. https://doi.org/10.1093/pnasnexus/pgac263.
+Launch the executable from the run directory so that PepAD reads that directory's
+`input.txt` and writes its results there:
 
-[3] X. Xiao, Y. Wang, D.T. Seroski, K.M. Wong, R. Liu, A.K. Paravastu, G.A. Hudalla, C.K. Hall, De novo design of peptides that coassemble into β sheet–based nanofibrils, Science Advances 7 (2021) eabf7668. https://doi.org/10.1126/sciadv.abf7668.
+```bash
+../src/PepAD
+```
 
-[4] M.R. Sawaya, S. Sambashivan, R. Nelson, M.I. Ivanova, S.A. Sievers, M.I. Apostol, M.J. Thompson, M. Balbirnie, J.J.W. Wiltzius, H.T. McFarlane, A.Ø. Madsen, C. Riekel, D. Eisenberg, Atomic structures of amyloid cross-β spines reveal varied steric zippers, Nature 447 (2007) 453–457. https://doi.org/10.1038/nature05695.
+Adjust the executable path when the run directory is elsewhere.
 
-[5] R. Nelson, M.R. Sawaya, M. Balbirnie, A.Ø. Madsen, C. Riekel, R. Grothe, D. Eisenberg, Structure of the cross-β spine of amyloid-like fibrils, Nature 435 (2005) 773–778. https://doi.org/10.1038/nature03680.
+## v1.42 input format
 
-[6] H. Gohlke, C. Kiel, D.A. Case, Insights into Protein–Protein Binding by Binding Free Energy Calculation and Free Energy Decomposition for the Ras–Raf and Ras–RalGDS Complexes, J. Mol. Biol. 330 (2003) 891–913. https://doi.org/10.1016/S0022-2836(03)00610-7.
+### Syntax rules
 
-[7]	G. Rastelli, A.D. Rio, G. Degliesposti, M. Sgobba, Fast and accurate predictions of binding free energies using MM-PBSA and MM-GBSA, J. Comput. Chem. 31 (2010) 797–810. https://doi.org/10.1002/jcc.21372.
+Every nonblank input line has the form:
 
-[8]	X. Xiao, B. Zhao, P.F. Agris, C.K. Hall, Simulation study of the ability of a computationally‐designed peptide to recognize target tRNA Lys3 and other decoy tRNAs, Protein Sci. 25 (2016) 2243–2255. https://doi.org/10.1002/pro.3056.
+```text
+FLAG = value
+```
 
-[9] G.G. Tartaglia, A.P. Pawar, S. Campioni, C.M. Dobson, F. Chiti, M. Vendruscolo, Prediction of Aggregation-Prone Regions in Structured Proteins, J. Mol. Biol. 380 (2008) 425–436. https://doi.org/10.1016/j.jmb.2008.05.013.
+- Flag order does not matter.
+- Flag names are case-insensitive; uppercase is recommended.
+- Blank lines are allowed.
+- Comments may begin with `#` or `!`, including after a value.
+- Each flag may appear at most once.
+- Unknown flags and invalid or duplicate values stop the run with an error.
+- List values may be separated by spaces; chain lists also accept commas.
+- The only required flags are `PDBFILE` and `N_STEPS`.
 
-[10]	G.G. Tartaglia, M. Vendruscolo, The Zyggregator method for predicting protein aggregation propensities, Chem. Soc. Rev. 37 (2008) 1395–1401. https://doi.org/10.1039/B706784B.
+A minimal input is:
 
-[11]	A.P. Pawar, K.F. DuBay, J. Zurdo, F. Chiti, M. Vendruscolo, C.M. Dobson, Prediction of “Aggregation-prone” and “Aggregation-susceptible” Regions in Proteins Associated with Neurodegenerative Diseases, J. Mol. Biol. 350 (2005) 379–392. https://doi.org/10.1016/j.jmb.2005.04.016.
+```text
+PDBFILE = comp1.pdb
+N_STEPS = 10000
+```
 
-[12]	M.Z. Tien, D.K. Sydykova, A.G. Meyer, C.O. Wilke, PeptideBuilder: A simple Python library to generate model peptides, PeerJ 1 (2013) e80. https://doi.org/10.7717/peerj.80.
+With this minimal form, PepAD determines chain length, chain count, energy
+groups, beta sheets, and composition from the PDB file. Other calculations use
+the defaults listed below.
 
-[13]	P. Kunzmann, J.M. Anter, K. Hamacher, Adding hydrogen atoms to molecular models via fragment superimposition, Algorithms Mol. Biol. 17 (2022) 7. https://doi.org/10.1186/s13015-022-00215-x.
+### Initial structure and restart settings
 
+| Flag | Meaning | Default or rule |
+| --- | --- | --- |
+| `PDBFILE` | Initial structure filename | **Required**; normally relative to the run directory |
+| `N_RESIDUES` | Residues per chain, including caps | Auto-detected when omitted |
+| `N_CHAINS` | Total peptide chains | Auto-detected when omitted |
+| `GROUP_1`, `GROUP_2` | Chain IDs in the two binding-energy groups | DSSP-based assignment when both are omitted |
+| `SHEET_1`, `SHEET_2`, ... | Chain IDs in each beta sheet | DSSP-based assignment when all are omitted |
+| `RESTART` | `0` for a fresh run; `1` to restart | `0` |
 
+`N_RESIDUES` and `N_CHAINS` must either both be present or both be absent. If
+custom energy groups are provided, both `GROUP_1` and `GROUP_2` are required and
+every PDB chain must occur exactly once across the pair. Custom `SHEET_n` flags
+must be consecutively numbered from `SHEET_1`, and every chain must occur exactly
+once across all sheets.
+
+Example:
+
+```text
+PDBFILE   = comp1.pdb
+N_RESIDUES = 7
+N_CHAINS   = 8
+GROUP_1    = 1 3 5 7
+GROUP_2    = 2 4 6 8
+SHEET_1    = 1 2 3 4
+SHEET_2    = 5 6 7 8
+RESTART    = 0
+```
+
+### Monte Carlo and energy settings
+
+| Flag | Meaning | Default |
+| --- | --- | ---: |
+| `RANSEED` | Integer random seed | System clock |
+| `N_STEPS` | Number of Monte Carlo steps | **Required** |
+| `KBT_SEQ` | Sequence-move kBT when annealing is off | `1.0` |
+| `KBT_SHEETMOVE` | Sheet-move kBT when annealing is off | `0.6` |
+| `KBT_SEQ_HIGH`, `KBT_SEQ_LOW` | Initial and final sequence kBT during annealing | `2.0`, `0.5` |
+| `KBT_SHEETMOVE_HIGH`, `KBT_SHEETMOVE_LOW` | Initial and final sheet-move kBT during annealing | `1.2`, `0.3` |
+| `ANNEAL_STAGES` | `0` disables annealing; a positive integer sets its stage count | `0` |
+| `RMSD_MAX` | Maximum sheet-move RMSD in angstroms | `3.0` |
+| `PAGG_WEIGHT` | Aggregation-propensity weight, lambda | `2.0` |
+| `SHEETMOVE` | `0` disables or `1` enables sheet perturbations | `1` |
+| `STEPS_BEFORE_SHEETMOVE` | Sequence steps before the first sheet move | `500` |
+| `STEPS_BETWEEN_SHEETMOVE` | Sequence steps between sheet moves | `200` |
+| `ESURF_MODE` | Nonpolar solvation mode: `0` off, `1` full ARVO, `2` cached/incremental ARVO | `0` |
+
+When `ANNEAL_STAGES = 0`, PepAD uses `KBT_SEQ` and `KBT_SHEETMOVE`. When
+annealing is enabled, it instead uses the corresponding `HIGH` and `LOW` values.
+All kBT values must be positive, and each high value must be greater than or
+equal to its low value.
+
+### Amino-acid composition ranges
+
+The v1.42 input uses minimum and maximum counts instead of the four exact counts
+used by v1.37:
+
+| Category | Amino acids | Flags |
+| --- | --- | --- |
+| Hydrophobic | `GLY ALA VAL LEU ILE MET PHE TYR TRP` | `N_HYDROPHOBIC_MIN`, `N_HYDROPHOBIC_MAX` |
+| Polar | `SER ASN GLN THR HIE` | `N_POLAR_MIN`, `N_POLAR_MAX` |
+| Charged | `ARG LYS GLU ASP` | `N_CHARGED_MIN`, `N_CHARGED_MAX` |
+| Other | `CYS PRO` | `N_OTHER_MIN`, `N_OTHER_MAX` |
+
+If all eight category flags are omitted, PepAD uses the starting PDB composition.
+If custom composition mode is used, every category must have a minimum, a
+maximum, or both. An omitted minimum becomes `0`; an omitted maximum becomes
+`N_RESIDUES`. Equal minimum and maximum values impose an exact count.
+
+Composition totals exclude `ACE`, `NME`, and `NHE` caps, but include residues at
+single-site and grouped-site constrained positions.
+
+Example allowing a range of polar and charged content while fixing the
+hydrophobic count:
+
+```text
+N_HYDROPHOBIC_MIN = 4
+N_HYDROPHOBIC_MAX = 4
+N_POLAR_MIN       = 0
+N_POLAR_MAX       = 2
+N_CHARGED_MIN     = 0
+N_CHARGED_MAX     = 2
+N_OTHER_MIN       = 0
+N_OTHER_MAX       = 0
+```
+
+### Specific amino-acid count constraints
+
+Any standard PepAD amino acid can also have its own count range:
+
+```text
+N_<AA>_MIN = integer
+N_<AA>_MAX = integer
+```
+
+For example:
+
+```text
+N_ASN_MIN = 0
+N_ASN_MAX = 1
+N_SER_MIN = 1
+N_SER_MAX = 3
+```
+
+Supply only a minimum, only a maximum, or both. Equal values impose an exact
+count. Amino acids without these flags remain unconstrained, subject to their
+category limits. Supported names are `GLY`, `ALA`, `VAL`, `LEU`, `ILE`, `MET`,
+`PHE`, `TYR`, `TRP`, `SER`, `ASN`, `GLN`, `THR`, `HIE`, `ARG`, `LYS`, `GLU`,
+`ASP`, `CYS`, and `PRO`.
+
+### Positional constraints
+
+Cap positions (`ACE`, `NME`, and `NHE`) are recognized automatically and should
+not be listed as constraints. Site numbers refer only to amino-acid positions;
+caps are skipped when numbering. Thus, amino acid 3 is chain site 4 when chain
+site 1 is an ACE cap.
+
+#### Single-site constraints
+
+`SINGLE_SITE_CONSTRAINTS` accepts space-separated entries:
+
+- `site` keeps the amino acid already present at that site.
+- `site:AA` first changes the site to the named amino acid, then keeps it fixed.
+
+Do not place spaces around the colon:
+
+```text
+SINGLE_SITE_CONSTRAINTS = 5:ASN 6
+```
+
+Use `NONE` or omit the flag when no single-site constraint is needed.
+
+#### Grouped-site constraints
+
+Grouped sites draw residues from a user-defined pool:
+
+```text
+GROUPED_SITE_AA_POOL     = ASN SER THR ALA VAL
+GROUPED_SITE_CONSTRAINTS = 1 2 3
+```
+
+The pool must contain at least as many entries as there are grouped sites. A
+residue may be repeated in the pool to make more copies available; each remaining
+copy has equal selection probability. Grouped sites may not overlap caps or
+single-site constraints. PepAD validates the pool against the category and
+specific-amino-acid count limits.
+
+### Complete annotated template
+
+The maintained template is [`src/input.example.txt`](src/input.example.txt). Use
+it as the starting point for new calculations. Do not adapt a v1.37 input by
+changing only its labels: the old positional format and exact composition fields
+have different semantics.
+
+## Initial structure requirements
+
+The PDB file should contain peptide chains arranged as a cross-beta fibril and use
+atom and residue naming compatible with the parameter files in `src/lib/`.
+Prepared structures are available in [`Initial structures/`](Initial%20structures/).
+An initial structure may be obtained by:
+
+1. adapting an experimental amyloid structure from the
+   [RCSB Protein Data Bank](https://www.rcsb.org/) and relaxing it to remove
+   clashes; or
+2. building a steric-zipper model with the supplied
+   [`Initial structure builder`](Initial%20structure%20builder/), followed by an
+   appropriate relaxation procedure.
+
+## Output files
+
+PepAD writes output into the run directory.
+
+| Output | Contents |
+| --- | --- |
+| `energyprofile.txt` | Step, sequence, score, binding free energy, weighted aggregation propensity, and sheet RMSD |
+| `energydetails.txt` | Detailed trial energies, Monte Carlo move, and acceptance result |
+| `minimum_energy.txt` | Lowest-score sequences encountered during the search |
+| `backup4backbone.txt` | Restart information |
+| `pdbfiles/` | Structures saved for minimum-score designs |
+
+Run settings and progress are printed to standard output; an HPC submission
+script can redirect that stream to a job report. Energy quantities are reported
+in kcal/mol. RMSD is reported in angstroms.
+
+## Legacy v1.37 calculations
+
+For exact reproduction of an older run, use the source, input template, analyzer,
+and examples together from [`archive/v1.37`](archive/v1.37). Do not combine a
+v1.37 input with the v1.42 executable. For long-term release management, create a
+Git tag or GitHub Release for each stable version; the default branch should
+continue to contain only the current version.
+
+## Citation and references
+
+If PepAD contributes to published work, cite the relevant PepAD design papers:
+
+1. Sarma, S. et al. Design of parallel beta-sheet nanofibrils using Monte Carlo
+   search, coarse-grained simulations, and experimental testing. *Protein
+   Science* **33** (2024), e5102. https://doi.org/10.1002/pro.5102
+2. Xiao, X. et al. Sequence patterns and signatures: Computational and
+   experimental discovery of amyloid-forming peptides. *PNAS Nexus* **1**
+   (2022), pgac263. https://doi.org/10.1093/pnasnexus/pgac263
+3. Xiao, X. et al. De novo design of peptides that coassemble into beta
+   sheet-based nanofibrils. *Science Advances* **7** (2021), eabf7668.
+   https://doi.org/10.1126/sciadv.abf7668
+
+## License
+
+This project is distributed under the terms in [`LICENSE`](LICENSE).

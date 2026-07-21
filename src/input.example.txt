@@ -1,0 +1,70 @@
+### PepAD v1.42 input template
+### Copy this file into the run directory as input.txt.
+### Format: FLAG = value. Flag order does not matter.
+### Comments may begin with # or !. Each flag may appear only once.
+### Only PDBFILE and N_STEPS are required; all other flags have defaults.
+### Initial structure info
+PDBFILE = comp1.pdb   # REQUIRED. Initial structure PDB file
+N_RESIDUES = 7        # Number of residues per chain
+N_CHAINS   = 8        # Number of peptide chains
+GROUP_1 = 1 3 5 7     # Chain IDs in energy group 1
+GROUP_2 = 2 4 6 8     # Chain IDs in energy group 2
+SHEET_1 = 1 2 3 4     # Chain IDs in beta sheet 1
+SHEET_2 = 5 6 7 8     # Chain IDs in beta sheet 2
+RESTART = 0           # 0=fresh run (default); 1=restart
+
+### MC info or advanced calculation method
+RANSEED           = 1        # User-defined Random Seed
+N_STEPS           = 10000    # REQUIRED. Interger. Number of MC Steps
+KBT_SEQ           = 1.0      # Temperature factor for sequence change moves
+KBT_SHEETMOVE     = 0.6      # Temperature factor for sheet position perturbation moves
+RMSD_MAX          = 3.0      # Maximum RMSD for sheet position perturbation moves
+PAGG_WEIGHT       = 2.0      # Aggregation propensity weight
+ANNEAL_STAGES     = 0        # 0=no annealing; >0=number of annealing stages
+ESURF_MODE        = 0        # Nonpolar solvation: 0=off; 1=full ARVO; 2=cached/incremental ARVO
+SHEETMOVE         = 1        # 0=disable sheet moves; 1=enable sheet moves
+STEPS_BEFORE_SHEETMOVE = 500 # Number of sequence-change moves before the first sheet move
+STEPS_BETWEEN_SHEETMOVE = 200# Number of sequence-change moves between two sheet-moves
+
+### Amino acid Compositions
+N_HYDROPHOBIC_MIN = 4        # Minimum number of hydrophobic residues
+N_HYDROPHOBIC_MAX = 4        # Maximum number of hydrophobic residues
+N_POLAR_MIN       = 0        # Minimum number of polar residues
+N_POLAR_MAX       = 2        # Maximum number of polar residues
+N_CHARGED_MIN     = 0        # Minimum number of charged residues
+N_CHARGED_MAX     = 2        # Maximum number of charged residues
+N_OTHER_MIN       = 0        # Minimum number of other residues
+N_OTHER_MAX       = 0        # Maximum number of other residues
+
+### Constraints
+# Compositional constraints:
+  # N_<AA>_MIN                    Integer; minimum count of AA
+  # N_<AA>_MAX                    Integer; maximum count of AA
+  # AA = GLY ALA VAL LEU ILE MET PHE TYR TRP SER ASN GLN THR HIE ARG LYS GLU ASP CYS PRO
+  # Users may provide only a minimum, only a maximum, or both.
+  # Equal minimum and maximum values impose an exact AA count.
+  # Omit unconstrained amino-acids.
+  # Each N_<AA>_MIN or N_<AA>_MAX flag may appear only once.
+N_ASN_MIN = 0
+N_ASN_MAX = 1
+
+N_SER_MIN = 1
+N_SER_MAX = 3
+
+# Single site positional constraints
+  # Sites remain unchanged during the design run
+  # Usage:
+  # "Site number only": retain the amino acid from initial structure
+  # Example: 3 5 (3rd and 5 th amino acid are not changed)
+  # "Site number:AA": change the site to the specified amino acid
+  # and keep it unchanged
+  # Example: 3:CYS 12:LEU
+  # (Separate entries with spaces, do not place spaces around the colon)
+# e.g. Amino acid 5 first mutates to ASN, and sites 5 and 6 remain unchanged during design
+SINGLE_SITE_CONSTRAINTS   = 5:ASN 6 
+
+# Grouped site Positional constraints:
+  # GROUPED_SITE_AA_POOL: Allowed amino acids for grouped-site positional constrained sites
+  # GROUPED_SITE_CONSTRAINTS: Sites only select amino acid in the grouped pool without repetition
+GROUPED_SITE_AA_POOL      = ASN SER THR ALA VAL
+GROUPED_SITE_CONSTRAINTS  = 1 2 3
