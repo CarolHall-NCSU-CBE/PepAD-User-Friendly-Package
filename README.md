@@ -17,11 +17,10 @@ two stacked β-sheets corresponding to a specific class of cross-β spine [4,5].
 sequence is placed on the fixed peptide backbone and optimized through three
 Monte Carlo moves:
 
-1. **Residue mutation** replaces a residue with another residue from the same
-   hydration category.
-2. **Residue exchange** swaps two positions in the sequence.
-3. **Sheet position perturbation** translates one beta sheet while the other
-   sheet remains fixed.
+1. **Residue mutation** replaces a residue with another one
+2. **Residue exchange** swaps two residues in the sequence.
+3. **Sheet position perturbation** translates one β-sheet while the other
+   β-sheet remains fixed.
 
 <p align="center">
   <img width="450" alt="Simplified PepAD algorithm flow chart" src="https://github.com/user-attachments/assets/b0a786f8-a65d-48dd-a610-cdfaaca9e7fb" />
@@ -32,7 +31,7 @@ After each move, PepAD evaluates
 
 $$ Γ_{score} = ΔG_{binding} - \lambda \times P_{aggregation} $$
 
-More-negative scores indicate stronger predicted binding at the evaluated
+More negative scores indicate stronger predicted binding at the evaluated
 configuration. The binding term is calculated with an MM/GBSA-based model
 [6–8], and the aggregation term follows the Zyggregator approach [9–11].
 
@@ -42,13 +41,11 @@ configuration. The binding term is calculated with an MM/GBSA-based model
 | --- | --- |
 | [`src/main_v1.42.f90`](src/main_v1.42.f90) | PepAD source code |
 | [`src/input.example.txt`](src/input.example.txt) | Annotated input template |
-| `src/lib/` | Runtime force-field and rotamer data |
+| `src/lib/` | Force-field and rotamer data |
 | [`examples/`](examples/) | Examples |
 | [`Initial structures/`](Initial%20structures/) | Prepared fibril backbones and supporting files |
 | [`Initial structure builder/`](Initial%20structure%20builder/) | Initial Structure Builder |
-| [`archive/v1.37/`](archive/v1.37/) | Old source code, documentation, analyzer, and examples |
-
-The old files are in [`archive/v1.37/`](archive/v1.37/).
+| [`archive/`](archive/) | Old source code, documentation, analyzer, and examples |
 
 ## Quick start
 
@@ -60,18 +57,15 @@ The old files are in [`archive/v1.37/`](archive/v1.37/).
 ### 1. Compile PepAD
 
 PepAD is written in Fortran 90 and is intended for an HPC environment with an
-Intel Fortran compiler. From `src/`, compile the program beside the `lib/`
-directory:
+Intel Fortran compiler. From `src/`, compile the program in the same level with the `lib/`:
 
 ```bash
 module load PrgEnv-intel
 cd /path/to/PepAD-User-Friendly-Package/src
-ifx -O2 -o PepAD main_v1.42.f90
+ifx -o PepAD main_v1.42.f90
 ```
 
-Older Intel environments may use `ifort` instead of `ifx`. The executable finds
-its parameter library relative to its own location, so keep `PepAD` in `src/`
-beside `lib/` unless both are deployed together.
+The executable locates its parameter library relative to its own directory. Keep the `lib/` directory at the same level as the `PepAD` executable.
 
 To list all supported input parameters and defaults:
 
@@ -83,7 +77,7 @@ To list all supported input parameters and defaults:
 
 Each run needs:
 
-- an initial fibril structure in PDB format; and
+- an initial structure in PDB format; and
 - a text file named exactly `input.txt`.
 
 Create a working directory outside the PepAD package. Copy
@@ -123,7 +117,7 @@ PARAMETER = value
 - Comments may begin with `#` or `!`, including after a value.
 - Each parameter may appear at most once.
 - Unknown parameters and invalid or duplicate values stop the run with an error.
-- List values may be separated by spaces; chain lists also accept commas.
+- List values may be separated by spaces or commas.
 - The only required parameters are `PDBFILE` and `N_STEPS`.
 
 A minimal input is:
@@ -133,38 +127,37 @@ PDBFILE = comp1.pdb
 N_STEPS = 10000
 ```
 
-With this minimal form, PepAD determines chain length, chain count, energy
-groups, beta sheets, and composition from the PDB file. Other calculations use
-the defaults listed below.
+PepAD can automatically determines number of chains, number of residue per chain, energy
+groups, β-sheets, and composition from the PDB file. Other Parameters have defalut values.
 
 ### Initial structure and restart settings
 
-| Parameter | Meaning | Default or rule |
+| Parameter | Meaning | Default |
 | --- | --- | --- |
-| `PDBFILE` | Initial structure filename | **Required**; normally relative to the run directory |
-| `N_RESIDUES` | Residues per chain, including caps | Auto-detected when omitted |
-| `N_CHAINS` | Total peptide chains | Auto-detected when omitted |
-| `GROUP_1`, `GROUP_2` | Chain IDs in the two binding-energy groups | DSSP-based assignment when both are omitted |
-| `SHEET_1`, `SHEET_2`, ... | Chain IDs in each beta sheet | DSSP-based assignment when all are omitted |
+| `PDBFILE` | Initial structure filename | **Required** |
+| `N_RESIDUES` | Residues per chain, including caps | Auto-recognized |
+| `N_CHAINS` | Number of peptide chains | Auto-recognized |
+| `GROUP_1`, `GROUP_2` | Chain IDs in the two binding-energy groups | Auto-recognized |
+| `SHEET_1`, `SHEET_2`, ... | Chain IDs in each β-sheet | Auto-recognized |
 | `RESTART` | `0` for a fresh run; `1` to restart | `0` |
 
-`N_RESIDUES` and `N_CHAINS` must either both be present or both be absent. If
-custom energy groups are provided, both `GROUP_1` and `GROUP_2` are required and
-every PDB chain must occur exactly once across the pair. Custom `SHEET_n` parameters
-must be consecutively numbered from `SHEET_1`, and every chain must occur exactly
-once across all sheets.
+User-defined values for `N_RESIDUES`, `N_CHAINS`, `GROUP_1`, `GROUP_2`, and `SHEET_n` override the values automatically detected from the input PDB file.
+
+- `N_RESIDUES` and `N_CHAINS` must either both be provided or both be omitted. 
+- If custom energy groups are specified, both `GROUP_1` and `GROUP_2` are required, and every PDB chain must appear exactly once across the two groups.
+- Custom `SHEET_n` parameters must be consecutively numbered beginning with `SHEET_1`, and every chain must appear exactly once across all defined sheets.
 
 Example:
 
 ```text
-PDBFILE   = comp1.pdb
-N_RESIDUES = 7
-N_CHAINS   = 8
-GROUP_1    = 1 3 5 7
-GROUP_2    = 2 4 6 8
-SHEET_1    = 1 2 3 4
-SHEET_2    = 5 6 7 8
-RESTART    = 0
+PDBFILE   = comp1.pdb # REQUIRED
+N_RESIDUES = 7        # Can be omitted
+N_CHAINS   = 8        # Can be omitted
+GROUP_1    = 1 3 5 7  # Can be omitted
+GROUP_2    = 2 4 6 8  # Can be omitted
+SHEET_1    = 1 2 3 4  # Can be omitted
+SHEET_2    = 5 6 7 8  # Can be omitted
+RESTART    = 0        # Can be omitted
 ```
 
 ### Monte Carlo and energy settings
@@ -175,41 +168,40 @@ RESTART    = 0
 | `N_STEPS` | Number of Monte Carlo steps | **Required** |
 | `KBT_SEQ` | Sequence-move kBT when annealing is off | `1.0` |
 | `KBT_SHEETMOVE` | Sheet-move kBT when annealing is off | `0.6` |
-| `KBT_SEQ_HIGH`, `KBT_SEQ_LOW` | Initial and final sequence kBT during annealing | `2.0`, `0.5` |
-| `KBT_SHEETMOVE_HIGH`, `KBT_SHEETMOVE_LOW` | Initial and final sheet-move kBT during annealing | `1.2`, `0.3` |
+| `KBT_SEQ_HIGH` | Initial sequence kBT during annealing | `2.0` |
+| `KBT_SEQ_LOW` | Final sequence kBT during annealing | `0.5` |
+| `KBT_SHEETMOVE_HIGH` | Initial sheet-move kBT during annealing | `1.2` |
+| `KBT_SHEETMOVE_LOW` | Initial  sheet-move kBT during annealing | `0.3` |
 | `ANNEAL_STAGES` | `0` disables annealing; a positive integer sets its stage count | `0` |
 | `RMSD_MAX` | Maximum sheet-move RMSD in angstroms | `3.0` |
 | `PAGG_WEIGHT` | Aggregation-propensity weight, lambda | `2.0` |
 | `SHEETMOVE` | `0` disables or `1` enables sheet perturbations | `1` |
 | `STEPS_BEFORE_SHEETMOVE` | Sequence steps before the first sheet move | `500` |
 | `STEPS_BETWEEN_SHEETMOVE` | Sequence steps between sheet moves | `200` |
-| `ESURF_MODE` | Nonpolar solvation mode: `0` off, `1` full ARVO, `2` cached/incremental ARVO | `0` |
+| `ESURF_MODE` | Nonpolar solvation mode: `0` off, `1` full ARVO calculation, `2` cached local ARVO calculation using a neighbor list | `0` |
 
-When `ANNEAL_STAGES = 0`, PepAD uses `KBT_SEQ` and `KBT_SHEETMOVE`. When
-annealing is enabled, it instead uses the corresponding `HIGH` and `LOW` values.
-All kBT values must be positive, and each high value must be greater than or
-equal to its low value.
+- When `ANNEAL_STAGES = 0`, PepAD uses `KBT_SEQ` and `KBT_SHEETMOVE`.
+- When annealing is enabled, it instead uses the corresponding `HIGH` and `LOW` values.
+- All kBT values must be positive, and each high value must be greater than or equal to its low value.
+- ARVO is the geometric algorithm used to calculate solvent-accessible surface area. `ESURF_MODE=1` performs full calculation after each MC move. `ESURF_MODE=2` reuses cached values and recalculates only the local region affected by a mutation, making non-polar solvation energy calculation slighly faster.
 
 ### Amino acid compositions
 
-The input uses minimum and maximum counts instead of the four exact counts
-used by v1.37:
+The input uses minimum and maximum counts instead of the exact counts for four amino acid types:
 
-| Category | Amino acids | Parameters |
+| Parameter | Meaning | Default |
 | --- | --- | --- |
-| Hydrophobic | `GLY ALA VAL LEU ILE MET PHE TYR TRP` | `N_HYDROPHOBIC_MIN`, `N_HYDROPHOBIC_MAX` |
-| Polar | `SER ASN GLN THR HIE` | `N_POLAR_MIN`, `N_POLAR_MAX` |
-| Charged | `ARG LYS GLU ASP` | `N_CHARGED_MIN`, `N_CHARGED_MAX` |
-| Other | `CYS PRO` | `N_OTHER_MIN`, `N_OTHER_MAX` |
+| `N_HYDROPHOBIC_MIN`, `N_HYDROPHOBIC_MAX` | Minimum and maximum number of hydrophobic amino acids: `GLY ALA VAL LEU ILE MET PHE TYR TRP` | Composition of the input structure |
+| `N_POLAR_MIN`, `N_POLAR_MAX` | Minimum and maximum number of polar amino acids: `SER ASN GLN THR HIE` | Composition of the input structure |
+| `N_CHARGED_MIN`, `N_CHARGED_MAX` | Minimum and maximum number of charged amino acids: `ARG LYS GLU ASP` | Composition of the input structure |
+| `N_OTHER_MIN`, `N_OTHER_MAX` | Minimum and maximum number of other amino acids: `CYS PRO` | Composition of the input structure |
 
-If all eight category parameters are omitted, PepAD uses the starting PDB composition.
-If custom composition mode is used, every category must have a minimum, a
-maximum, or both. An omitted minimum becomes `0`; an omitted maximum becomes
-`N_RESIDUES`. Equal minimum and maximum values impose an exact count.
-
-Composition totals exclude `ACE`, `NME`, and `NHE` caps, but include residues at
-sites defined by single-site positional constraints and grouped-site positional
-constraints.
+- If all eight parameters are omitted, PepAD uses the same amino-acid composition as initial structure.
+- When designing compositions different from the initial structure, each category must specify a minimum, a maximum, or both.
+- An omitted minimum is set to `0`.
+- An omitted maximum is set to `N_RESIDUES`.
+- Equal minimum and maximum values impose an exact count.
+- Composition totals exclude number of `ACE`, `NME`, and `NHE` caps, but include residues at sites defined by single-site positional constraints and grouped-site positional constraints.
 
 Example allowing a range of polar and charged content while fixing the
 hydrophobic count:
