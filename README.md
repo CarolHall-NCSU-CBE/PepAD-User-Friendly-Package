@@ -7,7 +7,7 @@ trial with a physics-based score, and reports low-scoring designs for downstream
 simulation or experimental study.
 
 **Current version: v1.42.** The input format changed in v1.42 from a fixed,
-position-dependent form to named `FLAG = value` entries. Old v1.37 inputs are not
+position-dependent form to named `Parameter = value`. v1.37 inputs are not
 compatible with v1.42. The v1.37 source, documentation, analyzer, and examples are
 preserved in [`archive/v1.37`](archive/v1.37).
 
@@ -80,6 +80,7 @@ Each run needs:
 - an initial fibril structure in PDB format; and
 - a text file named exactly `input.txt`.
 
+<<<<<<< HEAD
 Copy [`src/input.example.txt`](src/input.example.txt) into the run directory,
 rename it to `input.txt`, and edit it for the selected PDB structure:
 
@@ -90,6 +91,10 @@ cp src/input.example.txt my_run/input.txt
 cp "Initial structures/comp1/comp1.pdb" my_run/
 cd my_run
 ```
+=======
+## Acknowledgement
+This project is supported by the National Science Foundation under Award No. 1931430, “Element: Computational Toolkit to Discover Peptides that Self-assemble into User-selected Structures.”  and Award No. 2347712, "CDS&E: Computational Design of Peptide-Based Biorecognition Elements". Any opinions, findings, and conclusions or recommendations expressed in this project are those of the authors and do not necessarily reflect the views of the National Science Foundation.
+>>>>>>> e891a6b9e5aca6933f3972223f309bcbe05927a4
 
 ### 3. Run PepAD
 
