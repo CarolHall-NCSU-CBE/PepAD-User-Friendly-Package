@@ -1,21 +1,12 @@
 # PepAD
 
-Peptide Assembly Design (PepAD) is a Monte Carlo sequence-design program for
-discovering peptides predicted to self-assemble on a user-supplied amyloid fibril
-backbone. PepAD explores peptide sequences and sheet arrangements, evaluates each
-trial with a physics-based score, and reports low-scoring designs for downstream
-simulation or experimental study.
+Peptide Assembly Design (PepAD) is a Monte Carlo sequence-design program for discovering peptides predicted to self-assemble on a user-supplied amyloid fibril backbone. PepAD explores peptide sequences and sheet arrangements, evaluates each trial with a physics-based score, and reports low-scoring designs for downstream simulation or experimental study.
 
-**Current version: v1.42.** This version uses named `PARAMETER = value` entries
-instead of the fixed, position-dependent input format. Inputs written for v1.37
-are not compatible.
+**Current version: v1.42.** This version uses named `PARAMETER = value` entries instead of the fixed, position-dependent input format. Inputs written for v1.37 are not compatible.
 
 ## What PepAD does
 
-PepAD starts from an initial peptide fibril structure, typically consisting of
-two stacked β-sheets corresponding to a specific class of cross-β spine [4,5]. A
-sequence is placed on the fixed peptide backbone and optimized through three
-Monte Carlo moves:
+PepAD starts from an initial peptide fibril structure, typically consisting of two stacked β-sheets corresponding to a specific class of cross-β spine [4,5]. A sequence is placed on the fixed peptide backbone and optimized through three Monte Carlo moves:
 
 1. **Residue mutation** replaces a residue with another one
 2. **Residue exchange** swaps two residues in the sequence.
@@ -31,9 +22,7 @@ After each move, PepAD evaluates
 
 $$ Γ_{score} = ΔG_{binding} - \lambda \times P_{aggregation} $$
 
-More negative scores indicate stronger predicted binding at the evaluated
-configuration. The binding term is calculated with an MM/GBSA-based model
-[6–8], and the aggregation term follows the Zyggregator approach [9–11].
+More negative scores indicate stronger predicted binding at the evaluated configuration. The binding term is calculated with an MM/GBSA-based model [6–8], and the aggregation term follows the Zyggregator approach [9–11].
 
 ## Repository layout
 
@@ -56,8 +45,7 @@ configuration. The binding term is calculated with an MM/GBSA-based model
 
 ### 1. Compile PepAD
 
-PepAD is written in Fortran 90 and is intended for an HPC environment with an
-Intel Fortran compiler. From `src/`, compile the program in the same level with the `lib/`:
+PepAD is written in Fortran 90 and is intended for an HPC environment with an Intel Fortran compiler. From `src/`, compile the program in the same level with the `lib/`:
 
 ```bash
 module load PrgEnv-intel
@@ -237,7 +225,7 @@ N_SER_MAX = 3
 - Enter only a minimum, only a maximum, or both.
 - Equal MIN and MAX values impose an exact count.
 - Amino acids without these parameters remain unconstrained, subject to their category limits.
-- <AA> can replaced with `GLY`, `ALA`, `VAL`, `LEU`, `ILE`, `MET`, `PHE`, `TYR`, `TRP`, `SER`, `ASN`, `GLN`, `THR`, `HIE`, `ARG`, `LYS`, `GLU`, `ASP`, `CYS`, and `PRO`.
+- \<AA\> can replaced with `GLY`, `ALA`, `VAL`, `LEU`, `ILE`, `MET`, `PHE`, `TYR`, `TRP`, `SER`, `ASN`, `GLN`, `THR`, `HIE`, `ARG`, `LYS`, `GLU`, `ASP`, `CYS`, and `PRO`.
 <br>
 
 ### Positional constraints
