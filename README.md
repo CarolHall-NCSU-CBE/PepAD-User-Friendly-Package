@@ -141,8 +141,7 @@ groups, β-sheets, and composition from the PDB file. Other Parameters have defa
 | `SHEET_1`, `SHEET_2`, ... | Chain IDs in each β-sheet | Auto-recognized |
 | `RESTART` | `0` for a fresh run; `1` to restart | `0` |
 
-User-defined values for `N_RESIDUES`, `N_CHAINS`, `GROUP_1`, `GROUP_2`, and `SHEET_n` override the values automatically detected from the input PDB file.
-
+- User-defined values for `N_RESIDUES`, `N_CHAINS`, `GROUP_1`, `GROUP_2`, and `SHEET_n` override the values automatically detected from the input PDB file.
 - `N_RESIDUES` and `N_CHAINS` must either both be provided or both be omitted. 
 - If custom energy groups are specified, both `GROUP_1` and `GROUP_2` are required, and every PDB chain must appear exactly once across the two groups.
 - Custom `SHEET_n` parameters must be consecutively numbered beginning with `SHEET_1`, and every chain must appear exactly once across all defined sheets.
@@ -207,10 +206,10 @@ Example allowing a range of polar and charged content while fixing the
 hydrophobic count:
 
 ```text
-N_HYDROPHOBIC_MIN = 4
-N_HYDROPHOBIC_MAX = 4
+N_HYDROPHOBIC_MIN = 0
+N_HYDROPHOBIC_MAX = 7
 N_POLAR_MIN       = 0
-N_POLAR_MAX       = 2
+N_POLAR_MAX       = 7
 N_CHARGED_MIN     = 0
 N_CHARGED_MAX     = 2
 N_OTHER_MIN       = 0
@@ -219,7 +218,7 @@ N_OTHER_MAX       = 0
 
 ### Compositional constraints
 
-Any standard PepAD amino acid can also have its own count range:
+Any amino acid can also have its own count range:
 
 ```text
 N_<AA>_MIN = integer
@@ -235,55 +234,59 @@ N_SER_MIN = 1
 N_SER_MAX = 3
 ```
 
-Supply only a minimum, only a maximum, or both. Equal values impose an exact
-count. Amino acids without these parameters remain unconstrained, subject to their
-category limits. Supported names are `GLY`, `ALA`, `VAL`, `LEU`, `ILE`, `MET`,
-`PHE`, `TYR`, `TRP`, `SER`, `ASN`, `GLN`, `THR`, `HIE`, `ARG`, `LYS`, `GLU`,
-`ASP`, `CYS`, and `PRO`.
+- Enter only a minimum, only a maximum, or both.
+- Equal MIN and MAX values impose an exact count.
+- Amino acids without these parameters remain unconstrained, subject to their category limits.
+- <AA> can replaced with `GLY`, `ALA`, `VAL`, `LEU`, `ILE`, `MET`, `PHE`, `TYR`, `TRP`, `SER`, `ASN`, `GLN`, `THR`, `HIE`, `ARG`, `LYS`, `GLU`, `ASP`, `CYS`, and `PRO`.
+<br>
 
 ### Positional constraints
 
-Cap positions (`ACE`, `NME`, and `NHE`) are recognized automatically and should
-not be listed as constraints. Site numbers refer only to amino-acid positions;
-caps are skipped when numbering. Thus, amino acid 3 is chain site 4 when chain
-site 1 is an ACE cap.
+- Cap positions (`ACE`, `NME`, and `NHE`) are recognized automatically and should not be listed as constraints. 
+- Residue numbers here refer only to amino-acid positions.
+- Caps are omitted when numbering. For a capped peptide, #3 is amino acid 3, which is at chain site 4 (since site 1 is an ACE cap).
 
 #### Single-site positional constraint
 
 `SINGLE_SITE_CONSTRAINTS` accepts space-separated entries:
 
-- `site` keeps the amino acid already present at that site.
-- `site:AA` first changes the site to the named amino acid, then keeps it fixed.
+- `site_num` keeps the amino acid already present at that site.
+- `site_num:AA` first changes the site to the named amino acid, then keeps it fixed.
 
-Do not place spaces around the colon:
+**Do not place spaces around the colon:**
 
 ```text
-SINGLE_SITE_CONSTRAINTS = 5:ASN 6
+SINGLE_SITE_CONSTRAINTS = 5:ASN 6 # Incorrect format
 ```
 
 Use `NONE` or omit the parameter when no single-site positional constraint is needed.
 
 #### Grouped-site positional constraint
 
-Grouped sites draw residues from a user-defined pool:
+Grouped-site constraints assign amino acids to selected positions from a user-defined pool:
 
 ```text
 GROUPED_SITE_AA_POOL     = ASN SER THR ALA VAL
 GROUPED_SITE_CONSTRAINTS = 1 2 3
 ```
+Here, sites 1, 2, and 3 are assigned amino acids from the `GROUPED_SITE_AA_POOL`.
 
-The pool must contain at least as many entries as there are grouped sites. A
-residue may be repeated in the pool to make more copies available; each remaining
-copy has equal selection probability. Grouped sites may not overlap caps or
-single-site positional constraints. PepAD validates the pool against the amino
-acid compositions and compositional constraints.
+PepAD allows to assign duplicate amino acid:
+```text
+GROUPED_SITE_AA_POOL     = ASN SER ALA ALA VAL
+GROUPED_SITE_CONSTRAINTS = 2 3 5
+```
+Here, `ALA` may appear on sites 2, 3, and 5 at most twice.
 
-### Complete annotated template
+- The number of amino acids in `GROUPED_SITE_AA_POOL` must no less than the number of `GROUPED_SITE_CONSTRAINTS`.
+- To allow an amino acid to appear one additional time, enter it one additional time in the pool.
+- Grouped-sites cannot overlap with sites listed in `SINGLE_SITE_CONSTRAINTS`.
+- PepAD checks whether the grouped-site pool is compatible with the overall composition limits and specific amino-acid constraints.
 
-The maintained template is [`src/input.example.txt`](src/input.example.txt). Use
-it as the starting point for new calculations. Do not adapt a v1.37 input by
-changing only its labels: the old positional format and exact composition fields
-have different semantics.
+
+### Annotated input.txt template
+
+The maintained template is [`src/input.example.txt`](src/input.example.txt). Use it as the starting point for new designs.
 
 ## Initial structure requirements
 
