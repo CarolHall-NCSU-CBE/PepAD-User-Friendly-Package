@@ -1,8 +1,8 @@
 ### PepAD v1.42 input template
 ### Copy this file into the run directory as input.txt.
-### Format: FLAG = value. Flag order does not matter.
-### Comments may begin with # or !. Each flag may appear only once.
-### Only PDBFILE and N_STEPS are required; all other flags have defaults.
+### Format: PARAMETER = value. Parameter order does not matter.
+### Comments may begin with # or !. Each parameter may appear only once.
+### Only PDBFILE and N_STEPS are required; all other parameters have defaults.
 ### Initial structure info
 PDBFILE = comp1.pdb   # REQUIRED. Initial structure PDB file
 N_RESIDUES = 7        # Number of residues per chain
@@ -44,7 +44,7 @@ N_OTHER_MAX       = 0        # Maximum number of other residues
   # Users may provide only a minimum, only a maximum, or both.
   # Equal minimum and maximum values impose an exact AA count.
   # Omit unconstrained amino-acids.
-  # Each N_<AA>_MIN or N_<AA>_MAX flag may appear only once.
+  # Each N_<AA>_MIN or N_<AA>_MAX parameter may appear only once.
 N_ASN_MIN = 0
 N_ASN_MAX = 1
 

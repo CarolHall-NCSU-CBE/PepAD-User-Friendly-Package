@@ -7,14 +7,14 @@ trial with a physics-based score, and reports low-scoring designs for downstream
 simulation or experimental study.
 
 **Current version: v1.42.** The input format changed in v1.42 from a fixed,
-position-dependent form to named `Parameter = value`. v1.37 inputs are not
+position-dependent form to named `PARAMETER = value` entries. v1.37 inputs are not
 compatible with v1.42. The v1.37 source, documentation, analyzer, and examples are
 preserved in [`archive/v1.37`](archive/v1.37).
 
 ## What PepAD does
 
 PepAD begins with a fibril model, usually two stacked beta sheets in one of the
-cross-beta steric-zipper classes. A sequence is placed on the fixed peptide
+cross-beta steric-zipper classes [4,5]. A sequence is placed on the fixed peptide
 backbone and optimized through three Monte Carlo moves:
 
 1. **Residue mutation** replaces a residue with another residue from the same
@@ -22,6 +22,11 @@ backbone and optimized through three Monte Carlo moves:
 2. **Residue exchange** swaps two positions in the sequence.
 3. **Sheet position perturbation** translates one beta sheet while the other
    sheet remains fixed.
+
+<p align="center">
+  <img width="450" alt="Simplified PepAD algorithm flow chart" src="https://github.com/user-attachments/assets/b0a786f8-a65d-48dd-a610-cdfaaca9e7fb" />
+</p>
+<p align="center"><b>Fig. 1.</b> Simplified flow chart of the PepAD algorithm.</p>
 
 After each move, PepAD evaluates
 
@@ -31,8 +36,8 @@ $$
 $$
 
 More-negative scores indicate stronger predicted binding at the evaluated
-configuration. The binding term is calculated with an MM/GBSA-based model, and
-the aggregation term follows the Zyggregator approach.
+configuration. The binding term is calculated with an MM/GBSA-based model
+[6–8], and the aggregation term follows the Zyggregator approach [9–11].
 
 ## Repository layout
 
@@ -51,6 +56,11 @@ files belong in `archive/`; do not place old source files beside `src/main.f90`.
 
 ## Quick start
 
+<p align="center">
+  <img width="1200" alt="PepAD peptide-design workflow" src="https://github.com/user-attachments/assets/982d5573-7dac-4381-a9ce-651992b16658" />
+</p>
+<p align="center"><b>Fig. 2.</b> Workflow for designing peptides with PepAD.</p>
+
 ### 1. Compile PepAD
 
 PepAD is written in Fortran 90 and is intended for an HPC environment with an
@@ -67,7 +77,7 @@ Older Intel environments may use `ifort` instead of `ifx`. The executable finds
 its parameter library relative to its own location, so keep `PepAD` in `src/`
 beside `lib/` unless both are deployed together.
 
-To list all supported v1.42 input flags and defaults:
+To list all supported v1.42 input parameters and defaults:
 
 ```bash
 ./PepAD --help
@@ -80,7 +90,6 @@ Each run needs:
 - an initial fibril structure in PDB format; and
 - a text file named exactly `input.txt`.
 
-<<<<<<< HEAD
 Copy [`src/input.example.txt`](src/input.example.txt) into the run directory,
 rename it to `input.txt`, and edit it for the selected PDB structure:
 
@@ -91,10 +100,6 @@ cp src/input.example.txt my_run/input.txt
 cp "Initial structures/comp1/comp1.pdb" my_run/
 cd my_run
 ```
-=======
-## Acknowledgement
-This project is supported by the National Science Foundation under Award No. 1931430, “Element: Computational Toolkit to Discover Peptides that Self-assemble into User-selected Structures.”  and Award No. 2347712, "CDS&E: Computational Design of Peptide-Based Biorecognition Elements". Any opinions, findings, and conclusions or recommendations expressed in this project are those of the authors and do not necessarily reflect the views of the National Science Foundation.
->>>>>>> e891a6b9e5aca6933f3972223f309bcbe05927a4
 
 ### 3. Run PepAD
 
@@ -114,17 +119,17 @@ Adjust the executable path when the run directory is elsewhere.
 Every nonblank input line has the form:
 
 ```text
-FLAG = value
+PARAMETER = value
 ```
 
-- Flag order does not matter.
-- Flag names are case-insensitive; uppercase is recommended.
+- Parameter order does not matter.
+- Parameter names are case-insensitive; uppercase is recommended.
 - Blank lines are allowed.
 - Comments may begin with `#` or `!`, including after a value.
-- Each flag may appear at most once.
-- Unknown flags and invalid or duplicate values stop the run with an error.
+- Each parameter may appear at most once.
+- Unknown parameters and invalid or duplicate values stop the run with an error.
 - List values may be separated by spaces; chain lists also accept commas.
-- The only required flags are `PDBFILE` and `N_STEPS`.
+- The only required parameters are `PDBFILE` and `N_STEPS`.
 
 A minimal input is:
 
@@ -139,7 +144,7 @@ the defaults listed below.
 
 ### Initial structure and restart settings
 
-| Flag | Meaning | Default or rule |
+| Parameter | Meaning | Default or rule |
 | --- | --- | --- |
 | `PDBFILE` | Initial structure filename | **Required**; normally relative to the run directory |
 | `N_RESIDUES` | Residues per chain, including caps | Auto-detected when omitted |
@@ -150,7 +155,7 @@ the defaults listed below.
 
 `N_RESIDUES` and `N_CHAINS` must either both be present or both be absent. If
 custom energy groups are provided, both `GROUP_1` and `GROUP_2` are required and
-every PDB chain must occur exactly once across the pair. Custom `SHEET_n` flags
+every PDB chain must occur exactly once across the pair. Custom `SHEET_n` parameters
 must be consecutively numbered from `SHEET_1`, and every chain must occur exactly
 once across all sheets.
 
@@ -169,7 +174,7 @@ RESTART    = 0
 
 ### Monte Carlo and energy settings
 
-| Flag | Meaning | Default |
+| Parameter | Meaning | Default |
 | --- | --- | ---: |
 | `RANSEED` | Integer random seed | System clock |
 | `N_STEPS` | Number of Monte Carlo steps | **Required** |
@@ -195,14 +200,14 @@ equal to its low value.
 The v1.42 input uses minimum and maximum counts instead of the four exact counts
 used by v1.37:
 
-| Category | Amino acids | Flags |
+| Category | Amino acids | Parameters |
 | --- | --- | --- |
 | Hydrophobic | `GLY ALA VAL LEU ILE MET PHE TYR TRP` | `N_HYDROPHOBIC_MIN`, `N_HYDROPHOBIC_MAX` |
 | Polar | `SER ASN GLN THR HIE` | `N_POLAR_MIN`, `N_POLAR_MAX` |
 | Charged | `ARG LYS GLU ASP` | `N_CHARGED_MIN`, `N_CHARGED_MAX` |
 | Other | `CYS PRO` | `N_OTHER_MIN`, `N_OTHER_MAX` |
 
-If all eight category flags are omitted, PepAD uses the starting PDB composition.
+If all eight category parameters are omitted, PepAD uses the starting PDB composition.
 If custom composition mode is used, every category must have a minimum, a
 maximum, or both. An omitted minimum becomes `0`; an omitted maximum becomes
 `N_RESIDUES`. Equal minimum and maximum values impose an exact count.
@@ -243,7 +248,7 @@ N_SER_MAX = 3
 ```
 
 Supply only a minimum, only a maximum, or both. Equal values impose an exact
-count. Amino acids without these flags remain unconstrained, subject to their
+count. Amino acids without these parameters remain unconstrained, subject to their
 category limits. Supported names are `GLY`, `ALA`, `VAL`, `LEU`, `ILE`, `MET`,
 `PHE`, `TYR`, `TRP`, `SER`, `ASN`, `GLN`, `THR`, `HIE`, `ARG`, `LYS`, `GLU`,
 `ASP`, `CYS`, and `PRO`.
@@ -268,7 +273,7 @@ Do not place spaces around the colon:
 SINGLE_SITE_CONSTRAINTS = 5:ASN 6
 ```
 
-Use `NONE` or omit the flag when no single-site constraint is needed.
+Use `NONE` or omit the parameter when no single-site constraint is needed.
 
 #### Grouped-site constraints
 
@@ -306,6 +311,34 @@ An initial structure may be obtained by:
    [`Initial structure builder`](Initial%20structure%20builder/), followed by an
    appropriate relaxation procedure.
 
+For the first approach, an experimental fibril such as the Sup35 prion segment
+GNNQQNY (PDB ID: 2OMM) can be replicated to make a larger cross-beta assembly,
+relaxed to remove atomic overlaps, and converted to PepAD's required PDB format.
+
+<p align="center">
+  <img width="650" alt="Preparing a PepAD structure from a Protein Data Bank fibril" src="https://github.com/user-attachments/assets/c476b3f8-90dd-411e-837f-1fc97d476770" />
+</p>
+<p align="center"><b>Fig. 3.</b> Preparing an initial structure from an experimental fibril in the Protein Data Bank.</p>
+
+For the second approach, a peptide such as Aβ(16–22), KLVFFAE, can be built with
+UCSF Chimera, packed into a two-layer fibril with Packmol, and relaxed using an
+explicit-solvent molecular dynamics simulation. The middle chains can then be
+extracted to reduce the computational cost of the PepAD calculation.
+
+<p align="center">
+  <img width="800" alt="Preparing an artificial amyloid backbone with molecular modeling tools" src="https://github.com/user-attachments/assets/3b1b6026-a947-4a42-98e6-0e8600c831d6" />
+</p>
+<p align="center"><b>Fig. 4.</b> Preparing an initial structure with molecular modeling tools.</p>
+
+The supplied builder can generate two beta-sheet fibril backbones in any of the
+eight steric-zipper classes [4]. It uses PeptideBuilder to construct peptides and
+Hydride to add hydrogens [12,13].
+
+<p align="center">
+  <img width="800" alt="Parallel seven-residue peptide backbone generated by the initial structure builder" src="https://github.com/user-attachments/assets/2c485625-af0e-4c3f-8a94-31fa2de56725" />
+</p>
+<p align="center"><b>Fig. 5.</b> A seven-residue parallel peptide backbone generated by the initial structure builder.</p>
+
 ## Output files
 
 PepAD writes output into the run directory.
@@ -322,28 +355,78 @@ Run settings and progress are printed to standard output; an HPC submission
 script can redirect that stream to a job report. Energy quantities are reported
 in kcal/mol. RMSD is reported in angstroms.
 
-## Legacy v1.37 calculations
-
-For exact reproduction of an older run, use the source, input template, analyzer,
-and examples together from [`archive/v1.37`](archive/v1.37). Do not combine a
-v1.37 input with the v1.42 executable. For long-term release management, create a
-Git tag or GitHub Release for each stable version; the default branch should
-continue to contain only the current version.
+<p align="center">
+  <img width="800" alt="PepAD score and RMSD evolution" src="https://github.com/user-attachments/assets/15786422-7758-4cfb-a3e5-2ff3c10b5856" />
+</p>
+<p align="center"><b>Fig. 6.</b> Score and RMSD evolution during a 10,000-step PepAD design run for a seven-residue antiparallel peptide.</p>
 
 ## Citation and references
 
-If PepAD contributes to published work, cite the relevant PepAD design papers:
+If PepAD contributes to published work, please cite the relevant PepAD design
+papers [1–3].
 
-1. Sarma, S. et al. Design of parallel beta-sheet nanofibrils using Monte Carlo
-   search, coarse-grained simulations, and experimental testing. *Protein
-   Science* **33** (2024), e5102. https://doi.org/10.1002/pro.5102
-2. Xiao, X. et al. Sequence patterns and signatures: Computational and
-   experimental discovery of amyloid-forming peptides. *PNAS Nexus* **1**
-   (2022), pgac263. https://doi.org/10.1093/pnasnexus/pgac263
-3. Xiao, X. et al. De novo design of peptides that coassemble into beta
-   sheet-based nanofibrils. *Science Advances* **7** (2021), eabf7668.
+1. S. Sarma, T.R. Sudarshan, V. Nguyen, A.S. Robang, X. Xiao, J.V. Le,
+   M.E. Helmicki, A.K. Paravastu, and C.K. Hall, “Design of parallel β-sheet
+   nanofibrils using Monte Carlo search, coarse-grained simulations, and
+   experimental testing,” *Protein Science* **33** (2024), e5102.
+   https://doi.org/10.1002/pro.5102
+2. X. Xiao, A.S. Robang, S. Sarma, J.V. Le, M.E. Helmicki, M.J. Lambert,
+   R. Guerrero-Ferreira, J. Arboleda-Echavarria, A.K. Paravastu, and C.K. Hall,
+   “Sequence patterns and signatures: Computational and experimental discovery
+   of amyloid-forming peptides,” *PNAS Nexus* **1** (2022), pgac263.
+   https://doi.org/10.1093/pnasnexus/pgac263
+3. X. Xiao, Y. Wang, D.T. Seroski, K.M. Wong, R. Liu, A.K. Paravastu,
+   G.A. Hudalla, and C.K. Hall, “De novo design of peptides that coassemble into
+   β-sheet-based nanofibrils,” *Science Advances* **7** (2021), eabf7668.
    https://doi.org/10.1126/sciadv.abf7668
+4. M.R. Sawaya, S. Sambashivan, R. Nelson, M.I. Ivanova, S.A. Sievers,
+   M.I. Apostol, M.J. Thompson, M. Balbirnie, J.J.W. Wiltzius, H.T. McFarlane,
+   A.Ø. Madsen, C. Riekel, and D. Eisenberg, “Atomic structures of amyloid
+   cross-β spines reveal varied steric zippers,” *Nature* **447** (2007),
+   453–457. https://doi.org/10.1038/nature05695
+5. R. Nelson, M.R. Sawaya, M. Balbirnie, A.Ø. Madsen, C. Riekel, R. Grothe,
+   and D. Eisenberg, “Structure of the cross-β spine of amyloid-like fibrils,”
+   *Nature* **435** (2005), 773–778. https://doi.org/10.1038/nature03680
+6. H. Gohlke, C. Kiel, and D.A. Case, “Insights into protein–protein binding by
+   binding free energy calculation and free energy decomposition for the
+   Ras–Raf and Ras–RalGDS complexes,” *Journal of Molecular Biology* **330**
+   (2003), 891–913. https://doi.org/10.1016/S0022-2836(03)00610-7
+7. G. Rastelli, A.D. Rio, G. Degliesposti, and M. Sgobba, “Fast and accurate
+   predictions of binding free energies using MM-PBSA and MM-GBSA,” *Journal of
+   Computational Chemistry* **31** (2010), 797–810.
+   https://doi.org/10.1002/jcc.21372
+8. X. Xiao, B. Zhao, P.F. Agris, and C.K. Hall, “Simulation study of the ability
+   of a computationally designed peptide to recognize target tRNA Lys3 and other
+   decoy tRNAs,” *Protein Science* **25** (2016), 2243–2255.
+   https://doi.org/10.1002/pro.3056
+9. G.G. Tartaglia, A.P. Pawar, S. Campioni, C.M. Dobson, F. Chiti, and
+   M. Vendruscolo, “Prediction of aggregation-prone regions in structured
+   proteins,” *Journal of Molecular Biology* **380** (2008), 425–436.
+   https://doi.org/10.1016/j.jmb.2008.05.013
+10. G.G. Tartaglia and M. Vendruscolo, “The Zyggregator method for predicting
+    protein aggregation propensities,” *Chemical Society Reviews* **37** (2008),
+    1395–1401. https://doi.org/10.1039/B706784B
+11. A.P. Pawar, K.F. DuBay, J. Zurdo, F. Chiti, M. Vendruscolo, and C.M. Dobson,
+    “Prediction of aggregation-prone and aggregation-susceptible regions in
+    proteins associated with neurodegenerative diseases,” *Journal of Molecular
+    Biology* **350** (2005), 379–392.
+    https://doi.org/10.1016/j.jmb.2005.04.016
+12. M.Z. Tien, D.K. Sydykova, A.G. Meyer, and C.O. Wilke, “PeptideBuilder: A
+    simple Python library to generate model peptides,” *PeerJ* **1** (2013), e80.
+    https://doi.org/10.7717/peerj.80
+13. P. Kunzmann, J.M. Anter, and K. Hamacher, “Adding hydrogen atoms to molecular
+    models via fragment superimposition,” *Algorithms for Molecular Biology*
+    **17** (2022), 7. https://doi.org/10.1186/s13015-022-00215-x
 
 ## License
 
 This project is distributed under the terms in [`LICENSE`](LICENSE).
+
+## Acknowledgment
+
+This project is supported by the National Science Foundation under Award No.
+1931430, “Element: Computational Toolkit to Discover Peptides that Self-assemble
+into User-selected Structures,” and Award No. 2347712, “CDS&E: Computational
+Design of Peptide-Based Biorecognition Elements.” Any opinions, findings, and
+conclusions or recommendations expressed in this project are those of the authors
+and do not necessarily reflect the views of the National Science Foundation.

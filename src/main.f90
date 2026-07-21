@@ -1105,7 +1105,7 @@ module input
 		stop
 	endif
 
-	! Read each FLAG = value line. Flag position does not matter.
+	! Read each PARAMETER = value line. Parameter position does not matter.
 	line_number=0
 	do
 		read(unit,'(A)',iostat=ios) line
@@ -1136,7 +1136,7 @@ module input
 
 		! All specific-amino-acid restrictions have the form N_<AA>_MIN/MAX.
 		! Keeping them here avoids forty nearly identical CASE blocks and makes
-		! duplicate MIN or MAX flags straightforward to reject.
+		! duplicate MIN or MAX parameters straightforward to reject.
 		amino_acid_flag=.false.
 		if (len_trim(key) == 9 .and. key(1:2) == 'N_' .and. &
 			(key(6:9) == '_MIN' .or. key(6:9) == '_MAX')) then
@@ -1152,7 +1152,7 @@ module input
 				amino_acid_flag=.true.
 				if (key(6:9) == '_MIN') then
 					if (aa_min_defined(aa_index)) &
-						call input_error('duplicate flag '//trim(key),line_number)
+						call input_error('duplicate parameter '//trim(key),line_number)
 					if (n_morethan >= maximum_aa_restrictions) &
 						call input_error('too many amino-acid minimum restrictions',line_number)
 					n_morethan=n_morethan+1
@@ -1161,7 +1161,7 @@ module input
 					aa_min_defined(aa_index)=.true.
 				else
 					if (aa_max_defined(aa_index)) &
-						call input_error('duplicate flag '//trim(key),line_number)
+						call input_error('duplicate parameter '//trim(key),line_number)
 					if (n_restrictions >= maximum_aa_restrictions) &
 						call input_error('too many amino-acid maximum restrictions',line_number)
 					n_restrictions=n_restrictions+1
@@ -1174,13 +1174,13 @@ module input
 		endif
 		if (amino_acid_flag) cycle
 
-		! Every ordinary input flag may appear only once.  The specific-amino-acid
-		! flags are counted separately above, and SHEET_n flags are checked below.
+		! Every ordinary input parameter may appear only once. The specific-amino-acid
+		! parameters are counted separately above, and SHEET_n parameters are checked below.
 		do counted_flag_index=1,number_of_counted_flags
 			if (trim(key) == trim(counted_flag_names(counted_flag_index))) then
 				flag_count(counted_flag_index)=flag_count(counted_flag_index)+1
 				if (flag_count(counted_flag_index) > 1) &
-					call input_error('duplicate flag '//trim(key),line_number)
+					call input_error('duplicate parameter '//trim(key),line_number)
 				exit
 			endif
 		enddo
@@ -1195,7 +1195,7 @@ module input
 				stop
 			endif
 			if (sheet_defined(sheet_number)) &
-				call input_error('duplicate flag '//trim(key),line_number)
+				call input_error('duplicate parameter '//trim(key),line_number)
 			sheet_value(sheet_number)=value
 			sheet_defined(sheet_number)=.true.
 			max_user_sheet=max(max_user_sheet,sheet_number)
@@ -1302,7 +1302,7 @@ module input
 
 		case default
 			write(*,'(A,I0,2A)') 'ERROR on input line ',line_number, &
-				': unknown flag ',trim(key)
+				': unknown parameter ',trim(key)
 			stop
 		end select
 
@@ -1914,7 +1914,7 @@ module input
 	write(6,'(1X,A,T38,"= ",F5.3)') 'Aggregation propensity weight', &
 		propensity_weighting_factor
 	write(6,'(1X,A,T38,"= ",I0)') 'Annealing stages',anneal_stages
-    write(6,'(1X,A,T38,"= ",I0)') 'Sheet-move flag',sheetmove_flag
+    write(6,'(1X,A,T38,"= ",I0)') 'Sheet-move parameter',sheetmove_flag
     if (sheetmove_flag == 1) then
 		write(6,'(1X,A,T38,"= ",A)') 'Sheet position perturbation move','enabled'
 		!write(6,'(1X,A,T38,"= ",F5.3)') 'Sheet-move proposal probability',sheet_switch
@@ -2429,9 +2429,9 @@ subroutine check_help
 	write(*,'(A)') '  PepAD -h              Display this help and exit'
 	write(*,'(A)') '  PepAD --help          Display this help and exit'
 	write(*,'(A)') ' '
-	write(*,'(A)') 'Input format: FLAG = value'
-	write(*,'(A)') 'Flag order does not matter. Comments may start with # or !.'
-	write(*,'(A)') 'Each input flag may appear only once.'
+	write(*,'(A)') 'Input format: PARAMETER = value'
+	write(*,'(A)') 'Parameter order does not matter. Comments may start with # or !.'
+	write(*,'(A)') 'Each input parameter may appear only once.'
 	write(*,'(A)') 'Only PDBFILE and N_STEPS are required.'
 	write(*,'(A)') ' '
 	write(*,'(A)') 'Required parameters:'
@@ -2505,12 +2505,12 @@ subroutine check_help
 	write(*,'(A)') '  N_OTHER_MAX                   Integer; maximum number of'
 	write(*,'(A)') '                                other residues'
 	write(*,'(A)') ' '
-	write(*,'(A)') '  If all category flags are omitted, the initial PDB composition'
+	write(*,'(A)') '  If all category parameters are omitted, the initial PDB composition'
 	write(*,'(A)') '  is used.'
 	write(*,'(A)') '  In custom mode, every category requires MIN, MAX, or both.'
 	write(*,'(A)') '  An omitted MIN becomes 0; an omitted MAX becomes N_RESIDUES.'
 	write(*,'(A)') '  Equal minimum and maximum values indicate a fixed category number.'
-	write(*,'(A)') '  A category MIN or MAX flag may appear only once.'
+	write(*,'(A)') '  A category MIN or MAX parameter may appear only once.'
 	write(*,'(A)') '  Composition totals exclude ACE, NME, and NHE cap residues.'
 	write(*,'(A)') '  Single-site and grouped-site amino acids are included in composition totals.'
 	write(*,'(A)') '  Fixed single-site amino acids contribute to the minimum required AA/category counts.'
@@ -2524,7 +2524,7 @@ subroutine check_help
 	write(*,'(A)') '  Users may provide only a minimum, only a maximum, or both.'
 	write(*,'(A)') '  Equal minimum and maximum values impose an exact AA count.'
 	write(*,'(A)') '  Omitted amino-acids are unconstrained.'
-	write(*,'(A)') '  Each N_<AA>_MIN or N_<AA>_MAX flag may appear only once.'
+	write(*,'(A)') '  Each N_<AA>_MIN or N_<AA>_MAX parameter may appear only once.'
 	write(*,'(A)') '  Specific-AA minima cannot exceed the corresponding category maximum.'
 	write(*,'(A)') ' '
 
