@@ -1,6 +1,6 @@
-# PepAD v1.42 examples
+# PepAD examples
 
-Examples in this directory should use the v1.42 `FLAG = value` input format.
+Examples in this directory should use the `PARAMETER = value` input format.
 Start from [`src/input.example.txt`](../src/input.example.txt), copy it to a run
 directory as `input.txt`, and place the referenced PDB file in that directory.
 

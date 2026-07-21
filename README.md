@@ -6,16 +6,16 @@ backbone. PepAD explores peptide sequences and sheet arrangements, evaluates eac
 trial with a physics-based score, and reports low-scoring designs for downstream
 simulation or experimental study.
 
-**Current version: v1.42.** The input format changed in v1.42 from a fixed,
-position-dependent form to named `PARAMETER = value` entries. v1.37 inputs are not
-compatible with v1.42. The v1.37 source, documentation, analyzer, and examples are
-preserved in [`archive/v1.37`](archive/v1.37).
+**Current version: v1.42.** This version uses named `PARAMETER = value` entries
+instead of the fixed, position-dependent input format. Inputs written for v1.37
+are not compatible.
 
 ## What PepAD does
 
-PepAD begins with a fibril model, usually two stacked beta sheets in one of the
-cross-beta steric-zipper classes [4,5]. A sequence is placed on the fixed peptide
-backbone and optimized through three Monte Carlo moves:
+PepAD starts from an initial peptide fibril structure, typically consisting of
+two stacked β-sheets corresponding to a specific class of cross-β spine [4,5]. A
+sequence is placed on the fixed peptide backbone and optimized through three
+Monte Carlo moves:
 
 1. **Residue mutation** replaces a residue with another residue from the same
    hydration category.
@@ -26,7 +26,7 @@ backbone and optimized through three Monte Carlo moves:
 <p align="center">
   <img width="450" alt="Simplified PepAD algorithm flow chart" src="https://github.com/user-attachments/assets/b0a786f8-a65d-48dd-a610-cdfaaca9e7fb" />
 </p>
-<p align="center"><b>Fig. 1.</b> Simplified flow chart of the PepAD algorithm.</p>
+<p align="center"><b>Fig. 1.</b> Simplified flow chart describing the PepAD algorithm.</p>
 
 After each move, PepAD evaluates
 
@@ -43,23 +43,22 @@ configuration. The binding term is calculated with an MM/GBSA-based model
 
 | Path | Contents |
 | --- | --- |
-| [`src/main.f90`](src/main.f90) | Current PepAD v1.42 source |
-| [`src/input.example.txt`](src/input.example.txt) | Annotated v1.42 input template |
+| [`src/main_v1.42.f90`](src/main_v1.42.f90) | PepAD source code |
+| [`src/input.example.txt`](src/input.example.txt) | Annotated input template |
 | `src/lib/` | Runtime force-field and rotamer data |
-| [`examples/`](examples/) | Location for v1.42 examples |
+| [`examples/`](examples/) | Examples |
 | [`Initial structures/`](Initial%20structures/) | Prepared fibril backbones and supporting files |
-| [`Initial structure builder/`](Initial%20structure%20builder/) | Optional Python tool for building fibril backbones |
-| [`archive/v1.37/`](archive/v1.37/) | Complete legacy v1.37 material |
+| [`Initial structure builder/`](Initial%20structure%20builder/) | Initial Structure Builder |
+| [`archive/v1.37/`](archive/v1.37/) | Old source code, documentation, analyzer, and examples |
 
-The repository root tracks the current release. Version-specific historical
-files belong in `archive/`; do not place old source files beside `src/main.f90`.
+The old files are in [`archive/v1.37/`](archive/v1.37/).
 
 ## Quick start
 
 <p align="center">
   <img width="1200" alt="PepAD peptide-design workflow" src="https://github.com/user-attachments/assets/982d5573-7dac-4381-a9ce-651992b16658" />
 </p>
-<p align="center"><b>Fig. 2.</b> Workflow for designing peptides with PepAD.</p>
+<p align="center"><b>Fig. 2.</b> A workflow chart describing how to design peptides.</p>
 
 ### 1. Compile PepAD
 
@@ -69,18 +68,18 @@ directory:
 
 ```bash
 module load PrgEnv-intel
-cd src
-ifx -O2 -o PepAD main.f90
+cd /path/to/PepAD-User-Friendly-Package/src
+ifx -O2 -o PepAD main_v1.42.f90
 ```
 
 Older Intel environments may use `ifort` instead of `ifx`. The executable finds
 its parameter library relative to its own location, so keep `PepAD` in `src/`
 beside `lib/` unless both are deployed together.
 
-To list all supported v1.42 input parameters and defaults:
+To list all supported input parameters and defaults:
 
 ```bash
-./PepAD --help
+/path/to/PepAD-User-Friendly-Package/src/PepAD --help
 ```
 
 ### 2. Prepare a run directory
@@ -90,29 +89,28 @@ Each run needs:
 - an initial fibril structure in PDB format; and
 - a text file named exactly `input.txt`.
 
-Copy [`src/input.example.txt`](src/input.example.txt) into the run directory,
-rename it to `input.txt`, and edit it for the selected PDB structure:
+Create a working directory outside the PepAD package. Copy
+[`src/input.example.txt`](src/input.example.txt) into the working directory as
+`input.txt`, copy the initial PDB structure, and edit `input.txt`:
 
 ```bash
-cd /path/to/PepAD-User-Friendly-Package
-mkdir my_run
-cp src/input.example.txt my_run/input.txt
-cp "Initial structures/comp1/comp1.pdb" my_run/
-cd my_run
+mkdir -p /path/to/PepAD_runs/my_run
+cp /path/to/PepAD-User-Friendly-Package/src/input.example.txt /path/to/PepAD_runs/my_run/input.txt
+cp "/path/to/PepAD-User-Friendly-Package/Initial structures/comp1/comp1.pdb" /path/to/PepAD_runs/my_run/
+cd /path/to/PepAD_runs/my_run
 ```
 
 ### 3. Run PepAD
 
-Launch the executable from the run directory so that PepAD reads that directory's
-`input.txt` and writes its results there:
+Remember the path to the compiled PepAD executable. From the working directory,
+run PepAD using its full path. PepAD reads `input.txt` and writes the results in
+the working directory:
 
 ```bash
-../src/PepAD
+/path/to/PepAD-User-Friendly-Package/src/PepAD
 ```
 
-Adjust the executable path when the run directory is elsewhere.
-
-## v1.42 input format
+## Input format
 
 ### Syntax rules
 
@@ -195,9 +193,9 @@ annealing is enabled, it instead uses the corresponding `HIGH` and `LOW` values.
 All kBT values must be positive, and each high value must be greater than or
 equal to its low value.
 
-### Amino-acid composition ranges
+### Amino acid compositions
 
-The v1.42 input uses minimum and maximum counts instead of the four exact counts
+The input uses minimum and maximum counts instead of the four exact counts
 used by v1.37:
 
 | Category | Amino acids | Parameters |
@@ -213,7 +211,8 @@ maximum, or both. An omitted minimum becomes `0`; an omitted maximum becomes
 `N_RESIDUES`. Equal minimum and maximum values impose an exact count.
 
 Composition totals exclude `ACE`, `NME`, and `NHE` caps, but include residues at
-single-site and grouped-site constrained positions.
+sites defined by single-site positional constraints and grouped-site positional
+constraints.
 
 Example allowing a range of polar and charged content while fixing the
 hydrophobic count:
@@ -229,7 +228,7 @@ N_OTHER_MIN       = 0
 N_OTHER_MAX       = 0
 ```
 
-### Specific amino-acid count constraints
+### Compositional constraints
 
 Any standard PepAD amino acid can also have its own count range:
 
@@ -260,7 +259,7 @@ not be listed as constraints. Site numbers refer only to amino-acid positions;
 caps are skipped when numbering. Thus, amino acid 3 is chain site 4 when chain
 site 1 is an ACE cap.
 
-#### Single-site constraints
+#### Single-site positional constraint
 
 `SINGLE_SITE_CONSTRAINTS` accepts space-separated entries:
 
@@ -273,9 +272,9 @@ Do not place spaces around the colon:
 SINGLE_SITE_CONSTRAINTS = 5:ASN 6
 ```
 
-Use `NONE` or omit the parameter when no single-site constraint is needed.
+Use `NONE` or omit the parameter when no single-site positional constraint is needed.
 
-#### Grouped-site constraints
+#### Grouped-site positional constraint
 
 Grouped sites draw residues from a user-defined pool:
 
@@ -287,8 +286,8 @@ GROUPED_SITE_CONSTRAINTS = 1 2 3
 The pool must contain at least as many entries as there are grouped sites. A
 residue may be repeated in the pool to make more copies available; each remaining
 copy has equal selection probability. Grouped sites may not overlap caps or
-single-site constraints. PepAD validates the pool against the category and
-specific-amino-acid count limits.
+single-site positional constraints. PepAD validates the pool against the amino
+acid compositions and compositional constraints.
 
 ### Complete annotated template
 
@@ -299,45 +298,35 @@ have different semantics.
 
 ## Initial structure requirements
 
-The PDB file should contain peptide chains arranged as a cross-beta fibril and use
-atom and residue naming compatible with the parameter files in `src/lib/`.
-Prepared structures are available in [`Initial structures/`](Initial%20structures/).
-An initial structure may be obtained by:
+Users must provide an initial structure PDB file for PepAD. The structure usually
+consists of individual peptides in a configuration of cross-β spine. Prepared
+structures are available in [`Initial structures/`](Initial%20structures/). Two
+recommended approaches for preparing the initial structure are as follows.
 
-1. adapting an experimental amyloid structure from the
-   [RCSB Protein Data Bank](https://www.rcsb.org/) and relaxing it to remove
-   clashes; or
-2. building a steric-zipper model with the supplied
-   [`Initial structure builder`](Initial%20structure%20builder/), followed by an
-   appropriate relaxation procedure.
-
-For the first approach, an experimental fibril such as the Sup35 prion segment
-GNNQQNY (PDB ID: 2OMM) can be replicated to make a larger cross-beta assembly,
-relaxed to remove atomic overlaps, and converted to PepAD's required PDB format.
+First, users can search for existing amyloid fibril structures in the
+[RCSB Protein Data Bank](https://www.rcsb.org/). For example, the Sup35 prion
+segment GNNQQNY structure (PDB ID: 2OMM) can be replicated to generate a larger
+Class-1 cross-β spine. The resulting structure should be relaxed using
+explicit-solvent atomistic molecular dynamics simulation to remove atomic
+overlaps and then converted to PepAD's required PDB format.
 
 <p align="center">
   <img width="650" alt="Preparing a PepAD structure from a Protein Data Bank fibril" src="https://github.com/user-attachments/assets/c476b3f8-90dd-411e-837f-1fc97d476770" />
 </p>
-<p align="center"><b>Fig. 3.</b> Preparing an initial structure from an experimental fibril in the Protein Data Bank.</p>
+<p align="center"><b>Fig. 3.</b> Prepare initial structure using existing fibril structure from Protein Data Bank.</p>
 
-For the second approach, a peptide such as Aβ(16–22), KLVFFAE, can be built with
-UCSF Chimera, packed into a two-layer fibril with Packmol, and relaxed using an
-explicit-solvent molecular dynamics simulation. The middle chains can then be
-extracted to reduce the computational cost of the PepAD calculation.
+Second, users can build artificial amyloid backbones using molecular modeling
+tools such as UCSF Chimera and Packmol. For example, Aβ(16–22) KLVFFAE was built
+with UCSF Chimera, packed into a two-layer Class-8 antiparallel β-sheet fibril
+using Packmol, and relaxed by explicit-solvent molecular dynamics simulation. To
+reduce PepAD computational cost, the middle eight peptides were extracted from
+the relaxed fibril and saved as `comp1.pdb`. The amyloid backbone can also be
+generated using the Initial Structure Builder provided in this package.
 
 <p align="center">
   <img width="800" alt="Preparing an artificial amyloid backbone with molecular modeling tools" src="https://github.com/user-attachments/assets/3b1b6026-a947-4a42-98e6-0e8600c831d6" />
 </p>
-<p align="center"><b>Fig. 4.</b> Preparing an initial structure with molecular modeling tools.</p>
-
-The supplied builder can generate two beta-sheet fibril backbones in any of the
-eight steric-zipper classes [4]. It uses PeptideBuilder to construct peptides and
-Hydride to add hydrogens [12,13].
-
-<p align="center">
-  <img width="800" alt="Parallel seven-residue peptide backbone generated by the initial structure builder" src="https://github.com/user-attachments/assets/2c485625-af0e-4c3f-8a94-31fa2de56725" />
-</p>
-<p align="center"><b>Fig. 5.</b> A seven-residue parallel peptide backbone generated by the initial structure builder.</p>
+<p align="center"><b>Fig. 4.</b> Prepare initial structure using molecular modeling tool.</p>
 
 ## Output files
 
@@ -358,7 +347,19 @@ in kcal/mol. RMSD is reported in angstroms.
 <p align="center">
   <img width="800" alt="PepAD score and RMSD evolution" src="https://github.com/user-attachments/assets/15786422-7758-4cfb-a3e5-2ff3c10b5856" />
 </p>
-<p align="center"><b>Fig. 6.</b> Score and RMSD evolution during a 10,000-step PepAD design run for a seven-residue antiparallel peptide.</p>
+<p align="center"><b>Fig. 5.</b> The Γ<sub>score</sub> and RMSD evolution in a 10,000-step PepAD run of designing 7-mer antiparallel peptides.</p>
+
+### Initial Structure Builder
+
+We provide a supplemental **Initial Structure Builder** to build two β-sheet
+fibril backbones suitable for PepAD. The Initial Structure Builder can create the
+β-cross spine in one of the eight steric zipper classes [4]. It uses
+PeptideBuilder to construct peptides and Hydride to add hydrogens [12,13].
+
+<p align="center">
+  <img width="800" alt="Parallel 7-mer peptide backbone generated by the Initial Structure Builder" src="https://github.com/user-attachments/assets/2c485625-af0e-4c3f-8a94-31fa2de56725" />
+</p>
+<p align="center"><b>Fig. 6.</b> A 7-mer parallel peptide backbone generated by the Initial Structure Builder.</p>
 
 ## Citation and references
 

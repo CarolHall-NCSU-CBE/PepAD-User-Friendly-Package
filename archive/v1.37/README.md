@@ -58,7 +58,7 @@ The coding language is Fortran90. Users need to load Intel Fortran Compiler (ifx
 
 	module load PrgEnv-intel         # load Intel compiler
 
-    ifx -o PepAD main.f90            #  compile PepAD code
+    ifx -o PepAD main_v1.37.f90      # compile PepAD code
 
 
 > **Note:** Code must be compiled in the same directory as `/lib/`, since parameter files are required at runtime. After compilation, the PepAD can be run from any directory.
