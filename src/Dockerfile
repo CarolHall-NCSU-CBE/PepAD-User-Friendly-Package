@@ -7,10 +7,10 @@ USER root
 RUN apt-get update \
     && DEBIAN_FRONTEND=noninteractive apt-get install -y --reinstall --no-install-recommends man-db \
     && if [ -x /usr/bin/man.REAL ]; then \
-        ln -sf /usr/bin/man.REAL /usr/local/bin/man; \
-    else \
-        ln -sf /usr/bin/man /usr/local/bin/man; \
+        rm -f /usr/bin/man; \
+        ln -s /usr/bin/man.REAL /usr/bin/man; \
     fi \
+    && /usr/bin/man --version | grep -q "man-db" \
     && rm -rf /var/lib/apt/lists/*
 
 # Keep the PepAD executable and runtime library in the same directory.
@@ -29,7 +29,7 @@ RUN ifx -O2 -o /opt/PepAD/PepAD /opt/PepAD/main_v1.42-2.f90 \
     && test -x /usr/local/bin/PepAD \
     && test -d /opt/PepAD/lib \
     && test -f /opt/PepAD/man/man1/PepAD.1 \
-    && MANPATH=/opt/PepAD/man /usr/local/bin/man -w PepAD >/dev/null
+    && MANPATH=/opt/PepAD/man PATH=/usr/bin:/bin man -w PepAD >/dev/null
 
 # Make the executable and manual page available inside the container.
 ENV PATH="/opt/PepAD:${PATH}"
