@@ -1,0 +1,391 @@
+.TH PEPAD 1 "July 2026" "PepAD 1.42" "PepAD User Manual"
+.
+.SH NAME
+PepAD \- Peptide Assembly Design Algorithm
+.
+.SH SYNOPSIS
+.B PepAD
+.br
+.B PepAD
+.BR \-h
+.br
+.B PepAD
+.BR \-\-help
+.
+.SH DESCRIPTION
+.B PepAD
+performs sequence design for peptide assemblies using Monte Carlo
+sequence moves and molecular energy calculations.
+For a normal design run, a file named
+.I input.txt
+must be present in the directory where PepAD is started.
+All design parameters are read from this file and are not accepted as
+command-line options.
+.
+.PP
+Every parameter in
+.I input.txt
+must use the following format:
+.
+.RS
+.nf
+PARAMETER = value
+.fi
+.RE
+.
+.PP
+The equal sign is required.
+Parameter order does not matter.
+Comments may begin with
+.B #
+or
+.BR ! .
+Each input parameter may appear only once.
+Only
+.B PDBFILE
+and
+.B N_STEPS
+are required.
+.
+.SH OPTIONS
+.TP
+.BR \-h ", " \-\-help
+Display the PepAD help information and stop.
+.
+.PP
+Any other command-line option is rejected.
+All design parameters must be placed in
+.IR input.txt .
+.
+.SH REQUIRED INPUT PARAMETERS
+.TP
+.B PDBFILE
+String.
+Filename of the initial PDB structure.
+.TP
+.B N_STEPS
+Integer.
+Number of Monte Carlo steps.
+.
+.SH INITIAL STRUCTURE PARAMETERS
+.B PepAD
+automatically determines the number of amino acids, number of chains,
+energy-group assignment, and beta-sheet assignment from the PDB file.
+If the user supplies these parameters in
+.IR input.txt ,
+the user-supplied assignments override the automatically determined
+assignments.
+.
+.TP
+.B N_AA
+Integer.
+Optional user-defined number of amino acids per peptide chain.
+ACE, NME, and NHE cap residues are excluded from this number.
+.TP
+.B N_CHAINS
+Integer.
+Optional user-defined total number of peptide chains.
+.B N_AA
+and
+.B N_CHAINS
+must either both be supplied or both be omitted.
+.TP
+.BR GROUP_1 ", " GROUP_2
+Integer lists.
+Optional user-defined chain IDs belonging to each energy-calculation
+group.
+.TP
+.BR SHEET_1 ", " SHEET_2 ", ..."
+Integer lists.
+Optional user-defined chain IDs belonging to each beta-sheet.
+.TP
+.B RESTART
+Integer.
+Use 0 for a fresh run or 1 for a restart.
+The default is 0.
+.
+.PP
+When no user assignments are supplied, PepAD determines
+.BR N_AA ,
+.BR N_CHAINS ,
+the energy groups, and the beta-sheets from the PDB structure.
+Energy groups and beta-sheets are determined using DSSP-based
+analysis.
+.
+.SH MONTE CARLO AND ENERGY PARAMETERS
+.TP
+.B RANSEED
+Integer.
+Random-number seed.
+If this parameter is omitted, PepAD generates a seed from the current
+system clock time.
+If it is supplied, PepAD uses the user-provided seed.
+.TP
+.B KBT_SEQ
+Real.
+Sequence kBT used when
+.BR ANNEAL_STAGES " = 0."
+The default is 1.0.
+.TP
+.B KBT_SEQ_HIGH
+Real.
+Initial sequence kBT when
+.B ANNEAL_STAGES
+is greater than 0.
+The default is 2.0.
+.TP
+.B KBT_SEQ_LOW
+Real.
+Final sequence kBT when
+.B ANNEAL_STAGES
+is greater than 0.
+The default is 0.5.
+.TP
+.B KBT_SHEETMOVE
+Real.
+Sheet-move kBT used when
+.BR ANNEAL_STAGES " = 0."
+The default is 0.6.
+.TP
+.B KBT_SHEETMOVE_HIGH
+Real.
+Initial sheet-move kBT when
+.B ANNEAL_STAGES
+is greater than 0.
+The default is 1.2.
+.TP
+.B KBT_SHEETMOVE_LOW
+Real.
+Final sheet-move kBT when
+.B ANNEAL_STAGES
+is greater than 0.
+The default is 0.3.
+.TP
+.B RMSD_MAX
+Real.
+Maximum RMSD in angstroms.
+The default is 3.0.
+.TP
+.B PAGG_WEIGHT
+Real.
+Aggregation-propensity weight.
+The default is 2.0.
+.TP
+.B SHEETMOVE
+Integer.
+Use 0 to disable sheet-position perturbation moves or 1 to enable them.
+The default is 1.
+.TP
+.B ANNEAL_STAGES
+Integer.
+Use 0 for no annealing or a positive integer for the number of
+annealing stages.
+The default is 0.
+.TP
+.B ESURF_MODE
+Integer.
+Use 0 to disable non-polar solvation energy, 1 for the direct full
+ARVO reference calculation, or 2 for the cached/incremental ARVO
+calculation.
+The default is 0.
+.TP
+.B STEPS_BEFORE_SHEETMOVE
+Integer.
+Number of initial waiting steps before a sheet move.
+The default is 500.
+.TP
+.B STEPS_BETWEEN_SHEETMOVE
+Integer.
+Number of sequence steps between sheet-move opportunities.
+The default is 200.
+.
+.SH COMPOSITION PARAMETERS
+.TP
+.B N_HYDROPHOBIC_MIN
+Integer.
+Minimum number of hydrophobic amino acids.
+.TP
+.B N_HYDROPHOBIC_MAX
+Integer.
+Maximum number of hydrophobic amino acids.
+.TP
+.B N_POLAR_MIN
+Integer.
+Minimum number of polar amino acids.
+.TP
+.B N_POLAR_MAX
+Integer.
+Maximum number of polar amino acids.
+.TP
+.B N_CHARGED_MIN
+Integer.
+Minimum number of charged amino acids.
+.TP
+.B N_CHARGED_MAX
+Integer.
+Maximum number of charged amino acids.
+.TP
+.B N_OTHER_MIN
+Integer.
+Minimum number of other-category amino acids.
+.TP
+.B N_OTHER_MAX
+Integer.
+Maximum number of other-category amino acids.
+.
+.PP
+If all category flags are omitted, PepAD uses the composition of the
+initial PDB structure.
+In custom composition mode, every category requires a minimum, a
+maximum, or both.
+An omitted minimum becomes 0, and an omitted maximum becomes
+.BR N_AA .
+Equal minimum and maximum values specify a fixed category count.
+.
+.PP
+Composition totals exclude ACE, NME, and NHE cap residues.
+Single-site and grouped-site amino acids are included in the
+composition totals.
+Fixed single-site amino acids contribute to the required
+amino-acid and category minimums.
+.
+.SH COMPOSITIONAL CONSTRAINTS
+.TP
+.B N_<AA>_MIN
+Integer.
+Minimum count of the specified amino acid.
+.TP
+.B N_<AA>_MAX
+Integer.
+Maximum count of the specified amino acid.
+.
+.PP
+Supported amino-acid identifiers are:
+.
+.RS
+.nf
+GLY ALA VAL LEU ILE MET PHE TYR TRP SER
+ASN GLN THR HIE ARG LYS GLU ASP CYS PRO
+.fi
+.RE
+.
+.PP
+Users may provide only a minimum, only a maximum, or both.
+Equal minimum and maximum values impose an exact amino-acid count.
+An amino acid without either flag is unrestricted.
+Each
+.B N_<AA>_MIN
+or
+.B N_<AA>_MAX
+flag may appear only once.
+Specific-amino-acid minimums cannot exceed the corresponding category
+maximum.
+.
+.SH POSITIONAL CONSTRAINTS
+ACE, NME, and NHE cap positions are handled automatically.
+User-supplied site numbers refer only to amino acids; cap positions
+are skipped.
+For example, amino-acid position 3 is chain residue position 4 when
+chain residue position 1 is an ACE cap.
+.
+.TP
+.B SINGLE_SITE_CONSTRAINTS
+Sites that remain unchanged during the design run.
+A site number without an amino-acid name retains the amino acid from
+the initial structure.
+For example:
+.
+.RS
+.nf
+SINGLE_SITE_CONSTRAINTS = 3 5
+.fi
+.RE
+.
+.IP
+A
+.B site:AA
+entry changes the site to the specified amino acid and then keeps it
+unchanged.
+For example:
+.
+.RS
+.nf
+SINGLE_SITE_CONSTRAINTS = 3:CYS 12:LEU
+.fi
+.RE
+.
+.IP
+Separate entries with spaces and do not place spaces around the colon.
+.
+.TP
+.B GROUPED_SITE_AA_POOL
+Allowed amino-acid copies for the grouped sites.
+For example:
+.
+.RS
+.nf
+GROUPED_SITE_AA_POOL = ASN SER ALA ALA
+.fi
+.RE
+.
+.IP
+Repeated amino acids are allowed.
+Each remaining pool copy has an equal selection probability, so
+repeated entries increase that amino acid's selection probability.
+The number of pool entries must be at least the number of grouped-site
+constraints.
+.
+.TP
+.B GROUPED_SITE_CONSTRAINTS
+Amino-acid sites that select from the available grouped-site pool
+copies.
+For example:
+.
+.RS
+.nf
+GROUPED_SITE_CONSTRAINTS = 4 6 10 12
+.fi
+.RE
+.
+.PP
+PepAD checks grouped-pool category minimums and maximums against the
+overall composition limits.
+Caps and positional-constraint sites are excluded from ordinary Monte
+Carlo site selection.
+.
+.SH EXAMPLE INPUT
+.nf
+# Required parameters
+PDBFILE = assembly.pdb
+N_STEPS = 10000
+
+# Optional structure information
+N_AA = 7
+N_CHAINS = 8
+
+# Optional fixed composition
+N_HYDROPHOBIC_MIN = 5
+N_HYDROPHOBIC_MAX = 5
+N_POLAR_MIN = 0
+N_POLAR_MAX = 0
+N_CHARGED_MIN = 2
+N_CHARGED_MAX = 2
+N_OTHER_MIN = 0
+N_OTHER_MAX = 0
+.fi
+.
+.SH FILES
+.TP
+.I input.txt
+Required parameter file for a normal PepAD design run.
+It must be present in the directory where PepAD is started.
+.TP
+.I pdbfiles/
+Directory containing generated PDB structures and SCMF diagnostic
+structures.
+.
+.SH AUTHORS
+Haoyu Wang, Sudeep Sarma, and Carol K. Hall.
+.
+.SH VERSION
+PepAD version 1.42.
