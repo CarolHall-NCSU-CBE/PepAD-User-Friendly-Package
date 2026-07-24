@@ -3,9 +3,14 @@ FROM intel/oneapi-toolkit:latest
 
 USER root
 
-# Install the Linux man command.
+# Restore the real Linux man command removed from the minimized base image.
 RUN apt-get update \
-    && DEBIAN_FRONTEND=noninteractive apt-get install -y --no-install-recommends man-db \
+    && DEBIAN_FRONTEND=noninteractive apt-get install -y --reinstall --no-install-recommends man-db \
+    && if [ -x /usr/bin/man.REAL ]; then \
+        ln -sf /usr/bin/man.REAL /usr/local/bin/man; \
+    else \
+        ln -sf /usr/bin/man /usr/local/bin/man; \
+    fi \
     && rm -rf /var/lib/apt/lists/*
 
 # Keep the PepAD executable and runtime library in the same directory.
@@ -19,13 +24,16 @@ COPY man/ /opt/PepAD/man/
 # Compile PepAD and remove the source file from the runtime installation.
 RUN ifx -O2 -o /opt/PepAD/PepAD /opt/PepAD/main_v1.42-2.f90 \
     && rm /opt/PepAD/main_v1.42-2.f90 \
+    && ln -s /opt/PepAD/PepAD /usr/local/bin/PepAD \
     && test -x /opt/PepAD/PepAD \
+    && test -x /usr/local/bin/PepAD \
     && test -d /opt/PepAD/lib \
-    && test -f /opt/PepAD/man/man1/PepAD.1
+    && test -f /opt/PepAD/man/man1/PepAD.1 \
+    && MANPATH=/opt/PepAD/man /usr/local/bin/man -w PepAD >/dev/null
 
 # Make the executable and manual page available inside the container.
 ENV PATH="/opt/PepAD:${PATH}"
-ENV MANPATH="/opt/PepAD/man"
+ENV MANPATH="/opt/PepAD/man:"
 
 # User input files, PDB files, and generated output files belong in /work.
 WORKDIR /work
