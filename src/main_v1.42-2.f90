@@ -10116,12 +10116,13 @@ module optimization_techniques
 	real(kind=8)					:: binding_vdw_old, binding_ele_old, binding_sgb_old, binding_snp_old
 	real(kind=8)					:: binding_vdw_new, binding_ele_new, binding_sgb_new, binding_snp_new
 	real(kind=8)					:: delta_E_vdw,delta_E_ele,delta_E_sgb,delta_E_sur
-	real(kind=8)					:: delta_TS,lambda_delta_Pagg,total_abs_score_change
+	real(kind=8)					:: delta_TS,lambda_delta_Pagg
 	real							:: entropy_old, entropy_new
 	real							:: score4hydration_old, score4hydration_new
 	real							:: Pagg_old, Pagg_new
 	real							:: entropy4individual(repeated_unit,gnum), Tentropy4individual(repeated_unit,gnum), temp_entropy4individual(repeated_unit,gnum)
 	character*4						:: aminoacid_name_1, aminoacid_name_2
+	character*4						:: trial_sequence(gnum)
     character*20					:: accpt
 	character*4						:: group_name_1(3), group_name_2(3)
 	character*4						:: rest_AA(maximum_nmr_site_num)
@@ -10170,7 +10171,6 @@ module optimization_techniques
 				delta_E_sur=binding_snp_new-binding_snp_old
 				delta_TS=real(entropy_new-entropy_old,kind=8)
 				lambda_delta_Pagg=real(propensity_weighting_factor,kind=8)*real((score4hydration_new+Pagg_new)-(score4hydration_old+Pagg_old),kind=8)
-				total_abs_score_change=abs(delta_E_vdw)+abs(delta_E_ele)+abs(delta_E_sgb)+abs(delta_E_sur)+abs(delta_TS)+abs(lambda_delta_Pagg)
                 !Using MC-Metropolis algorithm to accept or reject sequence
 				call MC_technique_sequence(score_old, binding_energy_old, binding_vdw_old, binding_ele_old, &
 					binding_sgb_old, binding_snp_old, entropy_old, score4hydration_old, Pagg_old, group, &
@@ -10194,8 +10194,17 @@ module optimization_techniques
 						binding_snp_new,entropy_new, &
 						(score4hydration_new+Pagg_new)*propensity_weighting_factor,delta_E_vdw, &
 						delta_E_ele,delta_E_sgb,delta_E_sur,delta_TS,lambda_delta_Pagg, &
-						total_abs_score_change,"Mutation ",accpt
+						"Mutation ",accpt
 					write(3,'(*(A5))') (tgroup(1,j)%gtype,j=1,gnum)
+				close(3)
+			elseif (accpt=="Reject-Rotamer") then
+				do j=1,gnum
+					trial_sequence(j)=group(1,j)%gtype
+				enddo
+				trial_sequence(ic_1)=aminoacid_name_1
+				open(3, file="energydetails.txt", access="append")
+					write(3,'(I7,I7,A15,A15)') step,attempt,"Mutation ",accpt
+					write(3,'(*(A5))') (trial_sequence(j),j=1,gnum)
 				close(3)
 			endif
         else ! Exchange the amino-acid identities at two randomly selected sites.
@@ -10259,7 +10268,6 @@ module optimization_techniques
 					delta_E_sur=binding_snp_new-binding_snp_old
 					delta_TS=real(entropy_new-entropy_old,kind=8)
 					lambda_delta_Pagg=real(propensity_weighting_factor,kind=8)*real((score4hydration_new+Pagg_new)-(score4hydration_old+Pagg_old),kind=8)
-					total_abs_score_change=abs(delta_E_vdw)+abs(delta_E_ele)+abs(delta_E_sgb)+abs(delta_E_sur)+abs(delta_TS)+abs(lambda_delta_Pagg)
 					call MC_technique_sequence(score_old, binding_energy_old, binding_vdw_old, binding_ele_old, &
 						binding_sgb_old, binding_snp_old, entropy_old, score4hydration_old, Pagg_old, group, &
 						entropy4individual, score_new, binding_energy_new, binding_vdw_new, binding_ele_new, &
@@ -10282,8 +10290,18 @@ module optimization_techniques
 						binding_snp_new,entropy_new, &
 						(score4hydration_new+Pagg_new)*propensity_weighting_factor,delta_E_vdw, &
 						delta_E_ele,delta_E_sgb,delta_E_sur,delta_TS,lambda_delta_Pagg, &
-						total_abs_score_change,"Exchange ",accpt
+						"Exchange ",accpt
 					write(3,'(*(A5))') (tgroup(1,j)%gtype,j=1,gnum)
+				close(3)
+			elseif (accpt=="Reject-Rotamer") then
+				do j=1,gnum
+					trial_sequence(j)=group(1,j)%gtype
+				enddo
+				trial_sequence(ic_1)=aminoacid_name_1
+				trial_sequence(ic_2)=aminoacid_name_2
+				open(3, file="energydetails.txt", access="append")
+					write(3,'(I7,I7,A15,A15)') step,attempt,"Exchange ",accpt
+					write(3,'(*(A5))') (trial_sequence(j),j=1,gnum)
 				close(3)
 			endif
 		endif
@@ -10318,7 +10336,7 @@ module optimization_techniques
         endif
         !if (accpt=="Accept") exit
 	enddo
-4	format(i7,i7,14f15.4,a15,a15)
+4	format(i7,i7,13f15.4,a15,a15)
 
 	return
 	end subroutine sequence_optimization
@@ -10952,7 +10970,7 @@ module optimization_techniques
 	real(kind=8)				:: binding_vdw_old, binding_ele_old, binding_sgb_old, binding_snp_old
 	real(kind=8)				:: binding_vdw_new, binding_ele_new, binding_sgb_new, binding_snp_new
 	real(kind=8)				:: delta_E_vdw,delta_E_ele,delta_E_sgb,delta_E_sur
-	real(kind=8)				:: delta_TS,lambda_delta_Pagg,total_abs_score_change
+	real(kind=8)				:: delta_TS,lambda_delta_Pagg
 	real						:: entropy_old, entropy_new
 	real						:: score4hydration_old, score4hydration_new
 	real						:: Pagg_old, Pagg_new
@@ -11060,8 +11078,6 @@ module optimization_techniques
 		delta_TS=real(entropy_new-entropy_old,kind=8)
 		lambda_delta_Pagg=real(propensity_weighting_factor,kind=8)* &
 			real((score4hydration_new+Pagg_new)-(score4hydration_old+Pagg_old),kind=8)
-		total_abs_score_change=abs(delta_E_vdw)+abs(delta_E_ele)+abs(delta_E_sgb)+ &
-			abs(delta_E_sur)+abs(delta_TS)+abs(lambda_delta_Pagg)
 		call MC_technique_sheet(score_old, binding_energy_old, binding_vdw_old, binding_ele_old, &
 			binding_sgb_old, binding_snp_old, entropy_old, score4hydration_old, Pagg_old, group, &
 			entropy4individual, score_new, binding_energy_new, binding_vdw_new, binding_ele_new, &
@@ -11091,8 +11107,13 @@ module optimization_techniques
 					binding_snp_new,entropy_new, &
 					(score4hydration_new+Pagg_new)*propensity_weighting_factor,delta_E_vdw, &
 					delta_E_ele,delta_E_sgb,delta_E_sur,delta_TS,lambda_delta_Pagg, &
-					total_abs_score_change,sheet_change,accpt
+					sheet_change,accpt
 				write(3,'(*(A5))') (temp_group(1,j)%gtype,j=1,gnum)
+			close(3)
+		elseif (accpt=="Reject-Rotamer") then
+			open(3, file="energydetails.txt", access="append")
+				write(3,'(I7,I7,A15,A15)') step,attempt,sheet_change,accpt
+				write(3,'(*(A5))') (group(1,j)%gtype,j=1,gnum)
 			close(3)
 		endif
 	
@@ -11128,7 +11149,7 @@ module optimization_techniques
         !if (accpt=="Accept") exit
 	enddo
 	
-4	format(i7,i7,14f15.4,a15,a15)
+4	format(i7,i7,13f15.4,a15,a15)
 	return
 	end subroutine sheet_optimization
 

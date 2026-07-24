@@ -22,17 +22,17 @@ jobs:
         run: echo "IMAGE_NAME=ghcr.io/${GITHUB_REPOSITORY,,}" >> "$GITHUB_ENV"
 
       - name: Log in to GitHub Container Registry
-        uses: docker/login-action@v3
+        uses: docker/login-action@v4
         with:
-          registry: ghcr.io
-          username: ${{ github.actor }}
-          password: ${{ secrets.GITHUB_TOKEN }}
+            registry: ghcr.io
+            username: ${{ github.actor }}
+            password: ${{ secrets.GITHUB_TOKEN }}
 
       - name: Build and publish PepAD
-        uses: docker/build-push-action@v6
+        uses: docker/build-push-action@v7
         with:
-          context: ./src
-          file: ./src/Dockerfile
-          push: true
-          tags: ${{ env.IMAGE_NAME }}:1.42-2
-          
+            context: ./src
+            file: ./src/Dockerfile
+            push: true
+            tags: ${{ env.IMAGE_NAME }}:1.42-2
+            
