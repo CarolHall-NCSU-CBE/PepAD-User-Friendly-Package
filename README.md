@@ -1,6 +1,10 @@
 # PepAD
 
-Peptide Assembly Design (PepAD) is a Monte Carlo sequence-design program for discovering peptides predicted to self-assemble on a user-supplied amyloid fibril backbone. PepAD explores peptide sequences and sheet arrangements, evaluates each trial with a physics-based score, and reports low-scoring designs for downstream simulation or experimental study.
+Peptide Assembly Design (PepAD) is a Monte Carlo (MC)–based algorithm for discovering amyloid-forming peptides that self-assemble into user-defined reference structures [1–3]. PepAD designs peptide by optimizing the binding affinity within a predefined fibril backbone, which is composed of two stacked β-sheets.
+
+PepAD allows users to design peptides with specified sequence length, amino acid composition, and positional or compositional constraints. During the design process, residues on the peptide backbone are modified through MC moves. The new sequence is evaluated using a physics-based score function that quantifies the peptide self-assembly propensity.
+
+To run PepAD, users first need to compile the code in HPC with Intel@ Fortran compiler. Then need to provide an initial fibril structure (PDB format) and a text-based input file that defines parameters and constraints. PepAD outputs peptide sequences with their corresponding scores, as well as structural files for the top-scoring designs, which can be further used in downstream simulations or experiments.
 
 **Current version: v1.42.** This version uses named `PARAMETER = value` entries instead of the fixed, position-dependent input format. Inputs written for v1.37 are not compatible.
 
