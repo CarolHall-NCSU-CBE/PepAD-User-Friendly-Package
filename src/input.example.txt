@@ -5,7 +5,7 @@
 ### Only PDBFILE and N_STEPS are required; all other parameters have defaults.
 ### Initial structure info
 PDBFILE = comp1.pdb   # REQUIRED. Initial structure PDB file
-N_RESIDUES = 7        # Number of residues per chain
+N_AA       = 7        # Number of amino acids per chain, excluding caps
 N_CHAINS   = 8        # Number of peptide chains
 GROUP_1 = 1 3 5 7     # Chain IDs in energy group 1
 GROUP_2 = 2 4 6 8     # Chain IDs in energy group 2
@@ -15,7 +15,7 @@ RESTART = 0           # 0=fresh run (default); 1=restart
 
 ### MC info or advanced calculation method
 RANSEED           = 1        # User-defined Random Seed
-N_STEPS           = 10000    # REQUIRED. Interger. Number of MC Steps
+N_STEPS           = 10000    # REQUIRED. Integer. Number of MC steps
 KBT_SEQ           = 1.0      # Temperature factor for sequence change moves
 KBT_SHEETMOVE     = 0.6      # Temperature factor for sheet position perturbation moves
 RMSD_MAX          = 3.0      # Maximum RMSD for sheet position perturbation moves

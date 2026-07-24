@@ -4,7 +4,12 @@ Peptide Assembly Design (PepAD) is a Monte Carlo (MC)–based algorithm for disc
 
 PepAD allows users to design peptides with specified sequence length, amino acid composition, and positional or compositional constraints. During the design process, residues on the peptide backbone are modified through MC moves. The new sequence is evaluated using a physics-based score function that quantifies the peptide self-assembly propensity.
 
-To run PepAD, users first need to compile the code in HPC with Intel@ Fortran compiler. Then need to provide an initial fibril structure (PDB format) and a text-based input file that defines parameters and constraints. PepAD outputs peptide sequences with their corresponding scores, as well as structural files for the top-scoring designs, which can be further used in downstream simulations or experiments.
+To run PepAD, users can use the precompiled container or compile the code in an
+HPC environment with an Intel Fortran compiler. Users then provide an initial
+fibril structure in PDB format and a text-based input file that defines parameters
+and constraints. PepAD outputs peptide sequences with their corresponding scores,
+as well as structural files for the top-scoring designs, which can be used in
+downstream simulations or experiments.
 
 **Current version: v1.42.** This version uses named `PARAMETER = value` entries instead of the fixed, position-dependent input format. Inputs written for v1.37 are not compatible.
 
@@ -32,38 +37,36 @@ More negative scores indicate stronger predicted binding at the evaluated config
 
 | Path | Contents |
 | --- | --- |
-| [`src/main_v1.42.f90`](src/main_v1.42.f90) | PepAD source code |
+| [`src/main_v1.42-2.f90`](src/main_v1.42-2.f90) | PepAD source code |
 | [`src/input.example.txt`](src/input.example.txt) | Annotated input template |
 | `src/lib/` | Force-field and rotamer data |
 | [`examples/`](examples/) | Examples |
-| [`Initial structures/`](Initial%20structures/) | Prepared fibril backbones and supporting files |
-| [`Initial structure builder/`](Initial%20structure%20builder/) | Initial Structure Builder |
+| [`Initial_structures/`](Initial_structures/) | Prepared fibril backbones and supporting files |
+| [`Initial_structure_builder/`](Initial_structure_builder/) | Initial Structure Builder |
+| [`PepAD_analyzer/`](PepAD_analyzer/) | PepAD output-analysis tools |
 | [`archive/`](archive/) | Old source code, documentation, analyzer, and examples |
 
-## Quick start
+## Running PepAD
 
-<p align="center">
-  <img width="1200" alt="PepAD peptide-design workflow" src="https://github.com/user-attachments/assets/982d5573-7dac-4381-a9ce-651992b16658" />
-</p>
-<p align="center"><b>Fig. 2.</b> A workflow chart describing how to design peptides.</p>
+PepAD can be run with a precompiled container or compiled in the local
+environment.
 
-### 1. Compile PepAD
+## Method 1: Use the Docker image with Apptainer
 
-PepAD is written in Fortran 90 and is intended for an HPC environment with an Intel Fortran compiler. From `src/`, compile the program in the same level with the `lib/`:
+The container includes a precompiled PepAD executable. Users do not need an Intel Fortran compiler for this method.
 
-```bash
-module load PrgEnv-intel
-cd /path/to/PepAD-User-Friendly-Package/src
-ifx -o PepAD main_v1.42.f90
-```
+### 1. Download the SIF file
 
-The executable locates its parameter library relative to its own directory. Keep the `lib/` directory at the same level as the `PepAD` executable.
-
-To list all supported input parameters and defaults:
+Load Apptainer if it is provided as a module on the local system. Go to the directory where the container will be stored and pull the Docker image from the GitHub Container Registry:
 
 ```bash
-/path/to/PepAD-User-Friendly-Package/src/PepAD --help
+module load apptainer  # if required on the local system
+mkdir -p /path/to/PepAD_container
+cd /path/to/PepAD_container
+apptainer pull PepAD_package.sif docker://ghcr.io/carolhall-ncsu-cbe/pepad-user-friendly-package:1.42-2
 ```
+
+This creates `PepAD_package.sif` in `/path/to/PepAD_container`.
 
 ### 2. Prepare a run directory
 
@@ -72,25 +75,144 @@ Each run needs:
 - an initial structure in PDB format; and
 - a text file named exactly `input.txt`.
 
-Create a working directory outside the PepAD package. Copy
-[`src/input.example.txt`](src/input.example.txt) into the working directory as
-`input.txt`, copy the initial PDB structure, and edit `input.txt`:
+From the root of the downloaded PepAD repository, create a run directory. Copy
+the input template into the run directory as `input.txt`, copy the initial
+structure, and edit `input.txt`:
 
 ```bash
-mkdir -p /path/to/PepAD_runs/my_run
-cp /path/to/PepAD-User-Friendly-Package/src/input.example.txt /path/to/PepAD_runs/my_run/input.txt
-cp "/path/to/PepAD-User-Friendly-Package/Initial structures/comp1/comp1.pdb" /path/to/PepAD_runs/my_run/
-cd /path/to/PepAD_runs/my_run
+mkdir -p run1
+cp src/input.example.txt run1/input.txt
+cp Initial_structures/comp1/comp1.pdb run1/
+cd run1
 ```
 
 ### 3. Run PepAD
 
-Remember the path to the compiled PepAD executable. From the working directory,
-run PepAD using its full path. PepAD reads `input.txt` and writes the results in
-the working directory:
+Bind the run directory to `/work` inside the container. PepAD reads `input.txt`
+and writes its output files in the run directory:
 
 ```bash
-/path/to/PepAD-User-Friendly-Package/src/PepAD
+
+module load apptainer  # if required on the local system
+PEPAD_SIF=/path/to/PepAD_container/PepAD_package.sif  # Path to PepAD_package.sif
+
+RUN_DIR="$(pwd -P)"    # The real path of the working directory
+apptainer run --bind "${RUN_DIR}:/work" --pwd /work "$PEPAD_SIF" # execute PepAD
+
+```
+- `--bind "${RUN_DIR}:/work"` maps the current run directory on the host to `/work` inside the container.
+- `--pwd /work` sets `/work` as the working directory inside the container.
+
+### 4. Check the manual
+
+```bash
+module load apptainer  # if required on the local system
+PEPAD_SIF=/path/to/PepAD_container/PepAD_package.sif
+
+apptainer run "$PEPAD_SIF" --help
+```
+or
+```bash
+apptainer exec "$PEPAD_SIF" man PepAD
+```
+
+When using a batch script, load the Apptainer module in the script if it is
+required on the local system.
+
+## Method 2: Download and compile PepAD
+
+<p align="center">
+  <img width="1200" alt="PepAD peptide-design workflow" src="https://github.com/user-attachments/assets/982d5573-7dac-4381-a9ce-651992b16658" />
+</p>
+<p align="center"><b>Fig. 2.</b> A workflow chart describing how to design peptides.</p>
+
+### 1. Download and compile PepAD
+
+Download or clone this repository. PepAD is written in Fortran 90 and requires
+the Intel `ifx` compiler. The provided compilation script locates the source,
+runtime library, and manual relative to its own location, so it can be called
+from the repository root:
+
+```bash
+git clone https://github.com/CarolHall-NCSU-CBE/PepAD-User-Friendly-Package.git
+cd PepAD-User-Friendly-Package
+bash src/compile_code.sh
+```
+
+By default, the script creates this installation:
+
+```text
+src/PepAD/
+|-- PepAD
+|-- lib/
+`-- man/
+    `-- man1/
+        `-- PepAD.1
+```
+
+The PepAD executable is therefore `src/PepAD/PepAD`, not `src/PepAD`. The
+runtime `lib/` directory remains beside the executable, where PepAD can locate
+it.
+
+To install PepAD somewhere else, provide the installation directory as the
+first argument:
+
+```bash
+bash src/compile_code.sh /path/to/PepAD_install
+```
+
+### 2. Add PepAD to `PATH`
+
+For the default installation, run these commands from the repository root:
+
+```bash
+PEPAD_INSTALL="$(pwd -P)/src/PepAD"
+export PATH="$PEPAD_INSTALL:$PATH"
+export MANPATH="$PEPAD_INSTALL/man:${MANPATH:-}"
+```
+
+These commands affect the current shell. To make them permanent, add the two
+`export` commands, using the absolute installation path, to the shell startup
+file.
+
+Test the executable and manual:
+
+```bash
+PepAD --help
+man PepAD
+```
+
+### 3. Prepare a run directory
+
+Each run needs:
+
+- an initial structure in PDB format; and
+- a text file named exactly `input.txt`.
+
+From the repository root, create the run directory using the same paths as in
+Method 1:
+
+```bash
+mkdir -p run1
+cp src/input.example.txt run1/input.txt
+cp Initial_structures/comp1/comp1.pdb run1/
+cd run1
+```
+
+### 4. Run PepAD
+
+From `run1`, execute PepAD. It reads `input.txt` and writes the results in the
+working directory:
+
+```bash
+PepAD
+```
+
+If PepAD has not been added to `PATH`, the default installation can instead be
+run from `run1` using:
+
+```bash
+../src/PepAD/PepAD
 ```
 
 ## Input format
@@ -119,22 +241,23 @@ PDBFILE = comp1.pdb
 N_STEPS = 10000
 ```
 
-PepAD can automatically determines number of chains, number of residue per chain, energy
-groups, β-sheets, and composition from the PDB file. Other Parameters have defalut values.
+PepAD automatically determines the number of chains, number of amino acids per
+chain, energy groups, β-sheets, and composition from the PDB file. Other
+parameters have default values.
 
 ### Initial structure and restart settings
 
 | Parameter | Meaning | Default |
 | --- | --- | --- |
 | `PDBFILE` | Initial structure filename | **Required** |
-| `N_RESIDUES` | Residues per chain, including caps | Auto-recognized |
+| `N_AA` | Amino acids per chain, excluding caps | Auto-recognized |
 | `N_CHAINS` | Number of peptide chains | Auto-recognized |
 | `GROUP_1`, `GROUP_2` | Chain IDs in the two binding-energy groups | Auto-recognized |
 | `SHEET_1`, `SHEET_2`, ... | Chain IDs in each β-sheet | Auto-recognized |
 | `RESTART` | `0` for a fresh run; `1` to restart | `0` |
 
-- User-defined values for `N_RESIDUES`, `N_CHAINS`, `GROUP_1`, `GROUP_2`, and `SHEET_n` override the values automatically detected from the input PDB file.
-- `N_RESIDUES` and `N_CHAINS` must either both be provided or both be omitted. 
+- User-defined values for `N_AA`, `N_CHAINS`, `GROUP_1`, `GROUP_2`, and `SHEET_n` override the values automatically detected from the input PDB file.
+- `N_AA` and `N_CHAINS` must either both be provided or both be omitted.
 - If custom energy groups are specified, both `GROUP_1` and `GROUP_2` are required, and every PDB chain must appear exactly once across the two groups.
 - Custom `SHEET_n` parameters must be consecutively numbered beginning with `SHEET_1`, and every chain must appear exactly once across all defined sheets.
 
@@ -142,7 +265,7 @@ Example:
 
 ```text
 PDBFILE   = comp1.pdb # REQUIRED
-N_RESIDUES = 7        # Can be omitted
+N_AA       = 7        # Can be omitted
 N_CHAINS   = 8        # Can be omitted
 GROUP_1    = 1 3 5 7  # Can be omitted
 GROUP_2    = 2 4 6 8  # Can be omitted
@@ -162,7 +285,7 @@ RESTART    = 0        # Can be omitted
 | `KBT_SEQ_HIGH` | Initial sequence kBT during annealing | `2.0` |
 | `KBT_SEQ_LOW` | Final sequence kBT during annealing | `0.5` |
 | `KBT_SHEETMOVE_HIGH` | Initial sheet-move kBT during annealing | `1.2` |
-| `KBT_SHEETMOVE_LOW` | Initial  sheet-move kBT during annealing | `0.3` |
+| `KBT_SHEETMOVE_LOW` | Final sheet-move kBT during annealing | `0.3` |
 | `ANNEAL_STAGES` | `0` disables annealing; a positive integer sets its stage count | `0` |
 | `RMSD_MAX` | Maximum sheet-move RMSD in angstroms | `3.0` |
 | `PAGG_WEIGHT` | Aggregation-propensity weight, lambda | `2.0` |
@@ -174,7 +297,7 @@ RESTART    = 0        # Can be omitted
 - When `ANNEAL_STAGES = 0`, PepAD uses `KBT_SEQ` and `KBT_SHEETMOVE`.
 - When annealing is enabled, it instead uses the corresponding `HIGH` and `LOW` values.
 - All kBT values must be positive, and each high value must be greater than or equal to its low value.
-- ARVO is the geometric algorithm used to calculate solvent-accessible surface area. `ESURF_MODE=1` performs full calculation after each MC move. `ESURF_MODE=2` reuses cached values and recalculates only the local region affected by a mutation, making non-polar solvation energy calculation slighly faster.
+- ARVO is the geometric algorithm used to calculate solvent-accessible surface area. `ESURF_MODE = 1` performs a full calculation after each MC move. `ESURF_MODE = 2` reuses cached values and recalculates only the local region affected by a mutation, making the non-polar solvation energy calculation slightly faster.
 
 ### Amino acid compositions
 
@@ -187,12 +310,12 @@ The input uses minimum and maximum counts instead of the exact counts for four a
 | `N_CHARGED_MIN`, `N_CHARGED_MAX` | Minimum and maximum number of charged amino acids: `ARG LYS GLU ASP` | Composition of the input structure |
 | `N_OTHER_MIN`, `N_OTHER_MAX` | Minimum and maximum number of other amino acids: `CYS PRO` | Composition of the input structure |
 
-- If all eight parameters are omitted, PepAD uses the same amino-acid composition as initial structure.
+- If all eight parameters are omitted, PepAD uses the same amino-acid composition as the initial structure.
 - When designing compositions different from the initial structure, each category must specify a minimum, a maximum, or both.
 - An omitted minimum is set to `0`.
-- An omitted maximum is set to `N_RESIDUES`.
+- An omitted maximum is set to `N_AA`.
 - Equal minimum and maximum values impose an exact count.
-- Composition totals exclude number of `ACE`, `NME`, and `NHE` caps, but include residues at sites defined by single-site positional constraints and grouped-site positional constraints.
+- Composition totals exclude `ACE`, `NME`, and `NHE` caps, but include residues at sites defined by single-site positional constraints and grouped-site positional constraints.
 
 Example allowing a range of polar and charged content while fixing the
 hydrophobic count:
@@ -229,7 +352,7 @@ N_SER_MAX = 3
 - Enter only a minimum, only a maximum, or both.
 - Equal MIN and MAX values impose an exact count.
 - Amino acids without these parameters remain unconstrained, subject to their category limits.
-- \<AA\> can replaced with `GLY`, `ALA`, `VAL`, `LEU`, `ILE`, `MET`, `PHE`, `TYR`, `TRP`, `SER`, `ASN`, `GLN`, `THR`, `HIE`, `ARG`, `LYS`, `GLU`, `ASP`, `CYS`, and `PRO`.
+- \<AA\> can be replaced with `GLY`, `ALA`, `VAL`, `LEU`, `ILE`, `MET`, `PHE`, `TYR`, `TRP`, `SER`, `ASN`, `GLN`, `THR`, `HIE`, `ARG`, `LYS`, `GLU`, `ASP`, `CYS`, and `PRO`.
 <br>
 
 ### Positional constraints
@@ -248,7 +371,7 @@ N_SER_MAX = 3
 **Do not place spaces around the colon:**
 
 ```text
-SINGLE_SITE_CONSTRAINTS = 5:ASN 6 # Incorrect format
+SINGLE_SITE_CONSTRAINTS = 5:ASN 6
 ```
 
 Use `NONE` or omit the parameter when no single-site positional constraint is needed.
@@ -263,17 +386,17 @@ GROUPED_SITE_CONSTRAINTS = 1 2 3
 ```
 Here, sites 1, 2, and 3 are assigned amino acids from the `GROUPED_SITE_AA_POOL`.
 
-PepAD allows to assign duplicate amino acid:
+PepAD allows duplicate amino acids in the pool:
 ```text
 GROUPED_SITE_AA_POOL     = ASN SER ALA ALA VAL
 GROUPED_SITE_CONSTRAINTS = 2 3 5
 ```
 Here, `ALA` may appear on sites 2, 3, and 5 at most twice.
 
-- The number of amino acids in `GROUPED_SITE_AA_POOL` must no less than the number of `GROUPED_SITE_CONSTRAINTS`.
+- The number of amino acids in `GROUPED_SITE_AA_POOL` must not be less than the number of sites in `GROUPED_SITE_CONSTRAINTS`.
 - To allow an amino acid to appear one additional time, enter it one additional time in the pool.
-- Grouped-sites cannot overlap with sites listed in `SINGLE_SITE_CONSTRAINTS`.
-- PepAD checks whether the grouped-site pool is compatible with the overall composition limits and specific amino-acid constraints.
+- Grouped sites cannot overlap with sites listed in `SINGLE_SITE_CONSTRAINTS`.
+- PepAD checks whether the grouped-site pool is compatible with the overall composition limits and compositional constraints.
 
 
 ### Annotated input.txt template
@@ -284,7 +407,7 @@ The maintained template is [`src/input.example.txt`](src/input.example.txt). Use
 
 Users must provide an initial structure PDB file for PepAD. The structure usually
 consists of individual peptides in a configuration of cross-β spine. Prepared
-structures are available in [`Initial structures/`](Initial%20structures/). Two
+structures are available in [`Initial_structures/`](Initial_structures/). Two
 recommended approaches for preparing the initial structure are as follows.
 
 First, users can search for existing amyloid fibril structures in the
