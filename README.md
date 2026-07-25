@@ -150,12 +150,9 @@ src/PepAD/
         `-- PepAD.1
 ```
 
-The PepAD executable is therefore `src/PepAD/PepAD`, not `src/PepAD`. The
-runtime `lib/` directory remains beside the executable, where PepAD can locate
-it.
+The PepAD executable is therefore `src/PepAD/PepAD`, not `src/PepAD`. The runtime `lib/` directory should be at same level with the PepAD executable.
 
-To install PepAD somewhere else, provide the installation directory as the
-first argument:
+To install PepAD somewhere else, provide the installation directory as the first argument:
 
 ```bash
 bash src/compile_code.sh /path/to/PepAD_install
@@ -189,8 +186,7 @@ Each run needs:
 - an initial structure in PDB format; and
 - a text file named exactly `input.txt`.
 
-From the repository root, create the run directory using the same paths as in
-Method 1:
+From the repository root, create the run directory using the same paths as in Method 1:
 
 ```bash
 mkdir -p run1
@@ -201,15 +197,13 @@ cd run1
 
 ### 4. Run PepAD
 
-From `run1`, execute PepAD. It reads `input.txt` and writes the results in the
-working directory:
+From `run1`, execute PepAD. It reads `input.txt` and writes the results in the working directory:
 
 ```bash
 PepAD
 ```
 
-If PepAD has not been added to `PATH`, the default installation can instead be
-run from `run1` using:
+If PepAD has not been added to `PATH`, the default installation can instead be run from `run1` using:
 
 ```bash
 ../src/PepAD/PepAD
@@ -241,9 +235,7 @@ PDBFILE = comp1.pdb
 N_STEPS = 10000
 ```
 
-PepAD automatically determines the number of chains, number of amino acids per
-chain, energy groups, β-sheets, and composition from the PDB file. Other
-parameters have default values.
+PepAD automatically determines the number of chains, number of amino acids per chain, energy groups, β-sheets, and composition from the PDB file. Other parameters have default values.
 
 ### Initial structure and restart settings
 
