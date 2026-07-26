@@ -175,6 +175,7 @@ file.
 Test the executable and manual:
 
 ```bash
+module load PrgEnv-intel # Load Intel Compilers if necessary
 PepAD --help
 man PepAD
 ```
