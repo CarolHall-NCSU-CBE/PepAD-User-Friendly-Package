@@ -1,0 +1,10 @@
+ATOM      1  N   ALA A   4       3.326   1.548  -0.000
+ATOM      2  H   ALA A   4       3.909   0.724  -0.000
+ATOM      3  CA  ALA A   4       3.970   2.846  -0.000
+ATOM      4  HA  ALA A   4       3.672   3.400  -0.890
+ATOM      5  CB  ALA A   4       3.577   3.654   1.232
+ATOM      6  HB1 ALA A   4       3.877   3.116   2.131
+ATOM      7  HB2 ALA A   4       4.075   4.623   1.206
+ATOM      8  HB3 ALA A   4       2.497   3.801   1.241
+ATOM      9  C   ALA A   4       5.486   2.705  -0.000
+ATOM     10  O   ALA A   4       6.009   1.593  -0.000

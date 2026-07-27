@@ -1,0 +1,15 @@
+ATOM     21  N   GLU A   4       1.753  -0.007  -1.538
+ATOM     22  H   GLU A   4       1.013   0.727  -1.512
+ATOM     23  CA  GLU A   4       3.146   0.243  -1.074
+ATOM     24  HA  GLU A   4       3.834  -0.183  -1.819
+ATOM     25  CB  GLU A   4       3.408   1.746  -0.955
+ATOM     26  HB2 GLU A   4       4.461   1.903  -0.678
+ATOM     27  HB3 GLU A   4       3.263   2.211  -1.941
+ATOM     28  CG  GLU A   4       2.523   2.452   0.059
+ATOM     29  HG2 GLU A   4       1.468   2.302  -0.215
+ATOM     30  HG3 GLU A   4       2.668   1.994   1.048
+ATOM     31  CD  GLU A   4       2.812   3.937   0.149
+ATOM     32  OE1 GLU A   4       3.913   4.355  -0.268
+ATOM     33  OE2 GLU A   4       1.937   4.684   0.635
+ATOM     34  C   GLU A   4       3.429  -0.469   0.312
+ATOM     35  O   GLU A   4       4.246  -1.388   0.388

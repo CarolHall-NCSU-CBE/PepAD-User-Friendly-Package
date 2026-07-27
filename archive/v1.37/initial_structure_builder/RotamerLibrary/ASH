@@ -1,0 +1,13 @@
+ATOM     21  N   ASH A   4       0.423  -0.298  -1.436
+ATOM     22  H   ASH A   4       1.210   0.213  -1.807
+ATOM     23  CA  ASH A   4      -0.674   0.452  -0.859
+ATOM     24  HA  ASH A   4      -1.591   0.236  -1.407
+ATOM     25  CB  ASH A   4      -0.882   0.083   0.606
+ATOM     26  HB2 ASH A   4      -1.734   0.635   1.003
+ATOM     27  HB3 ASH A   4      -1.073  -0.987   0.687
+ATOM     28  CG  ASH A   4       0.371   0.438   1.403
+ATOM     29  OD1 ASH A   4       1.396   0.769   0.748
+ATOM     30  OD2 ASH A   4       0.293   0.374   2.659
+ATOM     31  HD2 ASH A   4       1.137   0.617   3.046
+ATOM     32  C   ASH A   4      -0.409   1.950  -0.928
+ATOM     33  O   ASH A   4       0.629   2.378  -1.427

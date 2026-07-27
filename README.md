@@ -130,7 +130,9 @@ required on the local system.
 
 Download or clone this repository. PepAD is written in Fortran 90 and requires
 the Intel `ifx` compiler. The provided compilation script locates the source,
-runtime library, and manual relative to its own location, so it can be called
+runtime library, and manual relative to its own location. It compiles PepAD into
+an installation directory and copies `lib/` into that same directory, placing
+the `PepAD` executable and `lib/` at the same level. The script can be called
 from the repository root:
 
 ```bash
@@ -150,9 +152,9 @@ src/PepAD/
         `-- PepAD.1
 ```
 
-The PepAD executable is therefore `src/PepAD/PepAD`, not `src/PepAD`. The
-runtime `lib/` directory remains beside the executable, where PepAD can locate
-it.
+The PepAD executable is therefore `src/PepAD/PepAD`, not `src/PepAD`.
+`src/PepAD/PepAD` and `src/PepAD/lib/` must remain at the same level because
+PepAD locates its runtime parameter files relative to the executable.
 
 To install PepAD somewhere else, provide the installation directory as the
 first argument:

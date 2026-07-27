@@ -1,170 +1,234 @@
-#!/usr/bin/env python
-# coding: utf-8
+# Initial Structure Builder v1.23
 
-# In[58]:
+# Source version: v1.23
 
 
+# %% Cell 30ee6987
 import numpy as np
-# from PeptideBuilder import Geometry
-# import PeptideBuilder
 import pandas as pd
-import scipy.linalg
-import matplotlib.pyplot as plt
 import argparse
-# import Bio.PDB
-# import hydride
-# import subprocess
+import random
+from typing import List, Optional, Sequence, Tuple, Union
+import math, warnings
+from pathlib import Path
 
 
-# In[59]:
-
-
+# %% Cell 79accf39-9c01-4f68-ae10-575e04ccb1bd
 def linear_fitting(data):
-#      reference:    
+    #      reference:
     # https://stackoverflow.com/questions/2298390/fitting-a-line-in-3d
 
+    """Function:
+        Fit one straight line through a group of 3D points and obtain the main line
+        direction.
+
+    Parameters
+    ----------
+    data : numpy.ndarray or pandas.DataFrame with shape (n, 3)
+        Each row is one 3D point.
+
+    Returns
+    -------
+    numpy.ndarray with shape (3,)
+        Fitted direction vector [x, y, z].
+    """
     datamean = data.mean(axis=0)
     uu, dd, vv = np.linalg.svd(data - datamean)
     return vv[0]
 
-def linear_fitting_3D_points(points):
 
-#      reference:
-#      https://www.doc88.com/p-8189740853644.html  
-#     《三维空间点中基于最小二乘法的分段直线拟合方法》 薛丽红，2015年7月，齐齐哈尔学报，第31卷第4期
+def unit_vector(vector, label="vector", allow_zero=False):
+    """Function:
+        Normalize a vector so its length becomes 1.
 
-    Sum_X=0.0
-    Sum_Y=0.0
-    Sum_Z=0.0
-    Sum_XZ=0.0
-    Sum_YZ=0.0
-    Sum_Z2=0.0
-    n=len(points)
-    for i in range(0,len(points)):
-        xi=points[i][0]
-        yi=points[i][1]
-        zi=points[i][2]
+    Parameters
+    ----------
+    vector : list, tuple, or numpy.ndarray
+        Vector components to normalize.
+    label : str
+        Name included in an error message when the vector is invalid.
+    allow_zero : bool
+        When True, a near-zero vector is allowed and returns None.
 
-        Sum_X = Sum_X + xi
-        Sum_Y = Sum_Y + yi
-        Sum_Z = Sum_Z + zi
-        Sum_XZ = Sum_XZ + xi*zi
-        Sum_YZ = Sum_YZ + yi*zi
-        Sum_Z2 = Sum_Z2 + zi**2
-
-    den = n*Sum_Z2 - Sum_Z * Sum_Z # 公式分母
-    k1 = (n*Sum_XZ - Sum_X * Sum_Z)/ den
-    b1 = (Sum_X - k1 * Sum_Z)/n
-    k2 = (n*Sum_YZ - Sum_Y * Sum_Z)/ den
-    b2 = (Sum_Y - k2 * Sum_Z)/n
-    
-    return k1, b1, k2, b2
-
-def unit_vector(vector, label='vector', allow_zero=False):
-    """Return a normalized vector; optionally return None for near-zero input."""
+    Returns
+    -------
+    numpy.ndarray or None
+        Array with the same shape as vector, or None.
+    """
     vector = np.asarray(vector, dtype=np.float64)
     norm = np.linalg.norm(vector)
     if norm < 1e-8:
         if allow_zero:
             return None
-        raise ValueError(f'Cannot normalize near-zero {label}.')
+        raise ValueError(f"Cannot normalize near-zero {label}.")
     return vector / norm
-    
+
+
 def cross2d(a, b):
-    return a[0]*b[1] - a[1]*b[0]
-    
+    """Function:
+        Calculate the signed 2D cross product used to judge clockwise or
+        counterclockwise rotation.
+
+    Parameters
+    ----------
+    a : array-like
+        First two-dimensional vector.
+    b : array-like
+        Second two-dimensional vector.
+
+    Returns
+    -------
+    float
+        Signed scalar cross product a_x*b_y - a_y*b_x.
+    """
+    return a[0] * b[1] - a[1] * b[0]
+
+
 def rotation_angle(v1, v2):
+    """Function:
+        Calculate the signed angle needed to rotate one 2D vector onto another vector.
+
+    Parameters
+    ----------
+    v1 : Vector, Atom, or array-like
+        Starting two-dimensional vector.
+    v2 : Vector, Atom, or array-like
+        Target two-dimensional vector.
+
+    Returns
+    -------
+    float
+        Signed rotation angle in radians.
+    """
     v1_u = unit_vector(v1)
     v2_u = unit_vector(v2)
-    
-    cos_angle = np.dot(v1_u, v2_u)/(np.sqrt(np.dot(v1_u, v1_u))*np.sqrt(np.dot(v2_u, v2_u)))
+
+    cos_angle = np.dot(v1_u, v2_u) / (
+        np.sqrt(np.dot(v1_u, v1_u)) * np.sqrt(np.dot(v2_u, v2_u))
+    )
     cos_angle = np.clip(cos_angle, -1.0, 1.0)
     angle = np.arccos(cos_angle)
-    
+
     # judge rotation direction
-    cross_product = cross2d(v1_u, v2_u) # cross_product OF 2d vector, it return a scalar
+    cross_product = cross2d(
+        v1_u, v2_u
+    )  # cross_product OF 2d vector, it return a scalar
     if cross_product < 0:
         direction = -1
     else:
         direction = 1
-    
+
     angle = angle * direction
     return angle
 
-def rotation_coordinates(df, axis, angle):
-    df_temp = df.copy()
-    data = df_temp[['x', 'y', 'z']].to_numpy()
 
-    if(axis == 'x'):
-        M = np.array([[1, 0, 0], [0, np.cos(angle), -np.sin(angle)], [0, np.sin(angle), np.cos(angle)]])
-    elif (axis == 'y'):
-        M = np.array([[np.cos(angle), 0, np.sin(angle)], [0, 1, 0], [-np.sin(angle), 0, np.cos(angle)]])
-    elif (axis == 'z'):
-        M = np.array([[np.cos(angle), -np.sin(angle), 0], [np.sin(angle), np.cos(angle), 0], [0, 0, 1]])
-    elif (axis == "none"):
+def rotation_coordinates(df, axis, angle):
+    """Function:
+        Rotate all atom coordinates in a peptide table around the x, y, or z axis.
+
+    Parameters
+    ----------
+    df : pandas.DataFrame
+        Peptide atom table containing x, y, z and residue information.
+    axis : str
+        'x', 'y', or 'z' selects the rotation axis and 'none' returns an unchanged copy.
+    angle : float
+        Rotation angle in radians.
+
+    Returns
+    -------
+    pandas.DataFrame
+        Rotated copy of df.
+    """
+    df_temp = df.copy()
+    data = df_temp[["x", "y", "z"]].to_numpy()
+
+    if axis == "x":
+        M = np.array(
+            [
+                [1, 0, 0],
+                [0, np.cos(angle), -np.sin(angle)],
+                [0, np.sin(angle), np.cos(angle)],
+            ]
+        )
+    elif axis == "y":
+        M = np.array(
+            [
+                [np.cos(angle), 0, np.sin(angle)],
+                [0, 1, 0],
+                [-np.sin(angle), 0, np.cos(angle)],
+            ]
+        )
+    elif axis == "z":
+        M = np.array(
+            [
+                [np.cos(angle), -np.sin(angle), 0],
+                [np.sin(angle), np.cos(angle), 0],
+                [0, 0, 1],
+            ]
+        )
+    elif axis == "none":
         return df_temp
-    
+
     rotated_data = (M @ data.T).T  # Transpose to apply matrix multiplication correctly
-    df_temp[['x', 'y', 'z']] = rotated_data
+    df_temp[["x", "y", "z"]] = rotated_data
 
     return df_temp
 
-def add_NH_remove_OH(pdbfile, o_filename):
-    pdb=[]
-    columns = ['atom', 'anum', 'atom_name', 'aa_name', 'resid', 'x', 'y', 'z']
 
-    with open(pdbfile, 'r') as f:
-        lines = f.readlines()
+def add_NH_remove_OH(peptide_df: pd.DataFrame) -> pd.DataFrame:
+    """Function:
+        Prepare uncapped peptide termini directly in a peptide DataFrame.
 
-    for line in lines:
-        if line.startswith("ATOM"):
-            components = line.split()
+    Parameters
+    ----------
+    peptide_df : pandas.DataFrame
+        Generated peptide atoms before terminal processing.
 
-            atom = line[0:6].strip()           # ATOM
-            anum = int(line[6:11])            # Atom number
-            atom_name = line[11:17].strip()   # Atom name
-            aa_name = line[17:21].strip()     # Amino acid name
-            resid = int(line[22:26])          # Residue ID
-            x = float(line[26:38])            # X-coordinate
-            y = float(line[38:46])            # Y-coordinate
-            z = float(line[46:54])            # Z-coordinate
+    Returns
+    -------
+    pandas.DataFrame
+        Peptide atoms with terminal hydrogens and residue names corrected.
+    """
+    df = peptide_df.copy().reset_index(drop=True)
+    ##### remove "H" on "OXT" ###############
+    df = df[df["atom_name"] != "HXT"]
+    df.loc[(df["atom_name"] == "H") & (df["resid"] == 1), "atom_name"] = "H1"
 
-            # Create a dictionary for the current line
-            row = {
-                'atom': atom,
-                'anum': anum,
-                'atom_name': atom_name,
-                'aa_name': aa_name,
-                'resid': resid,
-                'x': x,
-                'y': y,
-                'z': z
-            }
-
-            # Append the dictionary to the list
-            pdb.append(row)
-            
-    df = pd.DataFrame(pdb, columns=columns)
-    ##### remove "H" on "OXT" ############### 
-    df = df[df['atom_name'] != "HXT"]
-    df.loc[(df['atom_name'] == 'H') & (df['resid'] == 1), 'atom_name'] = 'H1'
-    
-    h2 = df[df['atom_name'] == 'H2'].iloc[0].copy()       
+    h2 = df[df["atom_name"] == "H2"].iloc[0].copy()
     h3 = h2.copy()
-    h3['atom_name'] = 'H3'
-    idx = df[df['atom_name'] == 'H2'].index[0] + 1                        # index of H2 in the df
-    df = pd.concat([df.iloc[:idx], pd.DataFrame([h3]), df.iloc[idx:]]).reset_index(drop=True) # combine dataframe
-    df['anum'] = range(1, len(df) + 1)                                                        # Reindex atom number
+    h3["atom_name"] = "H3"
+    idx = df[df["atom_name"] == "H2"].index[0] + 1  # index of H2 in the df
+    df = pd.concat([df.iloc[:idx], pd.DataFrame([h3]), df.iloc[idx:]]).reset_index(
+        drop=True
+    )  # combine dataframe
+    df["anum"] = range(1, len(df) + 1)  # Reindex atom number
 
     ################## calculate H coordinates #########
     # Solve the corrected system of equations
-    if df[df['resid'] == 1].iloc[0]['aa_name'] == 'GLY':
-        cb = df[(df['atom_name'] == 'HA2') & (df['resid'] == 1)].iloc[0][['x', 'y', 'z']].to_numpy()
+    if df[df["resid"] == 1].iloc[0]["aa_name"] == "GLY":
+        cb = (
+            df[(df["atom_name"] == "HA2") & (df["resid"] == 1)]
+            .iloc[0][["x", "y", "z"]]
+            .to_numpy()
+        )
     else:
-        cb = df[(df['atom_name'] == 'CB') & (df['resid'] == 1)].iloc[0][['x', 'y', 'z']].to_numpy()
+        cb = (
+            df[(df["atom_name"] == "CB") & (df["resid"] == 1)]
+            .iloc[0][["x", "y", "z"]]
+            .to_numpy()
+        )
 
-    ca = df[(df['atom_name'] == 'CA') & (df['resid'] == 1)].iloc[0][['x', 'y', 'z']].to_numpy()
-    n = df[(df['atom_name'] == 'N') & (df['resid'] == 1)].iloc[0][['x', 'y', 'z']].to_numpy()
+    ca = (
+        df[(df["atom_name"] == "CA") & (df["resid"] == 1)]
+        .iloc[0][["x", "y", "z"]]
+        .to_numpy()
+    )
+    n = (
+        df[(df["atom_name"] == "N") & (df["resid"] == 1)]
+        .iloc[0][["x", "y", "z"]]
+        .to_numpy()
+    )
 
     # need to reconstruct the numpy array again to prevent error
     cb = np.array([cb[0], cb[1], cb[2]])
@@ -175,361 +239,529 @@ def add_NH_remove_OH(pdbfile, o_filename):
     dihedral_angle_rad = 59.98 / 180 * np.pi
     bond_angle_rad = 109.49 / 180 * np.pi
     dihedral_angle = 59.98
-    bond_angle = 109.49 
+    bond_angle = 109.49
     bond_length = 1.01
 
     h_coordinate = place_fourth_atom(cb, ca, n, bond_length, bond_angle, dihedral_angle)
-    
+
     angles = [120, 240]  # Angles to rotate by
     rotated_h_coords = rotate_around_axis(ca, n, h_coordinate, angles)
 
-    df.loc[df['atom_name'] == 'H1', ['x', 'y', 'z']] = h_coordinate
-    df.loc[df['atom_name'] == 'H2', ['x', 'y', 'z']] = rotated_h_coords[0]
-    df.loc[df['atom_name'] == 'H3', ['x', 'y', 'z']] = rotated_h_coords[1]
+    df.loc[df["atom_name"] == "H1", ["x", "y", "z"]] = h_coordinate
+    df.loc[df["atom_name"] == "H2", ["x", "y", "z"]] = rotated_h_coords[0]
+    df.loc[df["atom_name"] == "H3", ["x", "y", "z"]] = rotated_h_coords[1]
 
-    with open(o_filename, 'w') as f:
-        for index, row in df.iterrows():
-            if row['resid'] == 1:
-                row['aa_name'] = "N" + row['aa_name']
-                output= "ATOM{:7d}{:^6}{:4}{:5d}{:12.3f}{:8.3f}{:8.3f}\n".format(
-                    row['anum'],row['atom_name'],row['aa_name'],row['resid'],
-                    row['x'],row['y'],row['z'])
-                
-            elif row['resid'] == df['resid'].max():
-                row['aa_name'] = "C" + row['aa_name']
-                output= "ATOM{:7d}{:^6}{:4}{:5d}{:12.3f}{:8.3f}{:8.3f}\n".format(
-                    row['anum'],row['atom_name'],row['aa_name'],row['resid'],
-                    row['x'],row['y'],row['z'])
-                
-            else:
-                output= "ATOM{:7d}{:^6}{:4}{:5d}{:12.3f}{:8.3f}{:8.3f}\n".format(
-                    row['anum'],row['atom_name'],row['aa_name'],row['resid'],
-                    row['x'],row['y'],row['z'])
-            
-            f.write(output)
+    first_resid = df["resid"].min()
+    last_resid = df["resid"].max()
+    first_mask = df["resid"] == first_resid
+    last_mask = (df["resid"] == last_resid) & ~first_mask
+    df.loc[first_mask, "aa_name"] = (
+        "N" + df.loc[first_mask, "aa_name"].astype(str)
+    )
+    df.loc[last_mask, "aa_name"] = (
+        "C" + df.loc[last_mask, "aa_name"].astype(str)
+    )
+    return df.reset_index(drop=True)
 
-def add_caps(pdbfile, o_filename, type_flag):            
-    # C-NME bond length = 1.291
+def add_caps(peptide_df: pd.DataFrame, type_flag: int) -> pd.DataFrame:
+    """Function:
+        Add ACE and the selected C-terminal cap directly to a peptide DataFrame.
 
+    Parameters
+    ----------
+    peptide_df : pandas.DataFrame
+        Generated peptide atoms before terminal processing.
+    type_flag : int
+        1 adds ACE+NME and 2 adds ACE+NHE.
 
+    Returns
+    -------
+    pandas.DataFrame
+        Peptide atoms with the selected terminal caps.
+    """
     NHE_data = [
-        {"anum": 1, "atom_name": "N",    "aa_name": "NHE", "resid": 1, "x": 2.194, "y": 1.598, "z": -0.000},
-        {"anum": 2, "atom_name": "HN1",  "aa_name": "NHE", "resid": 1, "x": 3.035, "y": 1.039, "z": -0.000},
-        {"anum": 3, "atom_name": "HN2",  "aa_name": "NHE", "resid": 1, "x": 2.250, "y": 2.606, "z": -0.000},
+        {
+            "anum": 1,
+            "atom_name": "N",
+            "aa_name": "NHE",
+            "resid": 1,
+            "x": 2.194,
+            "y": 1.598,
+            "z": -0.000,
+        },
+        {
+            "anum": 2,
+            "atom_name": "HN1",
+            "aa_name": "NHE",
+            "resid": 1,
+            "x": 3.035,
+            "y": 1.039,
+            "z": -0.000,
+        },
+        {
+            "anum": 3,
+            "atom_name": "HN2",
+            "aa_name": "NHE",
+            "resid": 1,
+            "x": 2.250,
+            "y": 2.606,
+            "z": -0.000,
+        },
     ]
-    
+
     NME_data = [
-        {"anum": 1, "atom_name": "N",    "aa_name": "NME", "resid": 1, "x": 3.326, "y": 1.548, "z": -0.000},
-        {"anum": 2, "atom_name": "H",    "aa_name": "NME", "resid": 1, "x": 3.909, "y": 0.724, "z": -0.000},
-        {"anum": 3, "atom_name": "CH3",  "aa_name": "NME", "resid": 1, "x": 3.970, "y": 2.846, "z": -0.000},
-        {"anum": 4, "atom_name": "HH31", "aa_name": "NME", "resid": 1, "x": 3.212, "y": 3.629, "z":  0.000},
-        {"anum": 5, "atom_name": "HH32", "aa_name": "NME", "resid": 1, "x": 4.592, "y": 2.943, "z":  0.890},
-        {"anum": 6, "atom_name": "HH33", "aa_name": "NME", "resid": 1, "x": 4.592, "y": 2.943, "z": -0.890},
+        {
+            "anum": 1,
+            "atom_name": "N",
+            "aa_name": "NME",
+            "resid": 1,
+            "x": 3.326,
+            "y": 1.548,
+            "z": -0.000,
+        },
+        {
+            "anum": 2,
+            "atom_name": "H",
+            "aa_name": "NME",
+            "resid": 1,
+            "x": 3.909,
+            "y": 0.724,
+            "z": -0.000,
+        },
+        {
+            "anum": 3,
+            "atom_name": "CH3",
+            "aa_name": "NME",
+            "resid": 1,
+            "x": 3.970,
+            "y": 2.846,
+            "z": -0.000,
+        },
+        {
+            "anum": 4,
+            "atom_name": "HH31",
+            "aa_name": "NME",
+            "resid": 1,
+            "x": 3.212,
+            "y": 3.629,
+            "z": 0.000,
+        },
+        {
+            "anum": 5,
+            "atom_name": "HH32",
+            "aa_name": "NME",
+            "resid": 1,
+            "x": 4.592,
+            "y": 2.943,
+            "z": 0.890,
+        },
+        {
+            "anum": 6,
+            "atom_name": "HH33",
+            "aa_name": "NME",
+            "resid": 1,
+            "x": 4.592,
+            "y": 2.943,
+            "z": -0.890,
+        },
     ]
-    
+
     ACE_data = [
-        {"anum": 1, "atom_name": "H1",   "aa_name": "ACE", "resid": 1, "x": 2.000, "y": 1.000, "z": -0.000},
-        {"anum": 2, "atom_name": "CH3",  "aa_name": "ACE", "resid": 1, "x": 2.000, "y": 2.090, "z":  0.000},
-        {"anum": 3, "atom_name": "H2",   "aa_name": "ACE", "resid": 1, "x": 1.486, "y": 2.454, "z":  0.890},
-        {"anum": 4, "atom_name": "H3",   "aa_name": "ACE", "resid": 1, "x": 1.486, "y": 2.454, "z": -0.890},
-        {"anum": 5, "atom_name": "C",    "aa_name": "ACE", "resid": 1, "x": 3.427, "y": 2.641, "z": -0.000},
-        {"anum": 6, "atom_name": "O",    "aa_name": "ACE", "resid": 1, "x": 4.391, "y": 1.877, "z": -0.000},
-    ] 
+        {
+            "anum": 1,
+            "atom_name": "H1",
+            "aa_name": "ACE",
+            "resid": 1,
+            "x": 2.000,
+            "y": 1.000,
+            "z": -0.000,
+        },
+        {
+            "anum": 2,
+            "atom_name": "CH3",
+            "aa_name": "ACE",
+            "resid": 1,
+            "x": 2.000,
+            "y": 2.090,
+            "z": 0.000,
+        },
+        {
+            "anum": 3,
+            "atom_name": "H2",
+            "aa_name": "ACE",
+            "resid": 1,
+            "x": 1.486,
+            "y": 2.454,
+            "z": 0.890,
+        },
+        {
+            "anum": 4,
+            "atom_name": "H3",
+            "aa_name": "ACE",
+            "resid": 1,
+            "x": 1.486,
+            "y": 2.454,
+            "z": -0.890,
+        },
+        {
+            "anum": 5,
+            "atom_name": "C",
+            "aa_name": "ACE",
+            "resid": 1,
+            "x": 3.427,
+            "y": 2.641,
+            "z": -0.000,
+        },
+        {
+            "anum": 6,
+            "atom_name": "O",
+            "aa_name": "ACE",
+            "resid": 1,
+            "x": 4.391,
+            "y": 1.877,
+            "z": -0.000,
+        },
+    ]
 
     NHE = pd.DataFrame(NHE_data)
     NME = pd.DataFrame(NME_data)
     ACE = pd.DataFrame(ACE_data)
-    
-    pdb=[]
-    columns = ['atom', 'anum', 'atom_name', 'aa_name', 'resid', 'x', 'y', 'z']
 
-    with open(pdbfile, 'r') as f:
-        lines = f.readlines()
+    df = peptide_df.copy().reset_index(drop=True)
 
-    for line in lines:
-        if line.startswith("ATOM"):
-            components = line.split()
+    ##### remove "H" on "OXT" ###############
 
-            atom = line[0:6].strip()          # ATOM
-            anum = int(line[6:11])            # Atom number
-            atom_name = line[11:17].strip()   # Atom name
-            aa_name = line[17:21].strip()     # Amino acid name
-            resid = int(line[22:26])          # Residue ID
-            x = float(line[26:38])            # X-coordinate
-            y = float(line[38:46])            # Y-coordinate
-            z = float(line[46:54])            # Z-coordinate
+    df = df[(df["atom_name"] != "HXT")]  # remove H on OXT
 
-            row = {
-                'atom': atom,
-                'anum': anum,
-                'atom_name': atom_name,
-                'aa_name': aa_name,
-                'resid': resid,
-                'x': x,
-                'y': y,
-                'z': z
-            }
+    # Keep one backbone N-H for the ACE amide bond. Put it at the same
+    # geometry as the uncapped N-terminal H3, then orient ACE from that H.
+    n_term_h_names = ["H", "H1", "HN", "HN1", "H2", "HN2", "H3", "HN3"]
+    first_res = df[df["resid"] == 1]
+    n = (
+        first_res[first_res["atom_name"] == "N"]
+        .iloc[0][["x", "y", "z"]]
+        .to_numpy(dtype=np.float64)
+    )
+    ca = (
+        first_res[first_res["atom_name"] == "CA"]
+        .iloc[0][["x", "y", "z"]]
+        .to_numpy(dtype=np.float64)
+    )
+    if first_res.iloc[0]["aa_name"] == "GLY":
+        ref_atom = first_res[first_res["atom_name"].isin(["HA2", "HA"])]
+    else:
+        ref_atom = first_res[first_res["atom_name"] == "CB"]
+    if ref_atom.empty:
+        raise ValueError(
+            "Cannot add ACE cap: no N-terminal CB/HA reference atom was "
+            "found on residue 1."
+        )
+    ref = ref_atom.iloc[0][["x", "y", "z"]].to_numpy(dtype=np.float64)
+    h_seed = place_fourth_atom(ref, ca, n, 1.01, 109.49, 59.98)
+    h3_coord = rotate_around_axis(ca, n, h_seed, [120, 240])[1]
 
-            pdb.append(row)
-    
-    df = pd.DataFrame(pdb, columns=columns)
-    
-##### remove "H" on "OXT" ############### 
-    
-    
-    df = df[(df['atom_name'] != "HXT")]                      # remove H on OXT
-
-    # Keep one backbone N-H for the ACE amide bond and normalize its name to "H".
-    # Hydride/PDB writers may call these H, H1/H2, or HN/HN1/HN2; Gly at the
-    # N-terminus is fine as long as one N-terminal backbone H is present.
-    n_term_h_names = ['H', 'H1', 'HN', 'HN1', 'H2', 'HN2', 'H3', 'HN3']
-    n_term_h = df[(df['resid'] == 1) & (df['atom_name'].isin(n_term_h_names))]
+    n_term_h = df[(df["resid"] == 1) & (df["atom_name"].isin(n_term_h_names))]
     if n_term_h.empty:
-        raise ValueError("Cannot add ACE cap: no N-terminal backbone H was found on residue 1.")
-    keep_h_idx = n_term_h.index[0]
-    remove_h_idx = n_term_h.index[1:]
-    df = df.drop(remove_h_idx)
-    df.loc[keep_h_idx, 'atom_name'] = 'H'
+        keep_h_idx = len(df)
+        h_row = first_res[first_res["atom_name"] == "N"].iloc[0].copy()
+        h_row["atom_name"] = "H"
+        h_row[["x", "y", "z"]] = h3_coord
+        df = pd.concat([df, pd.DataFrame([h_row])], ignore_index=True)
+    else:
+        keep_h_idx = n_term_h.index[0]
+        remove_h_idx = n_term_h.index[1:]
+        df = df.drop(remove_h_idx)
+        df.loc[keep_h_idx, "atom_name"] = "H"
+        df.loc[keep_h_idx, ["x", "y", "z"]] = h3_coord
 
-    df['resid'] += 1                                         # increase residue ID by 1
-    
+    df["resid"] += 1  # increase residue ID by 1
+
     ####### add ACE group ###########
     df = pd.concat([ACE, df], ignore_index=True)
 
     ###### calcualte NME or NHE position ########
-    last_resid = df[df['atom_name'] == 'C']['resid'].max()
-    C = df[(df['atom_name'] == 'C') & (df['resid'] == last_resid)].iloc[0][['x', 'y', 'z']].to_numpy()
-    OXT = df[(df['atom_name'] == 'OXT') & (df['resid'] == last_resid)].iloc[0][['x', 'y', 'z']].to_numpy()
+    last_resid = df[df["atom_name"] == "C"]["resid"].max()
+    C = (
+        df[(df["atom_name"] == "C") & (df["resid"] == last_resid)]
+        .iloc[0][["x", "y", "z"]]
+        .to_numpy()
+    )
+    OXT = (
+        df[(df["atom_name"] == "OXT") & (df["resid"] == last_resid)]
+        .iloc[0][["x", "y", "z"]]
+        .to_numpy()
+    )
     C_OXT_vector = OXT - C
-    C_N_vector = C_OXT_vector * 1.291 / np.linalg.norm(C_OXT_vector) 
+    C_N_vector = C_OXT_vector * 1.291 / np.linalg.norm(C_OXT_vector)
     N = C + C_N_vector
-    df = df[~((df['atom_name'] == "OXT") & (df['resid'] == last_resid))]          # remove OXT
-    
+    df = df[~((df["atom_name"] == "OXT") & (df["resid"] == last_resid))]  # remove OXT
+
     if type_flag == 1:
-        n_pos = NME[NME['atom_name'] == "N"][['x', 'y', 'z']].values[0]
+        n_pos = NME[NME["atom_name"] == "N"][["x", "y", "z"]].values[0]
         ####### add NME group ###########
-        NME['x'] = NME['x'] - n_pos[0] + N[0]
-        NME['y'] = NME['y'] - n_pos[1] + N[1]
-        NME['z'] = NME['z'] - n_pos[2] + N[2]
-        NME['resid'] += last_resid
-    
+        NME["x"] = NME["x"] - n_pos[0] + N[0]
+        NME["y"] = NME["y"] - n_pos[1] + N[1]
+        NME["z"] = NME["z"] - n_pos[2] + N[2]
+        NME["resid"] += last_resid
+
         df = pd.concat([df, NME], ignore_index=True)
-        df['anum'] = range(1, len(df) + 1) 
-        
+        df["anum"] = range(1, len(df) + 1)
+
         ####### Rotate NME group #######
-        CA= df[(df['atom_name'] == 'CA') & (df['resid'] == last_resid)].iloc[0][['x', 'y', 'z']].to_numpy()
-        N = df[(df['aa_name'] == 'NME') & (df['atom_name'] == 'N')].iloc[0][['x', 'y', 'z']].to_numpy()
-        H = df[(df['aa_name'] == 'NME') & (df['atom_name'] == 'H')].iloc[0][['x', 'y', 'z']].to_numpy()     # H from NME
-        CH3 = df[(df['aa_name'] == 'NME') & (df['atom_name'] == 'CH3')].iloc[0][['x', 'y', 'z']].to_numpy()
-        O = df[(df['resid'] == last_resid) & (df['atom_name'] == 'O')].iloc[0][['x', 'y', 'z']].to_numpy()
-        C = np.asarray(C, dtype=np.float64); CA= np.asarray(CA, dtype=np.float64); N = np.asarray(N, dtype=np.float64); 
-        H = np.asarray(H, dtype=np.float64); CH3 = np.asarray(CH3, dtype=np.float64); O = np.asarray(O, dtype=np.float64);
-        
-        v1 = C-N; v2 = CH3 - N
-        v3 = rotate_vector_plane_3D(v1, v2, np.pi*2/3) * np.linalg.norm(v2)      # rotate v2 to v1 by 120 degree
-        v4 = rotate_vector_plane_3D(v1, v2, np.pi*4/3) * np.linalg.norm(H - N)      # also get position of H
-    
-        CH3 = N + v3                                         # correct position of CH3, N
-        H = N + v4  
-        
-        df.loc[(df['atom_name'] == 'CH3') & (df['aa_name'] == 'NME'), ['x', 'y', 'z']] = CH3
-        df.loc[(df['atom_name'] == 'H') & (df['aa_name'] == 'NME'), ['x', 'y', 'z']] = H
-        
+        CA = (
+            df[(df["atom_name"] == "CA") & (df["resid"] == last_resid)]
+            .iloc[0][["x", "y", "z"]]
+            .to_numpy()
+        )
+        N = (
+            df[(df["aa_name"] == "NME") & (df["atom_name"] == "N")]
+            .iloc[0][["x", "y", "z"]]
+            .to_numpy()
+        )
+        H = (
+            df[(df["aa_name"] == "NME") & (df["atom_name"] == "H")]
+            .iloc[0][["x", "y", "z"]]
+            .to_numpy()
+        )  # H from NME
+        CH3 = (
+            df[(df["aa_name"] == "NME") & (df["atom_name"] == "CH3")]
+            .iloc[0][["x", "y", "z"]]
+            .to_numpy()
+        )
+        O = (
+            df[(df["resid"] == last_resid) & (df["atom_name"] == "O")]
+            .iloc[0][["x", "y", "z"]]
+            .to_numpy()
+        )
+        C = np.asarray(C, dtype=np.float64)
+        CA = np.asarray(CA, dtype=np.float64)
+        N = np.asarray(N, dtype=np.float64)
+        H = np.asarray(H, dtype=np.float64)
+        CH3 = np.asarray(CH3, dtype=np.float64)
+        O = np.asarray(O, dtype=np.float64)
+
+        v1 = C - N
+        v2 = CH3 - N
+        v3 = rotate_vector_plane_3D(v1, v2, np.pi * 2 / 3) * np.linalg.norm(
+            v2
+        )  # rotate v2 to v1 by 120 degree
+        v4 = rotate_vector_plane_3D(v1, v2, np.pi * 4 / 3) * np.linalg.norm(
+            H - N
+        )  # also get position of H
+
+        CH3 = N + v3  # correct position of CH3, N
+        H = N + v4
+
+        df.loc[
+            (df["atom_name"] == "CH3") & (df["aa_name"] == "NME"), ["x", "y", "z"]
+        ] = CH3
+        df.loc[(df["atom_name"] == "H") & (df["aa_name"] == "NME"), ["x", "y", "z"]] = H
+
         ################## calculate H coordinates #########
         p1 = H
         p2 = N
         p3 = CH3
-    
+
         # Parameters
-        dihedral_angle_deg = 97.150; bond_angle_deg = 110.00; bond_length = 1.078
-    
-        h_coordinate = place_fourth_atom(p1, p2, p3, bond_length, bond_angle_deg, dihedral_angle_deg) ## important
-        
+        dihedral_angle_deg = 97.150
+        bond_angle_deg = 110.00
+        bond_length = 1.078
+
+        h_coordinate = place_fourth_atom(
+            p1, p2, p3, bond_length, bond_angle_deg, dihedral_angle_deg
+        )  ## important
+
         angles = [120, 240]  # Angles to rotate by
         rotated_h_coords = rotate_around_axis(p2, p3, h_coordinate, angles)
-        
-        df.loc[(df['atom_name'] == 'HH31') & (df['aa_name'] == 'NME'), ['x', 'y', 'z']] = h_coordinate
-        df.loc[(df['atom_name'] == 'HH32') & (df['aa_name'] == 'NME'), ['x', 'y', 'z']] = rotated_h_coords[0]
-        df.loc[(df['atom_name'] == 'HH33') & (df['aa_name'] == 'NME'), ['x', 'y', 'z']] = rotated_h_coords[1]
-        
-        ##################### rotate C(amino acid) - N(NME) axis to 180 degree ################  
+
+        df.loc[
+            (df["atom_name"] == "HH31") & (df["aa_name"] == "NME"), ["x", "y", "z"]
+        ] = h_coordinate
+        df.loc[
+            (df["atom_name"] == "HH32") & (df["aa_name"] == "NME"), ["x", "y", "z"]
+        ] = rotated_h_coords[0]
+        df.loc[
+            (df["atom_name"] == "HH33") & (df["aa_name"] == "NME"), ["x", "y", "z"]
+        ] = rotated_h_coords[1]
+
+        # #################### rotate C(amino acid) - N(NME) axis to 180 degree
+        # ################
         theta = dihedral_angle(O, C, N, CH3)
         rotation_angle = 0 * np.pi - theta
-    
-        # Define rotation axis (C → N)
-        rotation_axis = N-C
+
+        rotation_axis = N - C
         rotation_axis /= np.linalg.norm(rotation_axis)  # Normalize axis
         rotation_center = N
-    
+
         # Copy NME group and rotate its atoms
-        NME_atoms = df[df['aa_name'] == "NME"].copy()
-    
+        NME_atoms = df[df["aa_name"] == "NME"].copy()
+
         for i, row in NME_atoms.iterrows():
-            if row['atom_name'] != "N":
-                v = np.array(row[['x', 'y', 'z']].values, dtype=np.float64) - rotation_center  # Translate to origin
+            if row["atom_name"] != "N":
+                v = (
+                    np.array(row[["x", "y", "z"]].values, dtype=np.float64)
+                    - rotation_center
+                )  # Translate to origin
                 v_rot = rotate_vector(v, rotation_axis, rotation_angle)  # Rotate
-                NME_atoms.loc[i, ['x', 'y', 'z']] = (v_rot + rotation_center).tolist()  # Translate back
-    
+                NME_atoms.loc[i, ["x", "y", "z"]] = (
+                    v_rot + rotation_center
+                ).tolist()  # Translate back
+
         # Replace old NME with rotated version
-        df = df[df['aa_name'] != "NME"]  
+        df = df[df["aa_name"] != "NME"]
         df = pd.concat([df, NME_atoms], ignore_index=True)
 
-    
-    ##################### rotate CA(amino acid) - C(Amino acid) axis to 180 degree ################
-
-        terminal_ha = df[(df['resid'] == last_resid) & (df['atom_name'].isin(['HA', 'HA2', 'HA3']))]
-        if terminal_ha.empty:
-            raise ValueError(f"Cannot orient C-terminal cap: no HA/HA2/HA3 found on residue {last_resid}.")
-        HA= terminal_ha.iloc[0][['x', 'y', 'z']].to_numpy()
-        CA= df[(df['atom_name'] == 'CA') & (df['resid'] == last_resid)].iloc[0][['x', 'y', 'z']].to_numpy()
-        HA = np.asarray(HA, dtype=np.float64); CA= np.asarray(CA, dtype=np.float64)
-    
-        theta = dihedral_angle(HA, CA, C, O)
-        rotation_angle = (-164.77)/180 * np.pi - theta
-    
-        # Define rotation axis
-        rotation_axis = C-CA
-        rotation_axis /= np.linalg.norm(rotation_axis)  # Normalize axis
-        rotation_center = C
-    
-        # Copy NME group and rotate its atoms
-        rotating_atoms = df[(df['aa_name'] == "NME") | ((df['atom_name'] == 'O') & (df['resid'] == last_resid))].copy()
-    
-    
-        for i, row in rotating_atoms.iterrows():
-            v = np.array(row[['x', 'y', 'z']].values, dtype=np.float64) - rotation_center  # Translate to origin
-            v_rot = rotate_vector(v, rotation_axis, rotation_angle)  # Rotate
-            rotating_atoms.loc[i, ['x', 'y', 'z']] = (v_rot + rotation_center).tolist()  # Translate back
-    
-        # Replace old NME with rotated version
-        df = df[~((df['aa_name'] == "NME") | ((df['atom_name'] == 'O') & (df['resid'] == last_resid)))] 
-        df = pd.concat([df, rotating_atoms], ignore_index=True)
+        # Keep terminal O fixed; the C-terminal cap N replaces the removed OXT.
 
     elif type_flag == 2:
-        n_pos = NHE[NHE['atom_name'] == "N"][['x', 'y', 'z']].values[0]
+        n_pos = NHE[NHE["atom_name"] == "N"][["x", "y", "z"]].values[0]
         ####### add NHE group ###########
-        NHE['x'] = NHE['x'] - n_pos[0] + N[0]
-        NHE['y'] = NHE['y'] - n_pos[1] + N[1]
-        NHE['z'] = NHE['z'] - n_pos[2] + N[2]
-        NHE['resid'] += last_resid
-    
+        NHE["x"] = NHE["x"] - n_pos[0] + N[0]
+        NHE["y"] = NHE["y"] - n_pos[1] + N[1]
+        NHE["z"] = NHE["z"] - n_pos[2] + N[2]
+        NHE["resid"] += last_resid
+
         df = pd.concat([df, NHE], ignore_index=True)
-        df['anum'] = range(1, len(df) + 1) 
+        df["anum"] = range(1, len(df) + 1)
         ####### Rotate NME group #######
-        CA= df[(df['atom_name'] == 'CA') & (df['resid'] == last_resid)].iloc[0][['x', 'y', 'z']].to_numpy()
-        HN1 = df[(df['aa_name'] == 'NHE') & (df['atom_name'] == 'HN1')].iloc[0][['x', 'y', 'z']].to_numpy()
-        HN2 = df[(df['aa_name'] == 'NHE') & (df['atom_name'] == 'HN2')].iloc[0][['x', 'y', 'z']].to_numpy()    
-        O = df[(df['resid'] == last_resid) & (df['atom_name'] == 'O')].iloc[0][['x', 'y', 'z']].to_numpy()
-        
-        C = np.asarray(C, dtype=np.float64); CA= np.asarray(CA, dtype=np.float64); N = np.asarray(N, dtype=np.float64); 
-        HN1 = np.asarray(HN1, dtype=np.float64); HN2 = np.asarray(HN2, dtype=np.float64); O = np.asarray(O, dtype=np.float64);
-        
-        v1 = C-N; v2 = HN1 - N
-        v3 = rotate_vector_plane_3D(v1, v2, np.pi*2/3) * np.linalg.norm(v2)           # rotate v2 to v1 by 120 degree
-        v4 = rotate_vector_plane_3D(v1, v2, np.pi*4/3) * np.linalg.norm(HN2 - N)      # also get position of H
-    
-        HN1 = N + v3                                         # correct position of CH3, N
-        HN2 = N + v4  
-        
-        df.loc[(df['atom_name'] == 'HN1') & (df['aa_name'] == 'NHE'), ['x', 'y', 'z']] = HN1
-        df.loc[(df['atom_name'] == 'HN2') & (df['aa_name'] == 'NHE'), ['x', 'y', 'z']] = HN2
-        
+        CA = (
+            df[(df["atom_name"] == "CA") & (df["resid"] == last_resid)]
+            .iloc[0][["x", "y", "z"]]
+            .to_numpy()
+        )
+        HN1 = (
+            df[(df["aa_name"] == "NHE") & (df["atom_name"] == "HN1")]
+            .iloc[0][["x", "y", "z"]]
+            .to_numpy()
+        )
+        HN2 = (
+            df[(df["aa_name"] == "NHE") & (df["atom_name"] == "HN2")]
+            .iloc[0][["x", "y", "z"]]
+            .to_numpy()
+        )
+        O = (
+            df[(df["resid"] == last_resid) & (df["atom_name"] == "O")]
+            .iloc[0][["x", "y", "z"]]
+            .to_numpy()
+        )
+
+        C = np.asarray(C, dtype=np.float64)
+        CA = np.asarray(CA, dtype=np.float64)
+        N = np.asarray(N, dtype=np.float64)
+        HN1 = np.asarray(HN1, dtype=np.float64)
+        HN2 = np.asarray(HN2, dtype=np.float64)
+        O = np.asarray(O, dtype=np.float64)
+
+        v1 = C - N
+        v2 = HN1 - N
+        v3 = rotate_vector_plane_3D(v1, v2, np.pi * 2 / 3) * np.linalg.norm(
+            v2
+        )  # rotate v2 to v1 by 120 degree
+        v4 = rotate_vector_plane_3D(v1, v2, np.pi * 4 / 3) * np.linalg.norm(
+            HN2 - N
+        )  # also get position of H
+
+        HN1 = N + v3  # correct position of CH3, N
+        HN2 = N + v4
+
+        df.loc[
+            (df["atom_name"] == "HN1") & (df["aa_name"] == "NHE"), ["x", "y", "z"]
+        ] = HN1
+        df.loc[
+            (df["atom_name"] == "HN2") & (df["aa_name"] == "NHE"), ["x", "y", "z"]
+        ] = HN2
+
         # ################## calculate H coordinates #########
         # p1 = H
         # p2 = N
         # p3 = CH3
-    
+
         # # Parameters
         # dihedral_angle_deg = 97.150; bond_angle_deg = 110.00; bond_length = 1.078
-    
-        # h_coordinate = place_fourth_atom(p1, p2, p3, bond_length, bond_angle_deg, dihedral_angle_deg) ## important
-        
+
+        # h_coordinate = place_fourth_atom(p1, p2, p3, bond_length, bond_angle_deg,
+        # dihedral_angle_deg) ## important
+
         # angles = [120, 240]  # Angles to rotate by
         # rotated_h_coords = rotate_around_axis(p2, p3, h_coordinate, angles)
-        
-        # df.loc[(df['atom_name'] == 'HH31') & (df['aa_name'] == 'NME'), ['x', 'y', 'z']] = h_coordinate
-        # df.loc[(df['atom_name'] == 'HH32') & (df['aa_name'] == 'NME'), ['x', 'y', 'z']] = rotated_h_coords[0]
-        # df.loc[(df['atom_name'] == 'HH33') & (df['aa_name'] == 'NME'), ['x', 'y', 'z']] = rotated_h_coords[1]
-        
-        ##################### rotate C(amino acid) - N(NME) axis to 180 degree ################  
+
+        # df.loc[(df['atom_name'] == 'HH31') & (df['aa_name'] == 'NME'), ['x', 'y',
+        # 'z']] = h_coordinate
+        # df.loc[(df['atom_name'] == 'HH32') & (df['aa_name'] == 'NME'), ['x', 'y',
+        # 'z']] = rotated_h_coords[0]
+        # df.loc[(df['atom_name'] == 'HH33') & (df['aa_name'] == 'NME'), ['x', 'y',
+        # 'z']] = rotated_h_coords[1]
+
+        # #################### rotate C(amino acid) - N(NME) axis to 180 degree
+        # ################
         theta = dihedral_angle(O, C, N, HN1)
         rotation_angle = 0 * np.pi - theta
-    
-        # Define rotation axis (C → N)
-        rotation_axis = N-C
+
+        rotation_axis = N - C
         rotation_axis /= np.linalg.norm(rotation_axis)  # Normalize axis
         rotation_center = N
-    
+
         # Copy NME group and rotate its atoms
-        NHE_atoms = df[df['aa_name'] == "NHE"].copy()
-    
+        NHE_atoms = df[df["aa_name"] == "NHE"].copy()
+
         for i, row in NHE_atoms.iterrows():
-            if row['atom_name'] != "N":
-                v = np.array(row[['x', 'y', 'z']].values, dtype=np.float64) - rotation_center  # Translate to origin
+            if row["atom_name"] != "N":
+                v = (
+                    np.array(row[["x", "y", "z"]].values, dtype=np.float64)
+                    - rotation_center
+                )  # Translate to origin
                 v_rot = rotate_vector(v, rotation_axis, rotation_angle)  # Rotate
-                NHE_atoms.loc[i, ['x', 'y', 'z']] = (v_rot + rotation_center).tolist()  # Translate back
-    
+                NHE_atoms.loc[i, ["x", "y", "z"]] = (
+                    v_rot + rotation_center
+                ).tolist()  # Translate back
+
         # Replace old NME with rotated version
-        df = df[df['aa_name'] != "NHE"]  
+        df = df[df["aa_name"] != "NHE"]
         df = pd.concat([df, NHE_atoms], ignore_index=True)
 
-    
-    ##################### rotate CA(amino acid) - C(Amino acid) axis to 180 degree ################
+        # Keep terminal O fixed; the C-terminal cap N replaces the removed OXT.
 
-        terminal_ha = df[(df['resid'] == last_resid) & (df['atom_name'].isin(['HA', 'HA2', 'HA3']))]
-        if terminal_ha.empty:
-            raise ValueError(f"Cannot orient C-terminal cap: no HA/HA2/HA3 found on residue {last_resid}.")
-        HA= terminal_ha.iloc[0][['x', 'y', 'z']].to_numpy()
-        CA= df[(df['atom_name'] == 'CA') & (df['resid'] == last_resid)].iloc[0][['x', 'y', 'z']].to_numpy()
-        HA = np.asarray(HA, dtype=np.float64); CA= np.asarray(CA, dtype=np.float64)
-    
-        theta = dihedral_angle(HA, CA, C, O)
-        rotation_angle = (-164.77)/180 * np.pi - theta
-    
-        # Define rotation axis
-        rotation_axis = C-CA
-        rotation_axis /= np.linalg.norm(rotation_axis)  # Normalize axis
-        rotation_center = C
-    
-        # Copy NME group and rotate its atoms
-        rotating_atoms = df[(df['aa_name'] == "NHE") | ((df['atom_name'] == 'O') & (df['resid'] == last_resid))].copy()
-    
-    
-        for i, row in rotating_atoms.iterrows():
-            v = np.array(row[['x', 'y', 'z']].values, dtype=np.float64) - rotation_center  # Translate to origin
-            v_rot = rotate_vector(v, rotation_axis, rotation_angle)  # Rotate
-            rotating_atoms.loc[i, ['x', 'y', 'z']] = (v_rot + rotation_center).tolist()  # Translate back
-    
-        # Replace old NME with rotated version
-        df = df[~((df['aa_name'] == "NHE") | ((df['atom_name'] == 'O') & (df['resid'] == last_resid)))] 
-        df = pd.concat([df, rotating_atoms], ignore_index=True)
-    
-    ###############################################################################################################################
+    # ----------------------------------------------------------------------------------
 
-
-    
     ############## correct ACE position ##############
-    CA= df[(df['atom_name'] == 'CA') & (df['resid'] == 2)].iloc[0][['x', 'y', 'z']].to_numpy()
-    N = df[(df['atom_name'] == 'N') & (df['resid'] == 2)].iloc[0][['x', 'y', 'z']].to_numpy()
-    H = df[(df['atom_name'] == 'H') & (df['resid'] == 2)].iloc[0][['x', 'y', 'z']].to_numpy()
-    CA= np.asarray(CA, dtype=np.float64); N = np.asarray(N, dtype=np.float64); H = np.asarray(H, dtype=np.float64);
-    
-    v1 = H-N; v2 = CA - N
-    v3 = rotate_vector_plane_3D(v1, v2, np.pi*2/3) * 1.290      # rotate v2 to v1 by 120 degree
-    C = N + v3                                                  # correct position of CH3, N
-  
-    df.loc[(df['atom_name'] == 'C') & (df['aa_name'] == 'ACE'), ['x', 'y', 'z']] = C
-    
+    CA = (
+        df[(df["atom_name"] == "CA") & (df["resid"] == 2)]
+        .iloc[0][["x", "y", "z"]]
+        .to_numpy()
+    )
+    N = (
+        df[(df["atom_name"] == "N") & (df["resid"] == 2)]
+        .iloc[0][["x", "y", "z"]]
+        .to_numpy()
+    )
+    H = (
+        df[(df["atom_name"] == "H") & (df["resid"] == 2)]
+        .iloc[0][["x", "y", "z"]]
+        .to_numpy()
+    )
+    CA = np.asarray(CA, dtype=np.float64)
+    N = np.asarray(N, dtype=np.float64)
+    H = np.asarray(H, dtype=np.float64)
+
+    v1 = H - N
+    v2 = CA - N
+    v3 = (
+        rotate_vector_plane_3D(v1, v2, np.pi * 2 / 3) * 1.290
+    )  # rotate v2 to v1 by 120 degree
+    C = N + v3  # correct position of CH3, N
+
+    df.loc[(df["atom_name"] == "C") & (df["aa_name"] == "ACE"), ["x", "y", "z"]] = C
+
     v1 = N - C
     # Use the CA-N direction as the ACE reference; H-N swaps the ACE O/CH3 sides.
     v2 = CA - N
-    v3 = rotate_vector_plane_3D(v1, v2, np.pi*4/3) * 1.238
-    v4 = rotate_vector_plane_3D(v1, v2, np.pi*2/3) * 1.514
+    v3 = rotate_vector_plane_3D(v1, v2, np.pi * 4 / 3) * 1.238
+    v4 = rotate_vector_plane_3D(v1, v2, np.pi * 2 / 3) * 1.514
     O = C + v3
     CH3 = C + v4
-    df.loc[(df['atom_name'] == 'O') & (df['aa_name'] == 'ACE'), ['x', 'y', 'z']] = O
-    df.loc[(df['atom_name'] == 'CH3') & (df['aa_name'] == 'ACE'), ['x', 'y', 'z']] = CH3
-    
+    df.loc[(df["atom_name"] == "O") & (df["aa_name"] == "ACE"), ["x", "y", "z"]] = O
+    df.loc[(df["atom_name"] == "CH3") & (df["aa_name"] == "ACE"), ["x", "y", "z"]] = CH3
+
     ####### place H3 #########
     p1 = O
     p2 = C
@@ -540,37 +772,45 @@ def add_caps(pdbfile, o_filename, type_flag):
     bond_angle_deg = 110.00
     bond_length = 1.080
 
-    h_coordinate = place_fourth_atom(p1, p2, p3, bond_length, bond_angle_deg, dihedral_angle_deg)
-    
+    h_coordinate = place_fourth_atom(
+        p1, p2, p3, bond_length, bond_angle_deg, dihedral_angle_deg
+    )
+
     angles = [120, 240]  # Angles to rotate by
     rotated_h_coords = rotate_around_axis(p2, p3, h_coordinate, angles)
-    
-    df.loc[(df['atom_name'] == 'H1') & (df['aa_name'] == 'ACE'), ['x', 'y', 'z']] = h_coordinate
-    df.loc[(df['atom_name'] == 'H2') & (df['aa_name'] == 'ACE'), ['x', 'y', 'z']] = rotated_h_coords[0]
-    df.loc[(df['atom_name'] == 'H3') & (df['aa_name'] == 'ACE'), ['x', 'y', 'z']] = rotated_h_coords[1]
 
-    ####### output structure ###########
-    with open(o_filename, 'w') as f:
-        for index, row in df.iterrows():
-            if len(row['aa_name'])==4:
-                output= "ATOM{:7d}{:^6}{:4}{:5d}{:12.3f}{:8.3f}{:8.3f}\n".format(
-                    row['anum'],row['atom_name'],row['aa_name'],row['resid'],
-                    row['x'],row['y'],row['z'])
-            else:
-                output= "ATOM{:7d}{:^6}{:4}{:5d}{:12.3f}{:8.3f}{:8.3f}\n".format(
-                    row['anum'],row['atom_name'],row['aa_name'],row['resid'],
-                    row['x'],row['y'],row['z'])
+    df.loc[(df["atom_name"] == "H1") & (df["aa_name"] == "ACE"), ["x", "y", "z"]] = (
+        h_coordinate
+    )
+    df.loc[(df["atom_name"] == "H2") & (df["aa_name"] == "ACE"), ["x", "y", "z"]] = (
+        rotated_h_coords[0]
+    )
+    df.loc[(df["atom_name"] == "H3") & (df["aa_name"] == "ACE"), ["x", "y", "z"]] = (
+        rotated_h_coords[1]
+    )
 
-            f.write(output)
+    df["anum"] = range(1, len(df) + 1)
+    return df.reset_index(drop=True)
 
 
-
-# In[60]:
-
-
+# %% Cell cd6c7834
 def rotate_vector(v, axis, angle):
-    """
-    Rotate vector `v` around `axis` by `angle` radians using Rodrigues' rotation formula.
+    """Function:
+        Rotate one 3D vector around a defined 3D axis by a defined angle.
+
+    Parameters
+    ----------
+    v : numpy.ndarray with shape (3,)
+        Vector to rotate.
+    axis : numpy.ndarray with shape (3,)
+        Rotation axis, for example x=[1,0,0], y=[0,1,0], or z=[0,0,1].
+    angle : float
+        Rotation angle in radians.
+
+    Returns
+    -------
+    numpy.ndarray with shape (3,)
+        Rotated vector.
     """
     axis = axis / np.linalg.norm(axis)  # Normalize the axis
     cos_theta = np.cos(angle)
@@ -579,9 +819,27 @@ def rotate_vector(v, axis, angle):
     dot_prod = np.dot(axis, v)
     return v * cos_theta + cross_prod * sin_theta + axis * dot_prod * (1 - cos_theta)
 
+
 def rotate_around_axis(p1, p2, p3, angles):
-    """
-    Rotate H around the p1->p2 axis by given angles.
+    """Function:
+        Generate several positions of one point by rotating it around the axis from p1
+        to p2.
+
+    Parameters
+    ----------
+    p1 : numpy.ndarray with shape (3,)
+        Coordinate of reference point 1.
+    p2 : numpy.ndarray with shape (3,)
+        Coordinate of reference point 2.
+    p3 : numpy.ndarray with shape (3,)
+        Coordinate of reference point 3.
+    angles : list or numpy.ndarray of floats in degrees
+        One output position is made for each angle.
+
+    Returns
+    -------
+    numpy.ndarray
+        Array with shape (len(angles), 3).
     """
     # Calculate the p1-p2 axis
     axis = p2 - p1
@@ -598,43 +856,92 @@ def rotate_around_axis(p1, p2, p3, angles):
 
     return np.array(rotated_p3_coords)
 
+
 def rotate_around_axis_one_angle(p1, p2, points, angle):
-    """
-    Rotate multiple points around axis defined by (p1 -> p2) by `angle` radians.
+    """Function:
+        Rotate a group of 3D points around the axis from p1 to p2 by one angle.
+
+    Parameters
+    ----------
+    p1 : numpy.ndarray with shape (3,)
+        Coordinate of reference point 1.
+    p2 : numpy.ndarray with shape (3,)
+        Coordinate of reference point 2.
+    points : numpy.ndarray with shape (n, 3)
+        Each row is one 3D point.
+    angle : float
+        Rotation angle in radians.
+
+    Returns
+    -------
+    numpy.ndarray with shape (n, 3)
+        Rotated points.
     """
     axis = p2 - p1  # Define rotation axis
     axis = np.asarray(axis, dtype=np.float64)
     points_translated = points - p1  # Translate points to make p1 the origin
     rotated_points = []
-    
+
     for p in points_translated:
-        
+
         p = np.asarray(p, dtype=np.float64)
         rp = rotate_vector(p, axis, angle)
-        rotated_points.append(rp + p1)  
-    
+        rotated_points.append(rp + p1)
+
     return np.array(rotated_points)
 
+
 def rotate_vector_plane_3D(v, u, angle):
-    
+    """Function:
+        Rotate and normalize vector v in the plane defined by vectors u and v.
+
+    Parameters
+    ----------
+    v : numpy.ndarray with shape (3,)
+        Vector to rotate.
+    u : numpy.ndarray with shape (3,)
+        Second vector used with v to define the rotation plane.
+    angle : float
+        Rotation angle in radians.
+
+    Returns
+    -------
+    numpy.ndarray with shape (3,)
+        Normalized rotated vector.
+    """
     n = np.cross(u, v)
-    n = np.asarray(n, dtype=np.float64); 
+    n = np.asarray(n, dtype=np.float64)
 
     n /= np.linalg.norm(n)  # Normalize
-    v_rot = v * np.cos(angle) + np.cross(n, v) * np.sin(angle) + n * np.dot(n, v) * (1 - np.cos(angle))
+    v_rot = (
+        v * np.cos(angle)
+        + np.cross(n, v) * np.sin(angle)
+        + n * np.dot(n, v) * (1 - np.cos(angle))
+    )
     v_rot /= np.linalg.norm(v_rot)
-    
+
     return v_rot
 
 
 def dihedral_angle(p1, p2, p3, p4):
-    """Calculate the dihedral angle between four points.
+    """Function:
+        Calculate the signed dihedral angle formed by four 3D points.
 
-    Args:
-        p1, p2, p3, p4 (numpy.ndarray): Coordinates of the four points.
+    Parameters
+    ----------
+    p1 : numpy.ndarray with shape (3,)
+        Coordinate of reference point 1.
+    p2 : numpy.ndarray with shape (3,)
+        Coordinate of reference point 2.
+    p3 : numpy.ndarray with shape (3,)
+        Coordinate of reference point 3.
+    p4 : numpy.ndarray with shape (3,)
+        Coordinate of reference point 4.
 
-    Returns:
-        float: The dihedral angle in degrees.
+    Returns
+    -------
+    float
+        Signed dihedral angle in radians.
     """
 
     b1 = p2 - p1
@@ -645,7 +952,9 @@ def dihedral_angle(p1, p2, p3, p4):
     n2 = np.cross(b2, b3)
 
     cos_phi = np.dot(n1, n2) / (np.linalg.norm(n1) * np.linalg.norm(n2))
-    sin_phi = np.dot(np.cross(n1, n2), b2) / (np.linalg.norm(b2) * np.linalg.norm(n1) * np.linalg.norm(n2))
+    sin_phi = np.dot(np.cross(n1, n2), b2) / (
+        np.linalg.norm(b2) * np.linalg.norm(n1) * np.linalg.norm(n2)
+    )
 
     phi = np.arctan2(sin_phi, cos_phi)
 
@@ -653,14 +962,29 @@ def dihedral_angle(p1, p2, p3, p4):
 
 
 def place_fourth_atom(p1, p2, p3, bond_length, bond_angle_deg, dihedral_deg):
-    """
-    p1 = CB coordinates (x1, y1, z1)
-    p2 = CA coordinates (x2, y2, z2)
-    p3 = N coordinates (x3, y3, z3)
-    p4 = H (x, y, z) unknown
-    bond_length = length of N-H bond
-    bond_angle_deg = CA-N-H angle (in degrees)
-    dihedral_deg = CB-CA-N-H dihedral angle (in degrees)
+    """Function:
+        Place a new atom from three reference atoms, one bond length, one bond angle,
+        and one dihedral angle.
+
+    Parameters
+    ----------
+    p1 : numpy.ndarray with shape (3,)
+        Coordinate of reference point 1.
+    p2 : numpy.ndarray with shape (3,)
+        Coordinate of reference point 2.
+    p3 : numpy.ndarray with shape (3,)
+        Coordinate of reference point 3.
+    bond_length : float
+        Bond length in Angstrom.
+    bond_angle_deg : float
+        Bond angle in degrees.
+    dihedral_deg : float
+        Dihedral angle in degrees.
+
+    Returns
+    -------
+    numpy.ndarray with shape (3,)
+        Coordinate of the fourth atom.
     """
     # Convert to numpy arrays
     p1 = np.array(p1)
@@ -676,7 +1000,7 @@ def place_fourth_atom(p1, p2, p3, bond_length, bond_angle_deg, dihedral_deg):
     v23 = p2 - p3
     # Normalize v23
     e1 = v23 / np.linalg.norm(v23)
-    
+
     # Normal to the plane
     n = np.cross(v12, v23)
     e2 = n / np.linalg.norm(n)
@@ -686,51 +1010,72 @@ def place_fourth_atom(p1, p2, p3, bond_length, bond_angle_deg, dihedral_deg):
 
     # Coordinates in the local frame
     x = bond_length * np.cos(bond_angle)
-    y = -bond_length * np.sin(bond_angle) * np.cos(dihedral + np.pi/2)
-    z = bond_length * np.sin(bond_angle) * np.sin(dihedral + np.pi/2)
+    y = -bond_length * np.sin(bond_angle) * np.cos(dihedral + np.pi / 2)
+    z = bond_length * np.sin(bond_angle) * np.sin(dihedral + np.pi / 2)
 
     # Position of H in global coordinates
     p4 = p3 + x * e1 + y * e2 + z * e3
     return p4
 
 
-# In[61]:
-
-
+# %% Cell local-add-hydrogen
 def _read_simple_pdb(pdbfile):
+    """Function:
+        Read ATOM records from a PDB file into the atom-table format used in this
+        notebook.
+
+    Parameters
+    ----------
+    pdbfile : str or pathlib.Path
+        Input PDB file.
+
+    Returns
+    -------
+    pandas.DataFrame
+        One row per ATOM record with atom, anum, atom_name, aa_name, resid, x, y, z.
+    """
     records = []
-    with open(pdbfile, 'r') as f:
+    with open(pdbfile, "r") as f:
         for line in f:
-            if not line.startswith('ATOM'):
+            if not line.startswith("ATOM"):
                 continue
-            records.append({
-                'atom': line[0:6].strip() or 'ATOM',
-                'anum': int(line[6:11]),
-                'atom_name': line[11:17].strip(),
-                'aa_name': line[17:21].strip(),
-                'resid': int(line[22:26]),
-                'x': float(line[26:38]),
-                'y': float(line[38:46]),
-                'z': float(line[46:54]),
-            })
-    return pd.DataFrame(records, columns=['atom', 'anum', 'atom_name', 'aa_name', 'resid', 'x', 'y', 'z'])
-
-
-def _write_simple_pdb(df, o_filename):
-    with open(o_filename, 'w') as f:
-        for _, row in df.iterrows():
-            f.write("ATOM{:7d}{:^6}{:4}{:5d}{:12.3f}{:8.3f}{:8.3f}\n".format(
-                int(row['anum']), row['atom_name'], row['aa_name'], int(row['resid']),
-                float(row['x']), float(row['y']), float(row['z'])
-            ))
-
-
-def copy_pdb_file(input_file, output_file):
-    with open(input_file, 'r') as src, open(output_file, 'w') as dst:
-        dst.write(src.read())
+            records.append(
+                {
+                    "atom": line[0:6].strip() or "ATOM",
+                    "anum": int(line[6:11]),
+                    "atom_name": line[11:17].strip(),
+                    "aa_name": line[17:21].strip(),
+                    "resid": int(line[22:26]),
+                    "x": float(line[26:38]),
+                    "y": float(line[38:46]),
+                    "z": float(line[46:54]),
+                }
+            )
+    return pd.DataFrame(
+        records,
+        columns=["atom", "anum", "atom_name", "aa_name", "resid", "x", "y", "z"],
+    )
 
 
 def _place_opposite_bisector(center, neighbors, bond_length):
+    """Function:
+        Place a new atom opposite to the average direction of its bonded neighboring
+        atoms.
+
+    Parameters
+    ----------
+    center : numpy.ndarray with shape (3,)
+        Xyz center of the operation.
+    neighbors : list of numpy.ndarray coordinates
+        Atoms bonded to the center atom.
+    bond_length : float
+        Bond length in Angstrom.
+
+    Returns
+    -------
+    numpy.ndarray or None
+        Array with shape (3,), or None when no direction can be defined.
+    """
     direction = np.zeros(3, dtype=np.float64)
     for neighbor in neighbors:
         unit = unit_vector(neighbor - center, allow_zero=True)
@@ -742,31 +1087,12 @@ def _place_opposite_bisector(center, neighbors, bond_length):
     return center + bond_length * direction
 
 
-
-
-
-# In[62]:
-
-
+# %% Cell local-peptide-builder
 # Local PeptideBuilder compatibility layer, vendored from PeptideBuilder 1.1.0.
 # Original authors: Matthew Z. Tien, Dariya K. Sydykova, Austin G. Meyer,
 # and Claus O. Wilke. The upstream files state that they are provided under
 # the MIT License. This cell removes the external PeptideBuilder package
 # dependency while preserving the same peptide-building geometry.
-
-"""This module is part of the PeptideBuilder library,
-written by Matthew Z. Tien, Dariya K. Sydykova,
-Austin G. Meyer, and Claus O. Wilke.
-
-The Geometry module contains the default geometries of
-all 20 amino acids. The main function to be used is the
-geometry() function, which returns the default geometry
-for the requested amino acid.
-
-This file is provided to you under the MIT License."""
-
-import random
-from typing import List
 
 
 class Geo:
@@ -1853,10 +2179,7 @@ class TrpGeo(Geo):
 
 
 def geometry(AA: str) -> Geo:
-    """Generates the geometry of the requested amino acid.
-    The amino acid needs to be specified by its single-letter
-    code. If an invalid code is specified, the function
-    returns the geometry of Glycine."""
+    """Create the geometry-parameter object for one amino-acid type."""
     if AA == "G":
         return GlyGeo()
     elif AA == "A":
@@ -1902,9 +2225,7 @@ def geometry(AA: str) -> Geo:
 
 
 # ---- PeptideBuilder.py implementation, adapted for a single notebook cell ----
-import math, warnings
-from typing import Optional, Union
-import numpy as np
+
 
 
 class Vector:
@@ -1941,6 +2262,7 @@ class Vector:
 
 
 def _as_array(value):
+    """Convert a local Vector, Atom, or other coordinate value into a NumPy array."""
     if isinstance(value, Vector):
         return value.array
     if isinstance(value, Atom):
@@ -1949,6 +2271,7 @@ def _as_array(value):
 
 
 def rotaxis(theta, vector):
+    """Create a 3 by 3 rotation matrix around a defined axis."""
     axis = _as_array(vector)
     norm = np.linalg.norm(axis)
     if norm == 0:
@@ -1966,6 +2289,7 @@ def rotaxis(theta, vector):
 
 
 def calc_angle(v1, v2, v3):
+    """Calculate the bond angle formed by three atoms, with v2 as the center atom."""
     a = _as_array(v1) - _as_array(v2)
     b = _as_array(v3) - _as_array(v2)
     denom = np.linalg.norm(a) * np.linalg.norm(b)
@@ -1975,6 +2299,7 @@ def calc_angle(v1, v2, v3):
 
 
 def calc_dihedral(v1, v2, v3, v4):
+    """Calculate the signed torsion angle formed by four atoms."""
     p0 = _as_array(v1)
     p1 = _as_array(v2)
     p2 = _as_array(v3)
@@ -2086,6 +2411,7 @@ _AA3_NAMES = {
 
 
 def is_aa(residue):
+    """Check whether a local Residue object is one of the 20 standard amino acids."""
     return getattr(residue, "resname", "") in _AA3_NAMES
 
 
@@ -2115,6 +2441,7 @@ class PDBIO:
 def calculateCoordinates(
     refA: Residue, refB: Residue, refC: Residue, L: float, ang: float, di: float
 ) -> np.ndarray:
+    """Calculate a new atom coordinate from three reference atoms and internal-coordinate geometry."""
     AV = refA.get_vector()
     BV = refB.get_vector()
     CV = refC.get_vector()
@@ -2203,7 +2530,7 @@ def calculateCoordinates(
 
 
 def makeGly(segID: int, N, CA, C, O, geo: Geo) -> Residue:
-    """Creates a Glycine residue"""
+    """Build one unhydrogenated glycine Residue from backbone atoms and its geometry settings."""
     res = Residue((" ", segID, " "), "GLY", "    ")
 
     res.add(N)
@@ -2214,7 +2541,7 @@ def makeGly(segID: int, N, CA, C, O, geo: Geo) -> Residue:
 
 
 def makeAla(segID: int, N, CA, C, O, geo: AlaGeo) -> Residue:
-    """Creates an Alanine residue"""
+    """Build one unhydrogenated alanine Residue from backbone atoms and its geometry settings."""
     ##R-Group
     CA_CB_length = geo.CA_CB_length
     C_CA_CB_angle = geo.C_CA_CB_angle
@@ -2235,7 +2562,7 @@ def makeAla(segID: int, N, CA, C, O, geo: AlaGeo) -> Residue:
 
 
 def makeSer(segID: int, N, CA, C, O, geo: SerGeo) -> Residue:
-    """Creates a Serine residue"""
+    """Build one unhydrogenated serine Residue from backbone atoms and its geometry settings."""
     ##R-Group
     CA_CB_length = geo.CA_CB_length
     C_CA_CB_angle = geo.C_CA_CB_angle
@@ -2266,7 +2593,7 @@ def makeSer(segID: int, N, CA, C, O, geo: SerGeo) -> Residue:
 
 
 def makeCys(segID: int, N, CA, C, O, geo: CysGeo) -> Residue:
-    """Creates a Cysteine residue"""
+    """Build one unhydrogenated cysteine Residue from backbone atoms and its geometry settings."""
     ##R-Group
     CA_CB_length = geo.CA_CB_length
     C_CA_CB_angle = geo.C_CA_CB_angle
@@ -2296,7 +2623,7 @@ def makeCys(segID: int, N, CA, C, O, geo: CysGeo) -> Residue:
 
 
 def makeVal(segID: int, N, CA, C, O, geo: ValGeo) -> Residue:
-    """Creates a Valine residue"""
+    """Build one unhydrogenated valine Residue from backbone atoms and its geometry settings."""
     ##R-Group
     CA_CB_length = geo.CA_CB_length
     C_CA_CB_angle = geo.C_CA_CB_angle
@@ -2335,7 +2662,7 @@ def makeVal(segID: int, N, CA, C, O, geo: ValGeo) -> Residue:
 
 
 def makeIle(segID: int, N, CA, C, O, geo: IleGeo) -> Residue:
-    """Creates an Isoleucine residue"""
+    """Build one unhydrogenated isoleucine Residue from backbone atoms and its geometry settings."""
     ##R-group
     CA_CB_length = geo.CA_CB_length
     C_CA_CB_angle = geo.C_CA_CB_angle
@@ -2383,7 +2710,7 @@ def makeIle(segID: int, N, CA, C, O, geo: IleGeo) -> Residue:
 
 
 def makeLeu(segID: int, N, CA, C, O, geo: LeuGeo) -> Residue:
-    """Creates a Leucine residue"""
+    """Build one unhydrogenated leucine Residue from backbone atoms and its geometry settings."""
     ##R-Group
     CA_CB_length = geo.CA_CB_length
     C_CA_CB_angle = geo.C_CA_CB_angle
@@ -2431,7 +2758,7 @@ def makeLeu(segID: int, N, CA, C, O, geo: LeuGeo) -> Residue:
 
 
 def makeThr(segID: int, N, CA, C, O, geo: ThrGeo) -> Residue:
-    """Creates a Threonine residue"""
+    """Build one unhydrogenated threonine Residue from backbone atoms and its geometry settings."""
     ##R-Group
     CA_CB_length = geo.CA_CB_length
     C_CA_CB_angle = geo.C_CA_CB_angle
@@ -2470,7 +2797,7 @@ def makeThr(segID: int, N, CA, C, O, geo: ThrGeo) -> Residue:
 
 
 def makeArg(segID: int, N, CA, C, O, geo: ArgGeo) -> Residue:
-    """Creates an Arginie residue"""
+    """Build one unhydrogenated arginine Residue from backbone atoms and its geometry settings."""
     ##R-Group
     CA_CB_length = geo.CA_CB_length
     C_CA_CB_angle = geo.C_CA_CB_angle
@@ -2545,7 +2872,7 @@ def makeArg(segID: int, N, CA, C, O, geo: ArgGeo) -> Residue:
 
 
 def makeLys(segID: int, N, CA, C, O, geo: LysGeo) -> Residue:
-    """Creates a Lysine residue"""
+    """Build one unhydrogenated lysine Residue from backbone atoms and its geometry settings."""
     ##R-Group
     CA_CB_length = geo.CA_CB_length
     C_CA_CB_angle = geo.C_CA_CB_angle
@@ -2602,7 +2929,7 @@ def makeLys(segID: int, N, CA, C, O, geo: LysGeo) -> Residue:
 
 
 def makeAsp(segID: int, N, CA, C, O, geo: AspGeo) -> Residue:
-    """Creates an Aspartic Acid residue"""
+    """Build one unhydrogenated aspartic acid Residue from backbone atoms and its geometry settings."""
     ##R-Group
     CA_CB_length = geo.CA_CB_length
     C_CA_CB_angle = geo.C_CA_CB_angle
@@ -2650,7 +2977,7 @@ def makeAsp(segID: int, N, CA, C, O, geo: AspGeo) -> Residue:
 
 
 def makeAsn(segID, N, CA, C, O, geo):
-    """Creates an Asparagine residue"""
+    """Build one unhydrogenated asparagine Residue from backbone atoms and its geometry settings."""
     ##R-Group
     CA_CB_length = geo.CA_CB_length
     C_CA_CB_angle = geo.C_CA_CB_angle
@@ -2698,7 +3025,7 @@ def makeAsn(segID, N, CA, C, O, geo):
 
 
 def makeGlu(segID: int, N, CA, C, O, geo: GluGeo) -> Residue:
-    """Creates a Glutamic Acid residue"""
+    """Build one unhydrogenated glutamic acid Residue from backbone atoms and its geometry settings."""
     ##R-Group
     CA_CB_length = geo.CA_CB_length
     C_CA_CB_angle = geo.C_CA_CB_angle
@@ -2756,7 +3083,7 @@ def makeGlu(segID: int, N, CA, C, O, geo: GluGeo) -> Residue:
 
 
 def makeGln(segID: int, N, CA, C, O, geo: GlnGeo) -> Residue:
-    """Creates a Glutamine residue"""
+    """Build one unhydrogenated glutamine Residue from backbone atoms and its geometry settings."""
     ##R-Group
     CA_CB_length = geo.CA_CB_length
     C_CA_CB_angle = geo.C_CA_CB_angle
@@ -2815,7 +3142,7 @@ def makeGln(segID: int, N, CA, C, O, geo: GlnGeo) -> Residue:
 
 
 def makeMet(segID: int, N, CA, C, O, geo: MetGeo) -> Residue:
-    """Creates a Methionine residue"""
+    """Build one unhydrogenated methionine Residue from backbone atoms and its geometry settings."""
     ##R-Group
     CA_CB_length = geo.CA_CB_length
     C_CA_CB_angle = geo.C_CA_CB_angle
@@ -2863,7 +3190,7 @@ def makeMet(segID: int, N, CA, C, O, geo: MetGeo) -> Residue:
 
 
 def makeHis(segID: int, N, CA, C, O, geo: HisGeo) -> Residue:
-    """Creates a Histidine residue"""
+    """Build one unhydrogenated histidine Residue from backbone atoms and its geometry settings."""
     ##R-Group
     CA_CB_length = geo.CA_CB_length
     C_CA_CB_angle = geo.C_CA_CB_angle
@@ -2929,7 +3256,7 @@ def makeHis(segID: int, N, CA, C, O, geo: HisGeo) -> Residue:
 
 
 def makePro(segID: int, N, CA, C, O, geo: ProGeo) -> Residue:
-    """Creates a Proline residue"""
+    """Build one unhydrogenated proline Residue from backbone atoms and its geometry settings."""
     ##R-Group
     CA_CB_length = geo.CA_CB_length
     C_CA_CB_angle = geo.C_CA_CB_angle
@@ -2970,7 +3297,7 @@ def makePro(segID: int, N, CA, C, O, geo: ProGeo) -> Residue:
 
 
 def makePhe(segID: int, N, CA, C, O, geo: PheGeo) -> Residue:
-    """Creates a Phenylalanine residue"""
+    """Build one unhydrogenated phenylalanine Residue from backbone atoms and its geometry settings."""
     ##R-Group
     CA_CB_length = geo.CA_CB_length
     C_CA_CB_angle = geo.C_CA_CB_angle
@@ -3045,7 +3372,7 @@ def makePhe(segID: int, N, CA, C, O, geo: PheGeo) -> Residue:
 
 
 def makeTyr(segID: int, N, CA, C, O, geo: TyrGeo) -> Residue:
-    """Creates a Tyrosine residue"""
+    """Build one unhydrogenated tyrosine Residue from backbone atoms and its geometry settings."""
     ##R-Group
     CA_CB_length = geo.CA_CB_length
     C_CA_CB_angle = geo.C_CA_CB_angle
@@ -3130,7 +3457,7 @@ def makeTyr(segID: int, N, CA, C, O, geo: TyrGeo) -> Residue:
 
 
 def makeTrp(segID: int, N, CA, C, O, geo: TrpGeo) -> Residue:
-    """Creates a Tryptophan residue"""
+    """Build one unhydrogenated tryptophan Residue from backbone atoms and its geometry settings."""
     ##R-Group
     CA_CB_length = geo.CA_CB_length
     C_CA_CB_angle = geo.C_CA_CB_angle
@@ -3239,6 +3566,7 @@ def makeTrp(segID: int, N, CA, C, O, geo: TrpGeo) -> Residue:
 
 
 def make_res_of_type(segID: int, N, CA, C, O, geo: Geo) -> Residue:
+    """Choose the correct residue-building function from the supplied amino-acid geometry object."""
     if isinstance(geo, GlyGeo):
         res = makeGly(segID, N, CA, C, O, geo)
     elif isinstance(geo, AlaGeo):
@@ -3286,10 +3614,7 @@ def make_res_of_type(segID: int, N, CA, C, O, geo: Geo) -> Residue:
 
 
 def initialize_res(residue: Union[Geo, str]) -> Structure:
-    """Creates a new structure containing a single amino acid. The type and
-    geometry of the amino acid are determined by the argument, which has to be
-    either a geometry object or a single-letter amino acid code.
-    The amino acid will be placed into chain A of model 0."""
+    """Create a new local peptide Structure containing the first residue."""
 
     if isinstance(residue, Geo):
         geo = residue
@@ -3342,10 +3667,7 @@ def initialize_res(residue: Union[Geo, str]) -> Structure:
 
 
 def getReferenceResidue(structure: Structure) -> Residue:
-    """Returns the last residue of chain A model 0 of the given structure.
-
-    This function is a helper function that should not normally be called
-    directly."""
+    """Get the last residue in chain A, which is used as the reference for adding another residue."""
 
     # If the following line doesn't work we're in trouble.
     # Likely initialize_res() wasn't called.
@@ -3360,12 +3682,7 @@ def getReferenceResidue(structure: Structure) -> Residue:
 
 
 def add_residue_from_geo(structure: Structure, geo: Geo) -> Structure:
-    """Adds a residue to chain A model 0 of the given structure, and
-    returns the new structure. The residue to be added is determined by
-    the geometry object given as second argument.
-
-    This function is a helper function and should not normally be called
-    directly. Call add_residue() instead."""
+    """Add one residue to an existing local Structure using a prepared geometry object."""
     resRef = getReferenceResidue(structure)
     AA = geo.residue_name
     segID = resRef.get_id()[1]
@@ -3438,9 +3755,7 @@ def add_residue_from_geo(structure: Structure, geo: Geo) -> Structure:
 
 
 def make_extended_structure(AA_chain: str) -> Structure:
-    """Place a sequence of amino acids into a peptide in the extended
-    conformation. The argument AA_chain holds the sequence of amino
-    acids to be used."""
+    """Build a peptide Structure from a sequence using the default extended conformation."""
     geo = geometry(AA_chain[0])
     struc = initialize_res(geo)
 
@@ -3455,16 +3770,7 @@ def make_extended_structure(AA_chain: str) -> Structure:
 def add_residue(
     structure: Structure, residue: Union[Geo, str], phi=-120, psi_im1=140, omega=-370
 ) -> Structure:
-    """Adds a residue to chain A model 0 of the given structure, and
-    returns the new structure. The residue to be added can be specified
-    in two ways: either as a geometry object (in which case
-    the remaining arguments phi, psi_im1, and omega are ignored) or as a
-    single-letter amino-acid code. In the latter case, the optional
-    arguments phi, psi_im1, and omega specify the corresponding backbone
-    angles.
-
-    When omega is specified, it needs to be a value greater than or equal
-    to -360. Values below -360 are ignored."""
+    """Add one residue to a peptide Structure using a residue code or a prepared geometry object."""
 
     if isinstance(residue, Geo):
         geo = residue
@@ -3483,13 +3789,7 @@ def add_residue(
 def make_structure(
     AA_chain: str, phi: List[float], psi_im1: List[float], omega: Optional[List] = None
 ) -> Structure:
-    """Place a sequence of amino acids into a peptide with specified
-    backbone dihedral angles. The argument AA_chain holds the
-    sequence of amino acids to be used. The arguments phi and psi_im1 hold
-    lists of backbone angles, one for each amino acid, *starting from
-    the second amino acid in the chain*. The argument
-    omega (optional) holds a list of omega angles, also starting from
-    the second amino acid in the chain."""
+    """Build a peptide Structure from a sequence and residue-by-residue backbone angles."""
     geo = geometry(AA_chain[0])
     struc = initialize_res(geo)
 
@@ -3506,7 +3806,7 @@ def make_structure(
 
 
 def make_structure_from_geos(geos: List[Geo]) -> Structure:
-    """Creates a structure out of a list of geometry objects."""
+    """Build a peptide Structure from a list of prepared residue geometry objects."""
     model_structure = initialize_res(geos[0])
     for i in range(1, len(geos)):
         add_residue(model_structure, geos[i])
@@ -3515,9 +3815,7 @@ def make_structure_from_geos(geos: List[Geo]) -> Structure:
 
 
 def add_terminal_OXT(structure: Structure, C_OXT_length: float = 1.23) -> Structure:
-    """Adds a terminal oxygen atom ('OXT') to the last residue of chain A model 0 of the given structure, and returns the new structure. The OXT atom object will be contained in the last residue object of the structure.
-
-This function should be used only when the structure object is completed and no further residues need to be appended."""
+    """Add the terminal OXT atom to the final residue of a completed peptide Structure."""
 
     rad = 180.0 / math.pi
 
@@ -3589,22 +3887,46 @@ class PeptideBuilder:
     make_structure_from_geos = staticmethod(make_structure_from_geos)
 
 
-
-
-# In[63]:
-
-
-from pathlib import Path
-
+# %% Cell rotamer-template-peptide-builder
 AA1_TO_ROTAMER = {
-    'A': 'ALA', 'R': 'ARG', 'N': 'ASN', 'D': 'ASP', 'C': 'CYS',
-    'Q': 'GLN', 'E': 'GLU', 'G': 'GLY', 'H': 'HIE', 'I': 'ILE',
-    'L': 'LEU', 'K': 'LYS', 'M': 'MET', 'F': 'PHE', 'P': 'PRO',
-    'S': 'SER', 'T': 'THR', 'W': 'TRP', 'Y': 'TYR', 'V': 'VAL',
+    "A": "ALA",
+    "R": "ARG",
+    "N": "ASN",
+    "D": "ASP",
+    "C": "CYS",
+    "Q": "GLN",
+    "E": "GLU",
+    "G": "GLY",
+    "H": "HIE",
+    "I": "ILE",
+    "L": "LEU",
+    "K": "LYS",
+    "M": "MET",
+    "F": "PHE",
+    "P": "PRO",
+    "S": "SER",
+    "T": "THR",
+    "W": "TRP",
+    "Y": "TYR",
+    "V": "VAL",
 }
 
 
 def structure_to_simple_dataframe(structure):
+    """Function:
+        Convert the local peptide Structure into the pandas atom table used by this
+        notebook.
+
+    Parameters
+    ----------
+    structure : Structure
+        Local peptide structure to convert.
+
+    Returns
+    -------
+    pandas.DataFrame
+        Peptide atom table with one atom per row and the notebook atom columns.
+    """
     rows = []
     anum = 1
     for model in structure.child_list:
@@ -3613,28 +3935,80 @@ def structure_to_simple_dataframe(structure):
                 resid = residue.get_id()[1]
                 for atom in residue.child_list:
                     x, y, z = atom.coord
-                    rows.append({
-                        'atom': 'ATOM',
-                        'anum': anum,
-                        'atom_name': atom.name,
-                        'aa_name': residue.resname,
-                        'resid': resid,
-                        'x': float(x),
-                        'y': float(y),
-                        'z': float(z),
-                    })
+                    rows.append(
+                        {
+                            "atom": "ATOM",
+                            "anum": anum,
+                            "atom_name": atom.name,
+                            "aa_name": residue.resname,
+                            "resid": resid,
+                            "x": float(x),
+                            "y": float(y),
+                            "z": float(z),
+                        }
+                    )
                     anum += 1
-    return pd.DataFrame(rows, columns=['atom', 'anum', 'atom_name', 'aa_name', 'resid', 'x', 'y', 'z'])
+    return pd.DataFrame(
+        rows, columns=["atom", "anum", "atom_name", "aa_name", "resid", "x", "y", "z"]
+    )
 
 
-def read_rotamer_template(residue_name, rotamer_dir='RotamerLibrary'):
-    template_file = Path(rotamer_dir) / residue_name
-    if not template_file.exists():
-        raise FileNotFoundError(f"Rotamer template not found: {template_file}")
+def read_rotamer_template(
+    residue_name: str, rotamer_dir: Union[str, Path] = "RotamerLibrary"
+) -> pd.DataFrame:
+    """Function:
+        Read one amino-acid template, including side-chain hydrogens, from
+        RotamerLibrary.
+
+    Parameters
+    ----------
+    residue_name : str
+        Residue name used by RotamerLibrary, such as ALA or NALA.
+    rotamer_dir : str or pathlib.Path
+        Folder containing RotamerLibrary templates.
+
+    Returns
+    -------
+    pandas.DataFrame
+        Atom table containing the rotamer-template atoms.
+    """
+    library_path = Path(rotamer_dir).expanduser()
+    if not library_path.exists():
+        raise FileNotFoundError(
+            f"RotamerLibrary folder does not exist: {library_path.resolve()}. "
+            "Check that the entire RotamerLibrary folder is available."
+        )
+    if not library_path.is_dir():
+        raise NotADirectoryError(
+            f"RotamerLibrary path is not a folder: {library_path.resolve()}"
+        )
+
+    template_file = library_path / residue_name
+    if not template_file.is_file():
+        raise FileNotFoundError(
+            f"Rotamer file does not exist: {template_file.resolve()}. "
+            "Check the residue files inside RotamerLibrary."
+        )
     return _read_simple_pdb(str(template_file))
 
 
 def _kabsch_transform(moving_points, target_points):
+    """Function:
+        Find the best rigid rotation and translation between two matched groups of 3D
+        points.
+
+    Parameters
+    ----------
+    moving_points : numpy.ndarray with shape (n, 3)
+        Coordinates to move.
+    target_points : numpy.ndarray with shape (n, 3)
+        Matched target coordinates.
+
+    Returns
+    -------
+    tuple
+        Tuple (rotation, translation), numpy arrays with shapes (3, 3) and (3,).
+    """
     moving_points = np.asarray(moving_points, dtype=np.float64)
     target_points = np.asarray(target_points, dtype=np.float64)
     moving_center = moving_points.mean(axis=0)
@@ -3653,11 +4027,86 @@ def _kabsch_transform(moving_points, target_points):
 
 
 def _apply_transform(coords, rotation, translation):
+    """Function:
+        Apply one rotation matrix and translation vector to a group of coordinates.
+
+    Parameters
+    ----------
+    coords : numpy.ndarray with shape (n, 3)
+        Coordinates to transform.
+    rotation : numpy.ndarray with shape (3, 3)
+        Rotation matrix.
+    translation : numpy.ndarray with shape (3,)
+        Translation vector.
+
+    Returns
+    -------
+    numpy.ndarray with shape (n, 3)
+        Transformed coordinates.
+    """
     coords = np.asarray(coords, dtype=np.float64)
     return coords @ rotation.T + translation
 
 
-def build_target_beta_backbone(sequence, angles):
+def rebuild_terminal_carbonyl_for_beta(structure, geo, psi_im1):
+    """Function:
+        Move the terminal carbonyl oxygen into the requested beta-strand geometry.
+
+    Parameters
+    ----------
+    structure : Structure
+        Local peptide structure whose final carbonyl oxygen is moved.
+    geo : Geo
+        Geometry settings for the final residue.
+    psi_im1 : float or list of floats in degrees
+        Backbone psi angle or angles.
+
+    Returns
+    -------
+    None
+        Modifies the terminal O coordinate inside structure.
+    """
+    terminal_res = getReferenceResidue(structure)
+    ghost_n_coord = calculateCoordinates(
+        terminal_res["N"],
+        terminal_res["CA"],
+        terminal_res["C"],
+        geo.peptide_bond,
+        geo.CA_C_N_angle,
+        psi_im1,
+    )
+    ghost_n = Atom("N", ghost_n_coord, 0.0, 0.0, " ", "N", 0, "N")
+    terminal_res["O"].set_coord(
+        calculateCoordinates(
+            ghost_n,
+            terminal_res["CA"],
+            terminal_res["C"],
+            geo.C_O_length,
+            geo.CA_C_O_angle,
+            180.0,
+        )
+    )
+
+
+def build_target_beta_backbone(
+    sequence: str, angles: Sequence[float]
+) -> pd.DataFrame:
+    """Function:
+        Build the requested amino-acid sequence with beta-strand backbone angles and
+        builder CB directions.
+
+    Parameters
+    ----------
+    sequence : str
+        Peptide sequence using one-letter amino-acid codes.
+    angles : list or tuple [phi, psi] in degrees
+        Beta-strand backbone angles.
+
+    Returns
+    -------
+    pandas.DataFrame
+        Atom table containing the unhydrogenated peptide backbone and builder CB atoms.
+    """
     geos = []
     for i, aa in enumerate(sequence):
         geo = Geometry.geometry(aa)
@@ -3666,123 +4115,252 @@ def build_target_beta_backbone(sequence, angles):
             geo.psi_im1 = angles[1]
         geos.append(geo)
     structure = PeptideBuilder.make_structure_from_geos(geos)
+    rebuild_terminal_carbonyl_for_beta(structure, geos[-1], angles[1])
     PeptideBuilder.add_terminal_OXT(structure)
     return structure_to_simple_dataframe(structure)
 
 
-
-
-
-# In[64]:
-
-
+# %% Cell polyA-transplant-builder
 # Clean peptide builder: poly-A/G backbone + rotamer side-chain transplant
 
-BACKBONE_TEMPLATE_ATOMS = {'N', 'H', 'H1', 'H2', 'H3', 'CA', 'HA', 'HA2', 'HA3', 'C', 'O', 'OXT'}
+BACKBONE_TEMPLATE_ATOMS = {
+    "N",
+    "H",
+    "H1",
+    "H2",
+    "H3",
+    "CA",
+    "HA",
+    "HA2",
+    "HA3",
+    "C",
+    "O",
+    "OXT",
+}
 
 
 def _atom_xyz_from_residue(residue_df, atom_name):
-    hit = residue_df[residue_df['atom_name'] == atom_name]
+    """Function:
+        Return the xyz coordinate of one named atom from one residue.
+
+    Parameters
+    ----------
+    residue_df : pandas.DataFrame
+        Atom rows for one residue only. The table must contain the columns `atom_name`,
+        `x`, `y`, and `z`; other columns are allowed.
+    atom_name : str
+        Exact PDB atom name to search for, such as `CA`, `CB`, or `O`. The search is
+        case-sensitive and does not change the table.
+
+    Returns
+    -------
+    numpy.ndarray or None
+        Coordinate [x, y, z] from the first matching row. Returns None when the atom is
+        absent.
+    """
+    hit = residue_df[residue_df["atom_name"] == atom_name]
     if hit.empty:
         return None
-    return hit.iloc[0][['x', 'y', 'z']].to_numpy(dtype=np.float64)
+    return hit.iloc[0][["x", "y", "z"]].to_numpy(dtype=np.float64)
 
 
 def _append_atom(rows, atom_name, aa_name, resid, xyz):
-    rows.append({
-        'atom': 'ATOM',
-        'anum': 0,
-        'atom_name': atom_name,
-        'aa_name': aa_name,
-        'resid': int(resid),
-        'x': float(xyz[0]),
-        'y': float(xyz[1]),
-        'z': float(xyz[2]),
-    })
+    """Function:
+        Append one atom record to a list that will later become a peptide DataFrame.
+
+    Parameters
+    ----------
+    rows : list of dict
+        Atom records that will become a pandas DataFrame.
+    atom_name : str
+        Name of the atom (e.g., 'CA', 'CB', 'N').
+    aa_name : str
+        Three- or four-character residue name.
+    resid : int
+        Residue number.
+    xyz : array-like of float, shape (3,)
+        Cartesian coordinates [x, y, z] of the atom.
+
+    Returns
+    -------
+    None
+        Appends one atom dictionary to rows.
+    """
+    rows.append(
+        {
+            "atom": "ATOM",
+            "anum": 0,
+            "atom_name": atom_name,
+            "aa_name": aa_name,
+            "resid": int(resid),
+            "x": float(xyz[0]),
+            "y": float(xyz[1]),
+            "z": float(xyz[2]),
+        }
+    )
 
 
-def Add_backbone_hydrogen(backbone_df, sequence):
+def Add_backbone_hydrogen(
+    backbone_df: pd.DataFrame, sequence: str
+) -> pd.DataFrame:
     # Add only peptide backbone and alpha hydrogens to an Ala/Gly scaffold.
+    """Function:
+        Add only backbone and alpha-carbon hydrogens to the peptide backbone.
+
+    Parameters
+    ----------
+    backbone_df : pandas.DataFrame
+        Peptide backbone atom coordinates.
+    sequence : str
+        Peptide sequence in one-letter amino-acid codes.
+
+    Returns
+    -------
+    pandas.DataFrame
+        Atom table containing the backbone atoms and backbone hydrogens.
+    """
     df = backbone_df.copy()
     sequence = sequence.upper().strip()
     additions = []
-    residues = sorted(df['resid'].unique())
-    residue_lookup = {resid: df[df['resid'] == resid].copy() for resid in residues}
+    residues = sorted(df["resid"].unique())
+    residue_lookup = {resid: df[df["resid"] == resid].copy() for resid in residues}
 
     for i, resid in enumerate(residues):
         res = residue_lookup[resid]
         original_aa = sequence[i]
-        aa_name = res.iloc[0]['aa_name']
-        n = _atom_xyz_from_residue(res, 'N')
-        ca = _atom_xyz_from_residue(res, 'CA')
-        c = _atom_xyz_from_residue(res, 'C')
-        cb = _atom_xyz_from_residue(res, 'CB')
+        aa_name = res.iloc[0]["aa_name"]
+        n = _atom_xyz_from_residue(res, "N")
+        ca = _atom_xyz_from_residue(res, "CA")
+        c = _atom_xyz_from_residue(res, "C")
+        cb = _atom_xyz_from_residue(res, "CB")
 
         if n is not None and ca is not None:
             if i == 0 and c is not None:
-                if _atom_xyz_from_residue(res, 'H') is None:
-                    _append_atom(additions, 'H', aa_name, resid, place_fourth_atom(c, ca, n, 1.01, 109.5, 120.0))
-                if _atom_xyz_from_residue(res, 'H2') is None:
-                    _append_atom(additions, 'H2', aa_name, resid, place_fourth_atom(c, ca, n, 1.01, 109.5, -120.0))
-            elif original_aa != 'P' and _atom_xyz_from_residue(res, 'H') is None:
+                if _atom_xyz_from_residue(res, "H") is None:
+                    _append_atom(
+                        additions,
+                        "H",
+                        aa_name,
+                        resid,
+                        place_fourth_atom(c, ca, n, 1.01, 109.5, 120.0),
+                    )
+                if _atom_xyz_from_residue(res, "H2") is None:
+                    _append_atom(
+                        additions,
+                        "H2",
+                        aa_name,
+                        resid,
+                        place_fourth_atom(c, ca, n, 1.01, 109.5, -120.0),
+                    )
+            elif original_aa != "P" and _atom_xyz_from_residue(res, "H") is None:
                 prev = residue_lookup[residues[i - 1]]
-                prev_c = _atom_xyz_from_residue(prev, 'C')
+                prev_c = _atom_xyz_from_residue(prev, "C")
                 if prev_c is not None:
                     h = _place_opposite_bisector(n, [prev_c, ca], 1.01)
                     if h is not None:
-                        _append_atom(additions, 'H', aa_name, resid, h)
+                        _append_atom(additions, "H", aa_name, resid, h)
 
         if n is not None and ca is not None and c is not None:
-            if original_aa == 'G':
-                if _atom_xyz_from_residue(res, 'HA2') is None:
-                    _append_atom(additions, 'HA2', aa_name, resid, place_fourth_atom(n, c, ca, 1.09, 109.5, 120.0))
-                if _atom_xyz_from_residue(res, 'HA3') is None:
-                    _append_atom(additions, 'HA3', aa_name, resid, place_fourth_atom(n, c, ca, 1.09, 109.5, -120.0))
-            elif _atom_xyz_from_residue(res, 'HA') is None:
+            if original_aa == "G":
+                if _atom_xyz_from_residue(res, "HA2") is None:
+                    _append_atom(
+                        additions,
+                        "HA2",
+                        aa_name,
+                        resid,
+                        place_fourth_atom(n, c, ca, 1.09, 109.5, 120.0),
+                    )
+                if _atom_xyz_from_residue(res, "HA3") is None:
+                    _append_atom(
+                        additions,
+                        "HA3",
+                        aa_name,
+                        resid,
+                        place_fourth_atom(n, c, ca, 1.09, 109.5, -120.0),
+                    )
+            elif _atom_xyz_from_residue(res, "HA") is None:
                 neighbors = [n, c] if cb is None else [n, c, cb]
                 ha = _place_opposite_bisector(ca, neighbors, 1.09)
                 if ha is not None:
-                    _append_atom(additions, 'HA', aa_name, resid, ha)
+                    _append_atom(additions, "HA", aa_name, resid, ha)
 
     if additions:
         df = pd.concat([df, pd.DataFrame(additions)], ignore_index=True)
 
-    df['_order'] = range(len(df))
-    df['_added_h'] = (df['anum'] == 0).astype(int)
-    df = df.sort_values(['resid', '_added_h', '_order']).drop(columns=['_order', '_added_h'])
+    df["_order"] = range(len(df))
+    df["_added_h"] = (df["anum"] == 0).astype(int)
+    df = df.sort_values(["resid", "_added_h", "_order"]).drop(
+        columns=["_order", "_added_h"]
+    )
     df = df.reset_index(drop=True)
-    df['anum'] = range(1, len(df) + 1)
+    df["anum"] = range(1, len(df) + 1)
     return df
 
 
 def _cb_local_frame(residue_df):
-    ca = _atom_xyz_from_residue(residue_df, 'CA')
-    cb = _atom_xyz_from_residue(residue_df, 'CB')
-    if ca is None or cb is None:
-        raise ValueError('Need CA and CB atoms to build a side-chain transplant frame.')
+    """Function:
+        Build a local coordinate frame around CA and CB for side-chain transplantation.
 
-    x_axis = unit_vector(cb - ca, 'CA-CB vector')
+    Parameters
+    ----------
+    residue_df : pandas.DataFrame
+        Atom rows belonging to one residue.
+
+    Returns
+    -------
+    numpy.ndarray with shape (3, 3)
+        Local CA-CB coordinate frame.
+    """
+    ca = _atom_xyz_from_residue(residue_df, "CA")
+    cb = _atom_xyz_from_residue(residue_df, "CB")
+    if ca is None or cb is None:
+        raise ValueError("Need CA and CB atoms to build a side-chain transplant frame.")
+
+    x_axis = unit_vector(cb - ca, "CA-CB vector")
     y_axis = None
-    for anchor_name in ('N', 'C'):
+    for anchor_name in ("N", "C"):
         anchor = _atom_xyz_from_residue(residue_df, anchor_name)
         if anchor is None:
             continue
         anchor_vec = anchor - ca
         anchor_vec = anchor_vec - np.dot(anchor_vec, x_axis) * x_axis
         if np.linalg.norm(anchor_vec) >= 1e-8:
-            y_axis = unit_vector(anchor_vec, f'{anchor_name}-CA plane vector')
+            y_axis = unit_vector(anchor_vec, f"{anchor_name}-CA plane vector")
             break
 
     if y_axis is None:
-        raise ValueError('Need N or C atom to orient the side-chain transplant frame.')
+        raise ValueError("Need N or C atom to orient the side-chain transplant frame.")
 
-    z_axis = unit_vector(np.cross(x_axis, y_axis), 'side-chain frame normal')
-    y_axis = unit_vector(np.cross(z_axis, x_axis), 'side-chain frame y-axis')
+    z_axis = unit_vector(np.cross(x_axis, y_axis), "side-chain frame normal")
+    y_axis = unit_vector(np.cross(z_axis, x_axis), "side-chain frame y-axis")
     return np.column_stack([x_axis, y_axis, z_axis])
 
 
-def Transplant(backbone_df, sequence, rotamer_dir='RotamerLibrary', residue_map=None):
+def Transplant(
+    backbone_df: pd.DataFrame, sequence: str,
+    rotamer_dir: Union[str, Path] = "RotamerLibrary",
+    residue_map: Optional[dict] = None
+) -> pd.DataFrame:
     # Keep the builder backbone/CB atoms, then add side-chain atoms from RotamerLibrary.
+    """Function:
+        Transplant side-chain from RotamerLibrary based on backbone and CB coordinates.
+
+    Parameters
+    ----------
+    backbone_df : pandas.DataFrame
+        Peptide backbone atom coordinates.
+    sequence : str
+        Peptide sequence (one-letter amino acid codes).
+    rotamer_dir : str or pathlib.Path
+        Directory path containing RotamerLibrary template files.
+    residue_map : dict or None, default=None
+        Mapping from 1-letter amino acid codes to RotamerLibrary residue names.
+
+    Returns
+    -------
+    pandas.DataFrame
+        Atom table containing the full peptide with transplanted side-chain atoms.
+    """
     sequence = sequence.upper().strip()
     residue_map = dict(AA1_TO_ROTAMER if residue_map is None else residue_map)
     df = backbone_df.copy()
@@ -3790,1239 +4368,3003 @@ def Transplant(backbone_df, sequence, rotamer_dir='RotamerLibrary', residue_map=
 
     for resid, aa in enumerate(sequence, start=1):
         residue_name = residue_map[aa]
-        df.loc[df['resid'] == resid, 'aa_name'] = residue_name
-        keep_atoms = BACKBONE_TEMPLATE_ATOMS | {'CB'}
-        df = df[(df['resid'] != resid) | df['atom_name'].isin(keep_atoms)].copy()
+        df.loc[df["resid"] == resid, "aa_name"] = residue_name
+        keep_atoms = BACKBONE_TEMPLATE_ATOMS | {"CB"}
+        df = df[(df["resid"] != resid) | df["atom_name"].isin(keep_atoms)].copy()
 
-        if aa == 'G':
+        if aa == "G":
             continue
 
-        target_res = df[df['resid'] == resid].copy()
+        target_res = df[df["resid"] == resid].copy()
         template = read_rotamer_template(residue_name, rotamer_dir=rotamer_dir).copy()
 
-        template_ca = _atom_xyz_from_residue(template, 'CA')
-        template_cb = _atom_xyz_from_residue(template, 'CB')
-        target_ca = _atom_xyz_from_residue(target_res, 'CA')
-        target_cb = _atom_xyz_from_residue(target_res, 'CB')
-        if template_ca is None or template_cb is None or target_ca is None or target_cb is None:
-            raise ValueError(f'Need CA and CB atoms to transplant residue {residue_name} at resid {resid}.')
+        template_ca = _atom_xyz_from_residue(template, "CA")
+        template_cb = _atom_xyz_from_residue(template, "CB")
+        target_ca = _atom_xyz_from_residue(target_res, "CA")
+        target_cb = _atom_xyz_from_residue(target_res, "CB")
+        if (
+            template_ca is None
+            or template_cb is None
+            or target_ca is None
+            or target_cb is None
+        ):
+            raise ValueError(
+                f"Need CA and CB atoms to transplant residue {residue_name} "
+                f"at resid {resid}."
+            )
 
         template_cb_length = np.linalg.norm(template_cb - template_ca)
-        target_cb_direction = unit_vector(target_cb - target_ca, 'builder CA-CB vector')
+        target_cb_direction = unit_vector(target_cb - target_ca, "builder CA-CB vector")
         placed_cb = target_ca + target_cb_direction * template_cb_length
-        cb_mask = (df['resid'] == resid) & (df['atom_name'] == 'CB')
-        df.loc[cb_mask, ['x', 'y', 'z']] = placed_cb
-        target_res.loc[target_res['atom_name'] == 'CB', ['x', 'y', 'z']] = placed_cb
+        cb_mask = (df["resid"] == resid) & (df["atom_name"] == "CB")
+        df.loc[cb_mask, ["x", "y", "z"]] = placed_cb
+        target_res.loc[target_res["atom_name"] == "CB", ["x", "y", "z"]] = placed_cb
 
         rotation = _cb_local_frame(target_res) @ _cb_local_frame(template).T
 
-        side_atoms = template[~template['atom_name'].isin(BACKBONE_TEMPLATE_ATOMS | {'CB'})].copy()
+        side_atoms = template[
+            ~template["atom_name"].isin(BACKBONE_TEMPLATE_ATOMS | {"CB"})
+        ].copy()
         if side_atoms.empty:
             continue
 
-        coords = side_atoms[['x', 'y', 'z']].to_numpy(dtype=np.float64)
-        side_atoms[['x', 'y', 'z']] = (coords - template_cb) @ rotation.T + placed_cb
-        side_atoms['resid'] = resid
-        side_atoms['aa_name'] = residue_name
+        coords = side_atoms[["x", "y", "z"]].to_numpy(dtype=np.float64)
+        side_atoms[["x", "y", "z"]] = (coords - template_cb) @ rotation.T + placed_cb
+        side_atoms["resid"] = resid
+        side_atoms["aa_name"] = residue_name
         sidechain_parts.append(side_atoms)
 
     if sidechain_parts:
         df = pd.concat([df] + sidechain_parts, ignore_index=True)
 
-    df['_order'] = range(len(df))
-    df = df.sort_values(['resid', '_order']).drop(columns=['_order']).reset_index(drop=True)
-    df['anum'] = range(1, len(df) + 1)
+    df["_order"] = range(len(df))
+    df = (
+        df.sort_values(["resid", "_order"])
+        .drop(columns=["_order"])
+        .reset_index(drop=True)
+    )
+    df["anum"] = range(1, len(df) + 1)
     return df
 
 
-def build_single_peptide_with_local_peptidebuilder(sequence, angles, output_file='temp_sequence.pdb',
-                                                   rotamer_dir='RotamerLibrary', residue_map=None):
-    # Build one peptide strand from the requested sequence, keeping builder backbone/CB geometry.
+def build_single_peptide_with_local_peptidebuilder(
+    sequence: str, angles: Sequence[float],
+    rotamer_dir: Union[str, Path] = "RotamerLibrary",
+    residue_map: Optional[dict] = None
+) -> pd.DataFrame:
+    """Function:
+        Build one peptide DataFrame without writing an intermediate PDB file.
+
+    Parameters
+    ----------
+    sequence : str
+        Peptide sequence using one-letter amino-acid codes.
+    angles : list or tuple [phi, psi] in degrees
+        Backbone angles used for the full strand.
+    rotamer_dir : str or pathlib.Path
+        Folder containing RotamerLibrary templates.
+    residue_map : dict or None
+        Maps one-letter amino-acid codes to RotamerLibrary residue names.
+
+    Returns
+    -------
+    pandas.DataFrame
+        Generated peptide atoms with backbone hydrogens and side chains.
+    """
     sequence = sequence.upper().strip()
-    
-    
+
     scaffold_sequence = sequence
-    
+
     backbone_df = build_target_beta_backbone(scaffold_sequence, angles)
-    
+
     backbone_df = Add_backbone_hydrogen(backbone_df, sequence)
-    peptide_df = Transplant(backbone_df, sequence, rotamer_dir=rotamer_dir, residue_map=residue_map)
-    _write_simple_pdb(peptide_df, output_file)
-    return peptide_df
+    peptide_df = Transplant(
+        backbone_df, sequence, rotamer_dir=rotamer_dir, residue_map=residue_map
+    )
+    return peptide_df.reset_index(drop=True)
 
 
-# In[65]:
+# %% Cell 990c2583-b6fa-4d1d-ab63-c54ad39ec366
+def balance_oxygen_z_roll(df):
+    """Function:
+        Roll one strand around y so the selected backbone oxygen atoms are balanced
+        around the x-y plane.
+
+    Parameters
+    ----------
+    df : pandas.DataFrame
+        Peptide atom table containing x, y, z and residue information.
+
+    Returns
+    -------
+    pandas.DataFrame
+        Peptide atom table after a y-axis roll that balances selected O atoms around the
+        x-y plane.
+    """
+    peptide_residues = (
+        df[
+            (df["atom_name"] == "CA")
+            & (df["aa_name"] != "ACE")
+            & (df["aa_name"] != "NME")
+        ]["resid"]
+        .drop_duplicates()
+        .sort_values()
+        .tolist()
+    )
+    if len(peptide_residues) < 3:
+        return df
+    if len(peptide_residues) % 2 == 1:
+        peptide_residues = peptide_residues[:-1]
+    residue_index = {resid: i + 1 for i, resid in enumerate(peptide_residues)}
+    selected_oxygen = df[
+        (df["atom_name"] == "O") & (df["resid"].isin(peptide_residues))
+    ].copy()
+    selected_oxygen["_peptide_index"] = selected_oxygen["resid"].map(residue_index)
+    selected_oxygen = selected_oxygen.sort_values("_peptide_index")
+    if len(selected_oxygen) < 2:
+        return df
+
+    x = selected_oxygen["x"].to_numpy(dtype=np.float64)
+    z = selected_oxygen["z"].to_numpy(dtype=np.float64)
+    x0 = x - x.mean()
+    z0 = z - z.mean()
+    s_xx = float(np.dot(x0, x0))
+    s_zz = float(np.dot(z0, z0))
+    s_xz = float(np.dot(x0, z0))
+    if s_xx + s_zz < 1e-10:
+        return df
+
+    theta0 = 0.5 * np.arctan2(2.0 * s_xz, s_xx - s_zz)
+    candidates = [theta0, theta0 + np.pi / 2.0, theta0 - np.pi / 2.0]
+
+    def z_spread_after_roll(theta):
+        """Function:
+            Calculate the oxygen z-coordinate variance after one trial roll.
+
+        Parameters
+        ----------
+        theta : float
+            Trial rotation angle around the y axis, in radians.
+
+        Returns
+        -------
+        float
+            Variance of the rotated oxygen z coordinates.
+        """
+        return float(np.var(-np.sin(theta) * x0 + np.cos(theta) * z0))
+
+    theta = min(candidates, key=z_spread_after_roll)
+    theta = min([theta, theta + np.pi, theta - np.pi], key=abs)
+    df_roll = rotation_coordinates(df, "y", theta)
+
+    gly_ha2 = df_roll["aa_name"].astype(str).str.endswith("GLY") & (
+        df_roll["atom_name"] == "HA2"
+    )
+    center_atoms = df_roll[
+        ((df_roll["atom_name"].isin(["N", "CA", "C", "CB"])) | gly_ha2)
+        & (df_roll["aa_name"] != "ACE")
+        & (df_roll["aa_name"] != "NME")
+    ]
+    if not center_atoms.empty:
+        x_mid = 0.5 * (center_atoms["x"].min() + center_atoms["x"].max())
+        df_roll["x"] = df_roll["x"] - x_mid
+    return df_roll
 
 
-def alignment(length, chains, pdbfile, o_filename, order=1):
-    pdb=[]
-    columns = ['atom', 'anum', 'atom_name', 'aa_name', 'resid', 'x', 'y', 'z']
+def _center_peptide_x_after_roll(df):
+    """Function:
+        Move a rolled peptide back to the center of the x direction.
 
-    with open(pdbfile, 'r') as f:
-        lines = f.readlines()
+    Parameters
+    ----------
+    df : pandas.DataFrame
+        Peptide atom table containing x, y, z and residue information.
 
-    for line in lines:
-        if line.startswith("ATOM"):
-            components = line.split()
-    
-            # Create a dictionary for the current line  
-            atom = line[0:6].strip()           # ATOM
-            anum = int(line[6:11])            # Atom number
-            atom_name = line[11:17].strip()   # Atom name
-            aa_name = line[17:21].strip()     # Amino acid name
-            resid = int(line[22:26])          # Residue ID
-            x = float(line[26:38])            # X-coordinate
-            y = float(line[38:46])            # Y-coordinate
-            z = float(line[46:54])            # Z-coordinate
-    
-            row = {
-                'atom': atom,
-                'anum': anum,
-                'atom_name': atom_name,
-                'aa_name': aa_name,
-                'resid': resid,
-                'x': x,
-                'y': y,
-                'z': z
-            }
-    
-            # Append the dictionary to the list
-            pdb.append(row)
+    Returns
+    -------
+    pandas.DataFrame
+        Peptide atom table translated so backbone, CB, and Gly HA2 atoms are centered in
+        x.
+    """
+    df = df.copy()
+    gly_ha2 = df["aa_name"].astype(str).str.endswith("GLY") & (df["atom_name"] == "HA2")
+    center_atoms = df[
+        ((df["atom_name"].isin(["N", "CA", "C", "CB"])) | gly_ha2)
+        & (df["aa_name"] != "ACE")
+        & (df["aa_name"] != "NME")
+    ]
+    if not center_atoms.empty:
+        x_mid = 0.5 * (center_atoms["x"].min() + center_atoms["x"].max())
+        df["x"] = df["x"] - x_mid
+    return df
 
-    # Convert the list of dictionaries to a DataFrame
-    df = pd.DataFrame(pdb, columns=columns)
-    
 
-    if (df[df['resid'] == 1]['aa_name'].iloc[0] != "ACE"):
-        filtered_df = df[(df['resid'] <= 10) & (df['atom_name'].isin(['C', 'CA', 'CB']))]
+def _middle_cb_residue_ids(df):
+    """Function:
+        Select the central residue or residues used for the parallel-strand CA-CB angle
+        check.
+
+    Parameters
+    ----------
+    df : pandas.DataFrame
+        Peptide atom table containing x, y, z and residue information.
+
+    Returns
+    -------
+    list of int residue numbers
+        One center residue for odd length or two for even length.
+    """
+    peptide_residues = (
+        df[
+            (df["atom_name"] == "CA")
+            & (df["aa_name"] != "ACE")
+            & (df["aa_name"] != "NME")
+        ]["resid"]
+        .drop_duplicates()
+        .sort_values()
+        .tolist()
+    )
+    cb_residues = set(df[df["atom_name"] == "CB"]["resid"].tolist())
+    if not peptide_residues or not cb_residues:
+        return []
+
+    center_index = 0.5 * (len(peptide_residues) - 1)
+    candidates = [
+        (abs(index - center_index), resid)
+        for index, resid in enumerate(peptide_residues)
+        if resid in cb_residues
+    ]
+    if not candidates:
+        return []
+    nearest_distance = min(distance for distance, _ in candidates)
+    return [
+        resid
+        for distance, resid in candidates
+        if abs(distance - nearest_distance) < 1e-8
+    ]
+
+
+def ca_cb_tilt_angles(df, residue_ids=None):
+    """Function:
+        Measure selected CA-CB bond angles from the nearest positive or negative z
+        direction.
+
+    Parameters
+    ----------
+    df : pandas.DataFrame
+        Peptide atom table containing x, y, z and residue information.
+    residue_ids : list of int or None
+        Residues to measure. None uses every residue that has a CB atom.
+
+    Returns
+    -------
+    numpy.ndarray with shape (m,)
+        CA-CB tilt angles in degrees from the nearest +z/-z direction.
+    """
+    angles = []
+    if residue_ids is None:
+        residue_ids = (
+            df[(df["aa_name"] != "ACE") & (df["aa_name"] != "NME")]["resid"]
+            .drop_duplicates()
+            .tolist()
+        )
+    for resid in residue_ids:
+        residue = df[df["resid"] == resid]
+        ca = residue[residue["atom_name"] == "CA"]
+        cb = residue[residue["atom_name"] == "CB"]
+        if ca.empty or cb.empty:
+            continue
+        ca_xyz = ca[["x", "y", "z"]].iloc[0].to_numpy(dtype=np.float64)
+        cb_xyz = cb[["x", "y", "z"]].iloc[0].to_numpy(dtype=np.float64)
+        v = cb_xyz - ca_xyz
+        v_norm = np.linalg.norm(v)
+        if v_norm < 1e-8:
+            continue
+        cos_to_z = abs(v[2] / v_norm)
+        angles.append(np.degrees(np.arccos(np.clip(cos_to_z, -1.0, 1.0))))
+    return np.asarray(angles, dtype=np.float64)
+
+
+def restrict_parallel_ca_cb_tilt(df, max_cb_tilt_deg=10.0):
+    """Function:
+        Apply the smallest y rotation needed to keep only the middle CA-CB bond or bonds
+        within the angle limit.
+
+    Parameters
+    ----------
+    df : pandas.DataFrame
+        Peptide atom table containing x, y, z and residue information.
+    max_cb_tilt_deg : float or None
+        Maximum allowed middle CA-CB tilt in degrees.
+
+    Returns
+    -------
+    pandas.DataFrame
+        Peptide atom table after the smallest y-axis roll that satisfies the
+        center-angle limit.
+    """
+    middle_residue_ids = _middle_cb_residue_ids(df)
+    angles = ca_cb_tilt_angles(df, residue_ids=middle_residue_ids)
+    if len(angles) == 0 or float(angles.max()) <= max_cb_tilt_deg:
+        return df
+
+    best_df = df
+    best_max_tilt = float(angles.max())
+    feasible = []
+
+    # Use a small y-axis roll only. This keeps the strand axis and packing direction
+    # unchanged.
+    for theta in np.linspace(-np.pi / 2.0, np.pi / 2.0, 721):
+        rolled = rotation_coordinates(df, "y", float(theta))
+        rolled = _center_peptide_x_after_roll(rolled)
+        rolled_angles = ca_cb_tilt_angles(rolled, residue_ids=middle_residue_ids)
+        if len(rolled_angles) == 0:
+            continue
+        max_tilt = float(rolled_angles.max())
+        if max_tilt < best_max_tilt:
+            best_max_tilt = max_tilt
+            best_df = rolled
+        if max_tilt <= max_cb_tilt_deg + 1e-6:
+            feasible.append((abs(float(theta)), max_tilt, rolled))
+
+    if feasible:
+        feasible.sort(key=lambda item: (item[0], item[1]))
+        return feasible[0][2]
+    warnings.warn(
+        f"Cannot make middle CA-CB angle within {max_cb_tilt_deg:.1f} "
+        f"degree; best angle is {best_max_tilt:.2f} degree."
+    )
+    return best_df
+
+
+def alignment(
+    length: int, chains: int, peptide_df: pd.DataFrame,
+    o_filename: Union[str, Path], order: int = 1,
+    max_cb_tilt_deg: Optional[float] = None
+) -> pd.DataFrame:
+    """Function:
+        Align a peptide DataFrame and write one aligned checking PDB file.
+
+    Parameters
+    ----------
+    length : int
+        Number of peptide residues, including caps when present.
+    chains : int
+        Number of peptide chains in the DataFrame, normally 1.
+    peptide_df : pandas.DataFrame
+        Peptide atoms after terminal processing.
+    o_filename : str or pathlib.Path
+        Output filename for the aligned checking PDB.
+    order : int
+        Selects the initial strand-axis direction during alignment.
+    max_cb_tilt_deg : float or None
+        Maximum allowed middle CA-CB tilt in degrees.
+
+    Returns
+    -------
+    pandas.DataFrame
+        Aligned peptide atoms. The function also writes the checking PDB.
+    """
+    df = peptide_df.copy().reset_index(drop=True)
+
+    if df[df["resid"] == 1]["aa_name"].iloc[0] != "ACE":
+        residue_window = df["resid"] <= 10
     else:
-        filtered_df = df[(df['resid'] > 1) &
-                                  (df['resid'] <= 11) &
-                                  (df['aa_name'] != "NME") &
-                                  (df['atom_name'].isin(['C', 'CA', 'CB']))]
+        residue_window = (
+            (df["resid"] > 1) & (df["resid"] <= 11) & (df["aa_name"] != "NME")
+        )
+    gly_ha2 = df["aa_name"].astype(str).str.endswith("GLY") & (df["atom_name"] == "HA2")
+    filtered_df = df[
+        residue_window & (df["atom_name"].isin(["C", "CA", "CB"]) | gly_ha2)
+    ]
 
-        
-    # filtered_df = df[(df['resid'] <= length * chains) & (df['atom_name'].isin(['O', 'C']))]
-    data = filtered_df[['x', 'y', 'z']].to_numpy()
+    # filtered_df = df[(df['resid'] <= length * chains) & (df['atom_name'].isin(['O',
+    # 'C']))]
+    data = filtered_df[["x", "y", "z"]].to_numpy()
 
     # regular grid covering the domain of the data
     X_min = filtered_df["x"].min()
     X_max = filtered_df["x"].max()
     Y_min = filtered_df["y"].min()
     Y_max = filtered_df["y"].max()
-    X,Y = np.meshgrid(np.arange(X_min, X_max, 0.6), np.arange(Y_min, Y_max, 0.5))
+    X, Y = np.meshgrid(np.arange(X_min, X_max, 0.6), np.arange(Y_min, Y_max, 0.5))
     XX = X.flatten()
     YY = Y.flatten()
 
-    ################## fitting sheet plane and get the plane normal vector #################
+    # ################# fitting sheet plane and get the plane normal vector
+    # #################
     # order = 1: linear, 2: quadratic
     if order == 1:
         # best-fit linear plane
         # data[:,0] = x-column, data[:,1] = y-column, data[:,2] = z-column
-        # 先准备matrix A，column 1 2 分别是 实际的x y数据，column 3只包含 1.
-        # 拟合公式 Z=C0*X + C1*Y + C2. Matrix A对应 [X, Y, 1].
-        # lstsq 里面,第一个输入matrix A，第二个输入实际Z的值，然后返回拟合公式的坐标值
-        A = np.c_[data[:,0], data[:,1], np.ones(data.shape[0])]
-        C,_,_,_ = scipy.linalg.lstsq(A, data[:,2])    # coefficients
+        A = np.c_[data[:, 0], data[:, 1], np.ones(data.shape[0])]
+        C, _, _, _ = np.linalg.lstsq(A, data[:, 2], rcond=None)  # coefficients
 
         # evaluate it on grid
-        Z = C[0]*X + C[1]*Y + C[2]
+        Z = C[0] * X + C[1] * Y + C[2]
 
         # or expressed using matrix/vector product
-        #Z = np.dot(np.c_[XX, YY, np.ones(XX.shape)], C).reshape(X.shape)
+        # Z = np.dot(np.c_[XX, YY, np.ones(XX.shape)], C).reshape(X.shape)
 
     elif order == 2:
         # best-fit quadratic curve
-        A = np.c_[np.ones(data.shape[0]), data[:,:2], np.prod(data[:,:2], axis=1), data[:,:2]**2]
-        C,_,_,_ = scipy.linalg.lstsq(A, data[:,2])
+        A = np.c_[
+            np.ones(data.shape[0]),
+            data[:, :2],
+            np.prod(data[:, :2], axis=1),
+            data[:, :2] ** 2,
+        ]
+        C, _, _, _ = np.linalg.lstsq(A, data[:, 2], rcond=None)
         print(A)
         # evaluate it on a grid
-        Z = np.dot(np.c_[np.ones(XX.shape), XX, YY, XX*YY, XX**2, YY**2], C).reshape(X.shape)
+        Z = np.dot(
+            np.c_[np.ones(XX.shape), XX, YY, XX * YY, XX**2, YY**2], C
+        ).reshape(X.shape)
 
-    # plot points and fitted surface
-#     fig = plt.figure()
-#     ax = fig.add_subplot(111, projection='3d')
-#     ax.plot_surface(X, Y, Z, rstride=1, cstride=1, alpha=0.2)
-#     ax.scatter(data[:,0], data[:,1], data[:,2], c='r', s=50)
-#     plt.xlabel('X')
-#     plt.ylabel('Y')
-#     ax.set_zlabel('Z')
-#     ax.axis('equal')
-#     ax.axis('tight')
-#     plt.show()
-
-    ############calculate the angles between z-axis and the plane normal vector ###################
-    nz=[0,0,1]
+    # ###########calculate the angles between z-axis and the plane normal vector
+    # ###################
+    nz = [0, 0, 1]
     # sheets plane normal vector = (C[0], C[1], -1)
-    # rotation on x-y plane (rotate by z-axis). v1 = (0,0), *** no need to rotate by z-axis ***
+    # rotation on x-y plane (rotate by z-axis). v1 = (0,0), *** no need to rotate by
+    # z-axis ***
     # v1=[C[0],C[1]]
     # v2=[nz[0],nz[1]]
     # tz = rotation_angle(v1,v2) # rotation from v1 to v2
 
     # rotation on x-z plane (rotate by y-axis)
-    v1=[C[0],-1]
-    v2=[nz[0],nz[2]]
-    ty = rotation_angle(v1,v2) # rotation from v1 to v2
+    v1 = [C[0], -1]
+    v2 = [nz[0], nz[2]]
+    ty = rotation_angle(v1, v2)  # rotation from v1 to v2
 
     # rotation on y-z plane (rotate by x-axis)
-    v1=[C[1],-1]
-    v2=[nz[1],nz[2]]
-    tx = rotation_angle(v1,v2) # rotation from v1 to v2
+    v1 = [C[1], -1]
+    v2 = [nz[1], nz[2]]
+    tx = rotation_angle(v1, v2)  # rotation from v1 to v2
 
-    ############calculate rotation matrix and rotate the plane normal to z-axis ###################
-    Rx_M = np.array([[1, 0, 0], [0, np.cos(tx), -np.sin(tx)], [0, np.sin(tx), np.cos(tx)]])
-    Ry_M = np.array([[np.cos(ty), 0, np.sin(ty)], [0, 1, 0], [-np.sin(ty), 0, np.cos(ty)]])
-    # Rz_M = np.array([[np.cos(ty), 0, np.sin(ty)], [0, 1, 0], [-np.sin(ty), 0, np.cos(ty)]])
+    # ###########calculate rotation matrix and rotate the plane normal to z-axis
+    # ###################
+    Rx_M = np.array(
+        [[1, 0, 0], [0, np.cos(tx), -np.sin(tx)], [0, np.sin(tx), np.cos(tx)]]
+    )
+    Ry_M = np.array(
+        [[np.cos(ty), 0, np.sin(ty)], [0, 1, 0], [-np.sin(ty), 0, np.cos(ty)]]
+    )
+    # Rz_M = np.array([[np.cos(ty), 0, np.sin(ty)], [0, 1, 0], [-np.sin(ty), 0,
+    # np.cos(ty)]])
 
-    data = df[['x', 'y', 'z']].to_numpy()
+    data = df[["x", "y", "z"]].to_numpy()
     df_temp = df.copy()
 
     for i, xyz in enumerate(data):
         xyz = Rx_M @ xyz
         xyz = Ry_M @ xyz
 
-        df_temp.at[i, 'x'] = xyz[0]
-        df_temp.at[i, 'y'] = xyz[1]
-        df_temp.at[i, 'z'] = xyz[2]
-    
-    ############################# fit each peptide parallel to y-axis and move the sheets to center ###############
-    vectors=[]
+        df_temp.at[i, "x"] = xyz[0]
+        df_temp.at[i, "y"] = xyz[1]
+        df_temp.at[i, "z"] = xyz[2]
 
-        # filtered_df = df_temp[(df_temp['resid']>i*length)&(df_temp['resid']<=(i+1)*length)&(df_temp['atom_name'].isin(['C','CA','N']))]
-    filtered_df = df_temp[df_temp['atom_name'].isin(['CA'])]
-    points = filtered_df[['x', 'y', 'z']].to_numpy()
+    # ############################ fit each peptide parallel to y-axis and move the
+    # sheets to center ###############
+    vectors = []
 
-#       k1, b1, k2, b2 = linear_fitting_3D_points(points)
+    # filtered_df = df_temp[(df_temp['resid']>i*length)&(df_temp['resid']<=(i+1)*length)
+    # &(df_temp['atom_name'].isin(['C','CA','N']))]
+    filtered_df = df_temp[df_temp["atom_name"].isin(["CA"])]
+    points = filtered_df[["x", "y", "z"]].to_numpy()
 
-#         p = 1
-#         m = k1 * p
-#         n = k2 * p
-    m,n,p = linear_fitting(points)
-    vector = [m, n, p] # sheet direction vector
+    #       k1, b1, k2, b2 = linear_fitting_3D_points(points)
+
+    #         p = 1
+    #         m = k1 * p
+    #         n = k2 * p
+    m, n, p = linear_fitting(points)
+    vector = [m, n, p]  # sheet direction vector
     vectors.append(vector)
 
-    vectors=np.array(vectors)
+    vectors = np.array(vectors)
     vector = np.mean(vectors, axis=0)
-    
-     ############################# align peptide to y-axis and move center to origin ###############
-    ny = [0, 1, 0]
-    v1=[vector[0],vector[1]]
-    v2=[ny[0],ny[1]]
-    tz = rotation_angle(v1,v2) # rotation from v1 to v2
 
-    Rz_M = np.array([[np.cos(tz), -np.sin(tz), 0], [np.sin(tz), np.cos(tz), 0], [0, 0, 1]])
-    
-    data = df_temp[['x', 'y', 'z']].to_numpy()
+    # ############################ align peptide to y-axis and move center to origin
+    # ###############
+    ny = [0, 1, 0]
+    v1 = [vector[0], vector[1]]
+    v2 = [ny[0], ny[1]]
+    tz = rotation_angle(v1, v2)  # rotation from v1 to v2
+
+    Rz_M = np.array(
+        [[np.cos(tz), -np.sin(tz), 0], [np.sin(tz), np.cos(tz), 0], [0, 0, 1]]
+    )
+
+    data = df_temp[["x", "y", "z"]].to_numpy()
 
     for i, xyz in enumerate(data):
         xyz = Rz_M @ xyz
-        df_temp.at[i, 'x'] = xyz[0]
-        df_temp.at[i, 'y'] = xyz[1]
-        df_temp.at[i, 'z'] = xyz[2]
-    
-    x_sum=0; y_sum=0; z_sum=0
-    data_for_center = df_temp[(df_temp['atom_name'].isin(['C', 'CA', 'N'])) &
-                              (df_temp['aa_name'] != "ACE") &
-                              (df_temp['aa_name'] != "NME")
-                             ][['x', 'y', 'z']].to_numpy()
+        df_temp.at[i, "x"] = xyz[0]
+        df_temp.at[i, "y"] = xyz[1]
+        df_temp.at[i, "z"] = xyz[2]
+
+    x_sum = 0
+    y_sum = 0
+    z_sum = 0
+    data_for_center = df_temp[
+        (df_temp["atom_name"].isin(["C", "CA", "N"]))
+        & (df_temp["aa_name"] != "ACE")
+        & (df_temp["aa_name"] != "NME")
+    ][["x", "y", "z"]].to_numpy()
     for i, xyz in enumerate(data_for_center):
-        x_sum+=xyz[0]
-        y_sum+=xyz[1]
-        z_sum+=xyz[2]
+        x_sum += xyz[0]
+        y_sum += xyz[1]
+        z_sum += xyz[2]
 
-    x_sum/=(i+1)
-    y_sum/=(i+1)
-    z_sum/=(i+1)
-    df_temp['x'] = df_temp['x'] - x_sum
-    df_temp['y'] = df_temp['y'] - y_sum
-    df_temp['z'] = df_temp['z'] - z_sum
-    
-    ############# rotate even residues toward z-axis and 较大序号基团朝向 y-axis ########################
-    if (df[df['resid'] == 1]['aa_name'].iloc[0] != "ACE"):
-        res_1_CA_x = df_temp[(df_temp['resid'] == 1) & (df_temp['atom_name'] == 'CA')]['x'].iloc[0]
-        res_2_CA_x = df_temp[(df_temp['resid'] == 2) & (df_temp['atom_name'] == 'CA')]['x'].iloc[0]
-        res_1_CA_y = df_temp[(df_temp['resid'] == 1) & (df_temp['atom_name'] == 'CA')]['y'].iloc[0]
-        res_2_CA_y = df_temp[(df_temp['resid'] == 2) & (df_temp['atom_name'] == 'CA')]['y'].iloc[0]
+    x_sum /= i + 1
+    y_sum /= i + 1
+    z_sum /= i + 1
+    df_temp["x"] = df_temp["x"] - x_sum
+    df_temp["y"] = df_temp["y"] - y_sum
+    df_temp["z"] = df_temp["z"] - z_sum
+
+    if df[df["resid"] == 1]["aa_name"].iloc[0] != "ACE":
+        res_1_CA_x = df_temp[(df_temp["resid"] == 1) & (df_temp["atom_name"] == "CA")][
+            "x"
+        ].iloc[0]
+        res_2_CA_x = df_temp[(df_temp["resid"] == 2) & (df_temp["atom_name"] == "CA")][
+            "x"
+        ].iloc[0]
+        res_1_CA_y = df_temp[(df_temp["resid"] == 1) & (df_temp["atom_name"] == "CA")][
+            "y"
+        ].iloc[0]
+        res_2_CA_y = df_temp[(df_temp["resid"] == 2) & (df_temp["atom_name"] == "CA")][
+            "y"
+        ].iloc[0]
     else:
-        res_1_CA_x = df_temp[(df_temp['resid'] == 2) & (df_temp['atom_name'] == 'CA')]['x'].iloc[0]
-        res_2_CA_x = df_temp[(df_temp['resid'] == 3) & (df_temp['atom_name'] == 'CA')]['x'].iloc[0]
-        res_1_CA_y = df_temp[(df_temp['resid'] == 2) & (df_temp['atom_name'] == 'CA')]['y'].iloc[0]
-        res_2_CA_y = df_temp[(df_temp['resid'] == 3) & (df_temp['atom_name'] == 'CA')]['y'].iloc[0]        
+        res_1_CA_x = df_temp[(df_temp["resid"] == 2) & (df_temp["atom_name"] == "CA")][
+            "x"
+        ].iloc[0]
+        res_2_CA_x = df_temp[(df_temp["resid"] == 3) & (df_temp["atom_name"] == "CA")][
+            "x"
+        ].iloc[0]
+        res_1_CA_y = df_temp[(df_temp["resid"] == 2) & (df_temp["atom_name"] == "CA")][
+            "y"
+        ].iloc[0]
+        res_2_CA_y = df_temp[(df_temp["resid"] == 3) & (df_temp["atom_name"] == "CA")][
+            "y"
+        ].iloc[0]
 
-    if(res_1_CA_x > res_2_CA_x):
-        print("res_1_CA_x > res_2_CA_x")
-        ty = np.pi/2 # 绕 y-axis 逆时针旋转 90°,即绕 y-axis 顺时针旋转90°
+    if res_1_CA_x > res_2_CA_x:
+        ty = np.pi / 2
     else:
-        print("res_1_CA_x < res_2_CA_x")
-        ty = -np.pi/2
+        ty = -np.pi / 2
 
-    df_temp = rotation_coordinates(df_temp, 'y', ty) # 绕 y-axis 旋转 90° or -90
+    df_temp = rotation_coordinates(df_temp, "y", ty)
 
-    
-    # 判断第一个基团的CA 的y坐标是否大于第二个基团的y坐标,即多肽链C端是否朝向y正方向
-    if(res_1_CA_y > res_2_CA_y):
-        print("res_1_CA_y > res_2_CA_y")
-        tz = np.pi                                        # set 180°
-        df_temp = rotation_coordinates(df_temp, 'z', tz)  # 绕 z-axis 旋转 180°
+    if res_1_CA_y > res_2_CA_y:
+        tz = np.pi
+        df_temp = rotation_coordinates(df_temp, "z", tz)
 
+    # The beta strand is twisted, not a perfect plane. Center the twist around
+    # the y-z midplane so roughly half of the strand envelope is at x < 0 and
+    # half is at x > 0 when viewed along the strand axis.
+    gly_ha2 = df_temp["aa_name"].astype(str).str.endswith("GLY") & (
+        df_temp["atom_name"] == "HA2"
+    )
+    spiral_center_atoms = df_temp[
+        ((df_temp["atom_name"].isin(["N", "CA", "C", "CB"])) | gly_ha2)
+        & (df_temp["aa_name"] != "ACE")
+        & (df_temp["aa_name"] != "NME")
+    ]
+    if not spiral_center_atoms.empty:
+        x_mid = 0.5 * (spiral_center_atoms["x"].min() + spiral_center_atoms["x"].max())
+        df_temp["x"] = df_temp["x"] - x_mid
 
-#     df_temp = df_temp[(df_temp['resid'] <= length)]
-    
-    ############# write out the transformed structure ###################     
-    with open(o_filename, 'w') as f:
+    df_temp = balance_oxygen_z_roll(df_temp)
+    if max_cb_tilt_deg is not None:
+        df_temp = restrict_parallel_ca_cb_tilt(df_temp, max_cb_tilt_deg=max_cb_tilt_deg)
+
+    #     df_temp = df_temp[(df_temp['resid'] <= length)]
+
+    ############# write out the transformed structure ###################
+    with open(o_filename, "w") as f:
         for index, row in df_temp.iterrows():
-            if len(row['aa_name'])==4:
-                output= "ATOM{:7d}{:^6}{:4}{:5d}{:12.3f}{:8.3f}{:8.3f}\n".format(
-                    row['anum'],row['atom_name'],row['aa_name'],row['resid'],
-                    row['x'],row['y'],row['z'])
+            if len(row["aa_name"]) == 4:
+                output = "ATOM{:7d}{:^6}{:4}{:5d}{:12.3f}{:8.3f}{:8.3f}\n".format(
+                    row["anum"],
+                    row["atom_name"],
+                    row["aa_name"],
+                    row["resid"],
+                    row["x"],
+                    row["y"],
+                    row["z"],
+                )
             else:
-                output= "ATOM{:7d}{:^6}{:4}{:5d}{:12.3f}{:8.3f}{:8.3f}\n".format(
-                    row['anum'],row['atom_name'],row['aa_name'],row['resid'],
-                    row['x'],row['y'],row['z'])
+                output = "ATOM{:7d}{:^6}{:4}{:5d}{:12.3f}{:8.3f}{:8.3f}\n".format(
+                    row["anum"],
+                    row["atom_name"],
+                    row["aa_name"],
+                    row["resid"],
+                    row["x"],
+                    row["y"],
+                    row["z"],
+                )
 
             f.write(output)
-            
+
     return df_temp
 
 
-# In[66]:
+# %% Cell 54ce3e23-782f-45a3-8fc4-31e20d984620
+def _packing_core_atoms(df):
+    """Function:
+        Select backbone, CB, and Gly HA2 atoms used to calculate packing centers.
 
+    Parameters
+    ----------
+    df : pandas.DataFrame
+        Peptide atom table containing x, y, z and residue information.
 
-def packpep(single_peptite, chain_length, classes, shifts, chains_per_sheet, format_flag, o_filename, 
-            core_residues="e", strand_dist = 4.8, sheet_dist = 11.5, sheet_shift = 2.4):
+    Returns
+    -------
+    pandas.DataFrame
+        DataFrame subset containing N, CA, C, CB, and Gly HA2 atoms.
     """
-    single_peptite:   DataFrame, singple peptide PDB file information
-    chain_length:     int, number of amino acid of the peptide
-    classes:          int, type of steric zipper
-    core_residues:    "e" = even number of residues in fibril core (default). "o" = odd number of residues in fibril core
-    shifts:           int, move sheet = 1 or = -1 residue relative to another, or 0 = not move
-    chains_per_sheet: int, how many peptides per sheet
+    gly_ha2 = df["aa_name"].astype(str).str.endswith("GLY") & (df["atom_name"] == "HA2")
+    core = df[
+        ((df["atom_name"].isin(["N", "CA", "C", "CB"])) | gly_ha2)
+        & (df["aa_name"] != "ACE")
+        & (df["aa_name"] != "NME")
+    ]
+    return df if core.empty else core
+
+
+def _packing_center(df):
+    """Function:
+        Calculate the mean xyz center of the atoms used for packing.
+
+    Parameters
+    ----------
+    df : pandas.DataFrame
+        Peptide atom table containing x, y, z and residue information.
+
+    Returns
+    -------
+    numpy.ndarray with shape (3,)
+        Mean [x, y, z] packing center.
     """
-    # sheet_shift = 2.4 # shift along fibril direction (x in this code)
-    # strand_dist = 4.8
-    # sheet_dist = 11.5
-    
-    if (classes == 1):
-        class_axis = "x"
-        if (core_residues == "e"):
-        # sheet cross sectional view
+    return (
+        _packing_core_atoms(df)[["x", "y", "z"]].to_numpy(dtype=np.float64).mean(axis=0)
+    )
 
-        ###### shifts = 0 ########        ###### shifts = 1 ########        ###### shifts = -1 ########
 
-        # z      7 5 3 1                  # z       7 5 3 1               # z     7 5 3 1 
-        # |    C--------N  (SHEET 2)      # |     C--------N  (SHEET 2)   # |   C--------N  (SHEET 2)
-        # |     8 6 4 2                   # |      8 6 4 2                # |    8 6 4 2
-        # |     2 4 6 8                   # |     2 4 6 8                 # |     2 4 6 8
-        # |   N--------C   (SHEET 1)      # |   N--------C    (SHEET 1)   # |   N--------C  (SHEET 1)
-        # |    1 3 5 7                    # |    1 3 5 7                  # |    1 3 5 7
-        # ----------------> y             # ----------------> y           # ----------------> y             
-  
-            if (chain_length%2 == 0):
-                x_adjust = 0 + sheet_shift
-                y_adjust = 2.75 + shifts * 3.275
-                z_adjust = 0
-                tx_adjust = np.pi*(0/360)
-                ty_adjust = np.pi*(0/360)
-                tz_adjust = np.pi*(5/360)
+def _packing_axis_midpoint(df, coord):
+    """Function:
+        Calculate the midpoint between the minimum and maximum value on one coordinate
+        axis.
 
-            elif (chain_length%2 == 1):
-                x_adjust = 0 + sheet_shift
-                y_adjust = -0.25 + shifts * 3.275
-                z_adjust = 0 
-                tx_adjust = np.pi*(0/360)
-                ty_adjust = np.pi*(0/360)
-                tz_adjust = np.pi*(5/360)
-                
-        elif (core_residues == "o"):      
-            sheet_dist = -sheet_dist       
-        # sheet cross sectional view
-        # shift = +1: upper sheets move right, shift = -1: upper sheets move left
-        ###### shifts = 0 ########       ###### shifts = 1 ########         ###### shifts = -1 ########
+    Parameters
+    ----------
+    df : pandas.DataFrame
+        Peptide atom table containing x, y, z and residue information.
+    coord : str
+        Coordinate column name 'x', 'y', or 'z'.
 
-        # z      2 4 6 8                    # z     2 4 6 8                # z     2 4 6 8
-        # |    N--------C   (SHEET 1)       # |   N--------C  (SHEET 1)    # |   N--------C    (SHEET 1)
-        # |     1 3 5 7                     # |    1 3 5 7                 # |    1 3 5 7
-        # |     7 5 3 1                     # |   7 5 3 1                  # |     7 5 3 1
-        # |   C--------N    (SHEET 2)       # | C--------N    (SHEET 2)    # |   C--------N    (SHEET 2)
-        # |    8 6 4 2                      # |  8 6 4 2                   # |    8 6 4 2
-        # ----------------> y               # ----------------> y          # ----------------> y 
-            if (chain_length%2 == 0):
-                x_adjust = 0 + sheet_shift
-                y_adjust = -3.7 - shifts * 3.275
-                z_adjust = 0
-                tx_adjust = np.pi*(0/360)
-                ty_adjust = np.pi*(0/360)
-                tz_adjust = np.pi*(5/360)
+    Returns
+    -------
+    float
+        Midpoint between the minimum and maximum coordinate.
+    """
+    values = _packing_core_atoms(df)[coord].to_numpy(dtype=np.float64)
+    return 0.5 * (values.min() + values.max())
 
-            elif (chain_length%2 == 1):
-                x_adjust = 0 + sheet_shift
-                y_adjust = -0.25 - shifts * 3.275
-                z_adjust = 0
-                tx_adjust = np.pi*(0/360)
-                ty_adjust = np.pi*(0/360)
-                tz_adjust = np.pi*(5/360)
-                
-    elif (classes == 3):
-        class_axis = "y"
-        if (core_residues == "e"):
-        # sheet cross sectional view
 
-        ###### shifts = 0 ########       ###### shifts = 1 ########        ###### shifts = -1 ########
+def _chain_center(df, chain_length, chain_index=0):
+    """Function:
+        Calculate the packing center of one selected chain in a packed sheet.
 
-        # z    1 3 5 7                    # z      1 3 5 7                # z   1 3 5 7 
-        # |   N--------C  (SHEET 2)       # |    N--------C  (SHEET 2)    # |  N--------C    (SHEET 2)
-        # |     2 4 6 8                   # |      2 6 4 8                # |    2 4 6 8
-        # |     2 4 6 8                   # |     2 4 6 8                 # |     2 4 6 8
-        # |   N--------C  (SHEET 1)       # |   N--------C   (SHEET 1)    # |   N--------C   (SHEET 1)
-        # |    1 3 5 7                    # |    1 3 5 7                  # |    1 3 5 7
-        # ----------------> y             # ----------------> y           # ----------------> y  
-            if (chain_length%2 == 0):
-                x_adjust = 0 + sheet_shift
-                y_adjust = -0.49 + shifts * 3.275
-                z_adjust = 0
-                tx_adjust = np.pi*(-2/360)
-                ty_adjust = np.pi*(0/360)       
-                tz_adjust = np.pi*(4/360)
-            elif (chain_length%2 == 1):
-                x_adjust = 0 + sheet_shift
-                y_adjust = -0.25 + shifts * 3.275
-                z_adjust = 0
-                tx_adjust = np.pi*(-1/360)
-                ty_adjust = np.pi*(0/360)
-                tz_adjust = np.pi*(4/360)
-        # sheet cross sectional view
+    Parameters
+    ----------
+    df : pandas.DataFrame
+        Peptide atom table containing x, y, z and residue information.
+    chain_length : int
+        Number of residue records assigned to one packed chain, including caps when
+        present.
+    chain_index : int
+        Zero-based index of the chain to select.
 
-        ###### shifts = 0 ########       ###### shifts = 1 ########        ###### shifts = -1 ########
+    Returns
+    -------
+    numpy.ndarray with shape (3,)
+        Center of the selected chain.
+    """
+    return _packing_center(_chain_slice(df, chain_length, chain_index=chain_index))
 
-        # z     2 4 6 8                   # |      2 4 6 8                 # |     2 4 6 8
-        # |   N--------C  (SHEET 1)       # |    N--------C  (SHEET 1)     # |   N--------C   (SHEET 1)
-        # |    1 3 5 7                    # |     1 3 5 7                  # |    1 3 5 7              
-        # |    1 3 5 7                    # |    1 3 5 7                   # |     1 3 5 7
-        # |   N--------C  (SHEET 2)       # |  N--------C    (SHEET 2)     # |    N--------C  (SHEET 2)
-        # |     2 4 6 8                   # |   2 6 4 8                    # |      2 6 4 8
-        # ----------------> y             # ----------------> y            # ----------------> y              
-        elif (core_residues == "o"):
-            sheet_dist = -sheet_dist
-            if (chain_length%2 == 0):
-                x_adjust = 0 + sheet_shift
-                y_adjust = -0.49 - shifts * 3.275
-                z_adjust = 0
-                tx_adjust = np.pi*(-2/360)
-                ty_adjust = np.pi*(0/360)
-                tz_adjust = np.pi*(4/360)
-            elif (chain_length%2 == 1):
-                x_adjust = 0 + sheet_shift
-                y_adjust = -0.25 - shifts * 3.275
-                z_adjust = 0
-                tx_adjust = np.pi*(-1/360)
-                ty_adjust = np.pi*(0/360)
-                tz_adjust = np.pi*(4/360)
-                
-    elif (classes == 4):
-    # sheet cross sectional view
 
-    ###### shifts = 0 ########       ###### shifts = 1 ########        ###### shifts = -1 ########
+def _translate_peptide(df, dx=0.0, dy=0.0, dz=0.0):
+    """Function:
+        Move every atom in a peptide by defined x, y, and z distances.
 
-    # z    8 6 4 2                    # |      8 6 4 2                 # |   8 6 4 2
-    # |   C--------N   (SHEET 2)      # |    C--------N  (SHEET 2)     # |  C--------N    (SHEET 2)
-    # |     7 5 3 1                   # |     7 5 3 1                  # |    7 5 3 1              
-    # |     2 4 6 8                   # |    2 4 6 8                   # |     2 4 6 8
-    # |   N--------C   (SHEET 1)      # |  N--------C    (SHEET 1)     # |   N--------C   (SHEET 1)
-    # |    1 3 5 7                    # |   1 3 5 7                    # |    1 3 5 7              
-    # ----------------> y             # ----------------> y            # ----------------> y          
-        class_axis = "z"
-        if (chain_length%2 == 0):
-            x_adjust = 0 + sheet_shift
-            y_adjust = -0.48 + shifts * 3.275
-            z_adjust = 0
-            tx_adjust = np.pi*(-1/180)
-            ty_adjust = np.pi*(0/180)            
-            tz_adjust = np.pi*(0/180)
-        elif (chain_length%2 == 1):
-            x_adjust = 0 + sheet_shift
-            y_adjust = -0.25 + shifts * 3.275
-            z_adjust = 0
-            tx_adjust = np.pi*(-0.5/180)
-            ty_adjust = np.pi*(0/180)
-            tz_adjust = np.pi*(0/180)
-    
-    elif (classes == 2):
-    # sheet cross sectional view
+    Parameters
+    ----------
+    df : pandas.DataFrame
+        Peptide atom table containing x, y, z and residue information.
+    dx : float
+        Translation distance along x in Angstrom.
+    dy : float
+        Translation distance along y in Angstrom.
+    dz : float
+        Translation distance along z in Angstrom.
 
-    ###### shifts = 0 ########       ###### shifts = 1 ########        ###### shifts = -1 ########
+    Returns
+    -------
+    pandas.DataFrame
+        Translated copy of df.
+    """
+    df = df.copy()
+    df["x"] = df["x"] + dx
+    df["y"] = df["y"] + dy
+    df["z"] = df["z"] + dz
+    return df
 
-    # z      2 4 6 8                  # |      2 4 6 8                 # |     2 4 6 8
-    # |    N--------C  (SHEET 2)      # |    N--------C  (SHEET 2)     # |   N--------C   (SHEET 2)
-    # |     1 3 5 7                   # |     1 3 5 7                  # |    1 3 5 7              
-    # |     2 4 6 8                   # |    2 4 6 8                   # |     2 4 6 8
-    # |   N--------C   (SHEET 1)      # |  N--------C    (SHEET 1)     # |   N--------C   (SHEET 1)
-    # |    1 3 5 7                    # |   1 3 5 7                    # |    1 3 5 7              
-    # ----------------> y             # ----------------> y            # ----------------> y          
-        class_axis = "none"
 
-        if (chain_length%2 == 0):
-            x_adjust = 0 + sheet_shift
-            y_adjust = 2.75 + shifts * 3.275
-            z_adjust = 0
-            tx_adjust = np.pi*(-1/180)
-            ty_adjust = np.pi*(0/180)            
-            tz_adjust = np.pi*(0/180)
-        elif (chain_length%2 == 1):
-            x_adjust = 0 + sheet_shift
-            y_adjust = 2.75 + shifts * 3.275
-            z_adjust = 0
-            tx_adjust = np.pi*(-1/180)
-            ty_adjust = np.pi*(0/180)            
-            tz_adjust = np.pi*(0/180)
+def _ca_trace(df):
+    """Function:
+        Select and order the CA atoms that define one peptide strand trace.
 
-###### set parameter ###############
+    Parameters
+    ----------
+    df : pandas.DataFrame
+        Peptide atom table containing x, y, z and residue information.
 
-    sheets=2
-    anum_max = single_peptite['anum'].max()
-    resid_max = single_peptite['resid'].max()
-    peptides = pd.DataFrame([]) # empty dataframe
-    # print(anum_max)
-###### pack first sheet ##################
+    Returns
+    -------
+    pandas.DataFrame
+        Atom table containing CA rows sorted by residue number.
+    """
+    return df[
+        (df["atom_name"] == "CA") & (df["aa_name"] != "ACE") & (df["aa_name"] != "NME")
+    ].sort_values("resid")
+
+
+def _chain_slice(df, chain_length, chain_index=0):
+    """Function:
+        Select one chain from a DataFrame containing several packed chains.
+
+    Parameters
+    ----------
+    df : pandas.DataFrame
+        Peptide atom table containing x, y, z and residue information.
+    chain_length : int
+        Number of residue records assigned to one packed chain, including caps when
+        present.
+    chain_index : int
+        Zero-based index of the chain to select.
+
+    Returns
+    -------
+    pandas.DataFrame
+        Atom table containing the selected chain.
+    """
+    min_resid = int(df["resid"].min())
+    start = min_resid + chain_index * chain_length
+    stop = start + chain_length
+    return df[(df["resid"] >= start) & (df["resid"] < stop)]
+
+
+def _strand_axis(df, chain_length=None, chain_index=0):
+    """Function:
+        Fit the N-to-C direction of one strand from its ordered CA atoms.
+
+    Parameters
+    ----------
+    df : pandas.DataFrame
+        Peptide atom table containing x, y, z and residue information.
+    chain_length : int or None
+        Use this value to select one chain when df contains packed chains.
+    chain_index : int
+        Zero-based index of the chain to select.
+
+    Returns
+    -------
+    numpy.ndarray with shape (3,)
+        Unit N-to-C strand direction.
+    """
+    if chain_length is not None:
+        df = _chain_slice(df, chain_length, chain_index=chain_index)
+    ca = _ca_trace(df)
+    points = ca[["x", "y", "z"]].to_numpy(dtype=np.float64)
+    if len(points) < 2:
+        raise ValueError("Need at least two CA atoms to define a strand axis.")
+    axis = linear_fitting(points)
+    first_to_last = points[-1] - points[0]
+    if np.dot(axis, first_to_last) < 0:
+        axis = -axis
+    return unit_vector(axis, "strand axis")
+
+
+def _xy_angle_between(v_from, v_to):
+    """Function:
+        Calculate the signed rotation angle between two vectors after projection onto
+        the x-y plane.
+
+    Parameters
+    ----------
+    v_from : array-like vector
+        Starting direction for the angle calculation.
+    v_to : array-like vector
+        Target direction for the angle calculation.
+
+    Returns
+    -------
+    float
+        Signed angle in radians in the x-y plane.
+    """
+    a = unit_vector(
+        np.asarray([v_from[0], v_from[1]], dtype=np.float64), "moving xy strand axis"
+    )
+    b = unit_vector(
+        np.asarray([v_to[0], v_to[1]], dtype=np.float64), "target xy strand axis"
+    )
+    return np.arctan2(cross2d(a, b), np.dot(a, b))
+
+
+def _rotate_z_about_center(df, angle, center=None):
+    """Function:
+        Rotate a peptide around a z-axis passing through a defined center.
+
+    Parameters
+    ----------
+    df : pandas.DataFrame
+        Peptide atom table containing x, y, z and residue information.
+    angle : float
+        Rotation angle in radians.
+    center : numpy.ndarray with shape (3,) or None
+        Rotation center. None uses the calculated packing center.
+
+    Returns
+    -------
+    pandas.DataFrame
+        Peptide atom table after rotation around z through center.
+    """
+    df = df.copy()
+    coords = df[["x", "y", "z"]].to_numpy(dtype=np.float64)
+    if center is None:
+        center = _packing_center(df)
+    center = np.asarray(center, dtype=np.float64)
+    rot = np.array(
+        [
+            [np.cos(angle), -np.sin(angle), 0.0],
+            [np.sin(angle), np.cos(angle), 0.0],
+            [0.0, 0.0, 1.0],
+        ]
+    )
+    df[["x", "y", "z"]] = (coords - center) @ rot.T + center
+    return df
+
+
+def _align_strand_xy(moving_df, target_df, same_direction=None, chain_length=None,
+                     moving_chain_index=0, target_chain_index=0):
+    """Function:
+        Rotate a moving strand so its projected strand direction matches a target
+        strand.
+
+    Parameters
+    ----------
+    moving_df : pandas.DataFrame
+        Strand or sheet coordinates that will be moved.
+    target_df : pandas.DataFrame
+        Fixed reference strand or sheet coordinates.
+    same_direction : bool or None
+        True aligns the same N-to-C direction, False aligns the opposite direction, and
+        None chooses automatically.
+    chain_length : int
+        Number of residue records assigned to one packed chain, including caps when
+        present.
+    moving_chain_index : int
+        Zero-based moving-chain index when moving_df contains several chains.
+    target_chain_index : int
+        Zero-based target-chain index when target_df contains several chains.
+
+    Returns
+    -------
+    pandas.DataFrame
+        Atom table containing the rotated moving strand or sheet.
+    """
+    moving_axis = _strand_axis(
+        moving_df, chain_length=chain_length, chain_index=moving_chain_index
+    )
+    target_axis = _strand_axis(
+        target_df, chain_length=chain_length, chain_index=target_chain_index
+    )
+    if same_direction is None:
+        desired_axis = (
+            target_axis
+            if np.dot(moving_axis[:2], target_axis[:2]) >= 0
+            else -target_axis
+        )
+    else:
+        desired_axis = target_axis if same_direction else -target_axis
+    angle = _xy_angle_between(moving_axis, desired_axis)
+    return _rotate_z_about_center(moving_df, angle)
+
+
+def _register_antiparallel_ca_y(moving_df, target_df, residue_offset=0,
+                                direction="minus"):
+    """Function:
+        Translate an antiparallel strand along y to match the requested CA registry.
+
+    Parameters
+    ----------
+    moving_df : pandas.DataFrame
+        Strand or sheet coordinates that will be moved.
+    target_df : pandas.DataFrame
+        Fixed reference strand or sheet coordinates.
+    residue_offset : int
+        Number of residues used for the registry offset.
+    direction : str
+        'minus' or 'plus' selects the registry-shift direction.
+
+    Returns
+    -------
+    pandas.DataFrame
+        Peptide atom table translated to the antiparallel CA registry.
+    """
+    moving_ca = _ca_trace(moving_df)
+    target_ca = _ca_trace(target_df)
+    n = min(len(moving_ca), len(target_ca))
+    if n == 0:
+        return moving_df
+    moving_y = moving_ca["y"].to_numpy(dtype=np.float64)[:n][::-1]
+    target_y = target_ca["y"].to_numpy(dtype=np.float64)[:n]
+    use_anchor_pair = False
+    if residue_offset:
+        residue_offset = min(abs(int(residue_offset)), n - 1)
+        if direction == "plus":
+            moving_y = moving_y[: n - residue_offset]
+            target_y = target_y[residue_offset:n]
+        else:
+            moving_y = moving_y[residue_offset:]
+            target_y = target_y[: len(moving_y)]
+        use_anchor_pair = True
+    dy = (
+        float(target_y[0] - moving_y[0])
+        if use_anchor_pair
+        else float(np.mean(target_y - moving_y))
+    )
+    return _translate_peptide(moving_df, dy=dy)
+
+
+def _register_parallel_ca_yz(moving_df, target_df, residue_offset=0, direction="minus"):
+    """Function:
+        Rigidly align a parallel strand to the target CA positions in y and z.
+
+    Parameters
+    ----------
+    moving_df : pandas.DataFrame
+        Strand or sheet coordinates that will be moved.
+    target_df : pandas.DataFrame
+        Fixed reference strand or sheet coordinates.
+    residue_offset : int
+        Number of residues used for the registry offset.
+    direction : str
+        'minus' or 'plus' selects the registry-shift direction.
+
+    Returns
+    -------
+    pandas.DataFrame
+        Peptide atom table transformed to the parallel CA registry.
+    """
+    moving_ca = _ca_trace(moving_df)
+    target_ca = _ca_trace(target_df)
+    n = min(len(moving_ca), len(target_ca))
+    if n == 0:
+        return moving_df
+    moving_points = moving_ca[["x", "y", "z"]].to_numpy(dtype=np.float64)[:n]
+    target_points = target_ca[["x", "y", "z"]].to_numpy(dtype=np.float64)[:n]
+    if residue_offset:
+        residue_offset = min(abs(int(residue_offset)), n - 1)
+        if direction == "plus":
+            moving_points = moving_points[residue_offset:n]
+            target_points = target_points[: len(moving_points)]
+        else:
+            moving_points = moving_points[: n - residue_offset]
+            target_points = target_points[residue_offset:n]
+    if len(moving_points) < 2:
+        delta = target_points.mean(axis=0) - moving_points.mean(axis=0)
+        return _translate_peptide(
+            moving_df, dx=float(delta[0]), dy=float(delta[1]), dz=float(delta[2])
+        )
+    rotation, translation = _kabsch_transform(moving_points, target_points)
+    registered = moving_df.copy()
+    coords = registered[["x", "y", "z"]].to_numpy(dtype=np.float64)
+    registered[["x", "y", "z"]] = _apply_transform(coords, rotation, translation)
+    return registered
+
+
+def _estimate_residue_spacing(single_peptite):
+    """Function:
+        Estimate the neighboring-residue spacing from the median CA-to-CA y distance.
+
+    Parameters
+    ----------
+    single_peptite : pandas.DataFrame
+        One aligned peptide strand used as a packing template.
+
+    Returns
+    -------
+    float
+        Median neighboring CA y-spacing in Angstrom.
+    """
+    ca = single_peptite[
+        (single_peptite["atom_name"] == "CA")
+        & (single_peptite["aa_name"] != "ACE")
+        & (single_peptite["aa_name"] != "NME")
+    ].sort_values("resid")
+    y_coords = ca["y"].to_numpy(dtype=np.float64)
+    if len(y_coords) < 2:
+        return 3.3
+    spacings = np.abs(np.diff(y_coords))
+    spacings = spacings[spacings > 1e-6]
+    if len(spacings) == 0:
+        return 3.3
+    return float(np.median(spacings))
+
+
+def _write_packed_peptides(peptides, chain_length, format_flag, o_filename):
+    """Function:
+        Write a packed one-component peptide DataFrame to a PDB file.
+
+    Parameters
+    ----------
+    peptides : pandas.DataFrame
+        All packed peptide atom rows.
+    chain_length : int
+        Number of residue records assigned to one packed chain, including caps when
+        present.
+    format_flag : int
+        Selects the normal or AMBER-style PDB residue-name format.
+    o_filename : str or pathlib.Path
+        Output PDB file.
+
+    Returns
+    -------
+    None
+        Writes the packed PDB file.
+    """
+    with open(o_filename, "w") as f:
+        last_resid = None
+        for _, row in peptides.iterrows():
+            resid = int(row["resid"])
+            aa_name = (
+                row["aa_name"][1:]
+                if format_flag == 1 and len(row["aa_name"]) == 4
+                else row["aa_name"]
+            )
+            if format_flag == 1 and last_resid is not None:
+                if (last_resid % chain_length == 0) and (resid % chain_length == 1):
+                    f.write("TER\n")
+            output = "ATOM{:7d}{:^6}{:4}{:5d}{:12.3f}{:8.3f}{:8.3f}\n".format(
+                int(row["anum"]),
+                row["atom_name"],
+                aa_name,
+                resid,
+                float(row["x"]),
+                float(row["y"]),
+                float(row["z"]),
+            )
+            f.write(output)
+            last_resid = resid
+
+
+def packpep_geometric(single_peptite, chain_length, classes, shifts, chains_per_sheet,
+                      format_flag, o_filename, core_residues="e", strand_dist=4.8,
+                      sheet_dist=11.5, sheet_shift=0.0, registry_direction="minus"):
+    """Function:
+        Construct and pack two one-component sheets for steric-zipper Classes 1-10.
+
+    Parameters
+    ----------
+    single_peptite : pandas.DataFrame
+        One aligned peptide strand used as a packing template.
+    chain_length : int
+        Number of residue records assigned to one packed chain, including caps when
+        present.
+    classes : int
+        Steric-zipper class number from 1 to 10.
+    shifts : int or float
+        Move sheet 2 along y by this number of residue spacings.
+    chains_per_sheet : int
+        Number of peptide strands placed in each sheet.
+    format_flag : int
+        Selects the normal or AMBER-style PDB residue-name format.
+    o_filename : str or pathlib.Path
+        Output PDB file.
+    core_residues : str
+        'e' packs even-numbered residues inside and 'o' packs odd-numbered residues
+        inside.
+    strand_dist : float
+        Neighboring-strand distance along x in Angstrom.
+    sheet_dist : float
+        Sheet-to-sheet distance along z in Angstrom.
+    sheet_shift : float
+        Move sheet 2 along x in units of half the strand distance.
+    registry_direction : str
+        'minus' or 'plus' selects the y direction of a one-residue registry shift.
+
+    Returns
+    -------
+    pandas.DataFrame containing both packed sheets
+        Also writes o_filename.
+    """
+    class_axis = {
+        1: "x",
+        2: "none",
+        3: "y",
+        4: "z",
+        5: "x",
+        6: "none",
+        7: "none",
+        8: "z",
+        9: "none",
+        10: "x",
+    }
+    if classes not in class_axis:
+        raise ValueError("classes must be an integer from 1 to 10")
+
+    anum_max = int(single_peptite["anum"].max())
+    resid_max = int(single_peptite["resid"].max())
+    if registry_direction not in ["minus", "plus"]:
+        raise ValueError("registry_direction must be 'minus' or 'plus'")
+    residue_spacing = _estimate_residue_spacing(single_peptite)
+    sheet_y_shift = float(shifts) * residue_spacing
+    sheet_x_shift = float(sheet_shift) * float(strand_dist) * 0.5
+
+    if classes in [5, 6, 7, 8]:
+        anti_axis = "z" if classes in [5, 6] else "x"
+        anti_pep = rotation_coordinates(single_peptite, anti_axis, np.pi)
+        anti_pep = _align_strand_xy(anti_pep, single_peptite, same_direction=False)
+        if classes in [5, 6]:
+            register_offset = 1 if chain_length % 2 == 0 else 0
+        elif classes in [7, 8]:
+            register_offset = 1 if chain_length % 2 == 1 else 0
+        else:
+            register_offset = 0
+        anti_pep = _register_antiparallel_ca_y(
+            anti_pep,
+            single_peptite,
+            residue_offset=register_offset,
+            direction=registry_direction,
+        )
+        center_delta = _packing_center(single_peptite) - _packing_center(anti_pep)
+        anti_pep = _translate_peptide(anti_pep, center_delta[0], 0.0, center_delta[2])
+    else:
+        anti_pep = None
+
+    if classes in [9, 10]:
+        face_pep = rotation_coordinates(single_peptite, "y", np.pi)
+        face_pep = _align_strand_xy(face_pep, single_peptite, same_direction=True)
+        face_delta = _packing_center(single_peptite) - _packing_center(face_pep)
+        face_pep = _translate_peptide(face_pep, face_delta[0], 0.0, face_delta[2])
+        face_pep = _register_parallel_ca_yz(
+            face_pep, single_peptite, residue_offset=1, direction=registry_direction
+        )
+    else:
+        face_pep = None
+
+    sheet1_parts = []
     for chain in range(chains_per_sheet):
-        new_peptide = single_peptite.copy()
-        new_peptide['x']     = new_peptide['x']     + chain * strand_dist
-        new_peptide['anum']  = new_peptide['anum']  + chain * anum_max
-        new_peptide['resid'] = new_peptide['resid'] + chain * resid_max
-        peptides = pd.concat([peptides, new_peptide])
-        
-###### create a temp peptide, rotate to form class-1 sheets and move upward by sheets-ditance, the even residues are facing each other ####
-    temp_pep = single_peptite.copy()                            # copy a original peptide
-    temp_pep['anum']  = temp_pep['anum'] + chains_per_sheet * anum_max             # shift atom number 
-    temp_pep['resid'] = temp_pep['resid'] + chains_per_sheet * resid_max   # shift residue number
-    
-    
-    theta = -np.pi                                              # construct 2nd peptide model to fit different classes
-    temp_pep = rotation_coordinates(temp_pep, class_axis, theta)
-    
-    temp_pep['z'] = temp_pep['z'] + sheet_dist                  # fine adjustment
-    
-    temp_pep['x'] = temp_pep['x'] + x_adjust
-    temp_pep['y'] = temp_pep['y'] + y_adjust
-    temp_pep['z'] = temp_pep['z'] + z_adjust
-    temp_pep = rotation_coordinates(temp_pep, 'x', tx_adjust)
-    temp_pep = rotation_coordinates(temp_pep, 'y', ty_adjust)
-    temp_pep = rotation_coordinates(temp_pep, 'z', tz_adjust)
+        if anti_pep is not None and chain % 2 == 1:
+            new_peptide = anti_pep.copy()
+        elif face_pep is not None and chain % 2 == 1:
+            new_peptide = face_pep.copy()
+        else:
+            new_peptide = single_peptite.copy()
+        new_peptide["x"] = new_peptide["x"] + chain * strand_dist
+        new_peptide["anum"] = new_peptide["anum"] + chain * anum_max
+        new_peptide["resid"] = new_peptide["resid"] + chain * resid_max
+        sheet1_parts.append(new_peptide)
 
-    
-###### pack second sheet ####################
+    sheet1 = pd.concat(sheet1_parts, ignore_index=True)
+    sheet2 = sheet1.copy()
+    if class_axis[classes] != "none":
+        sheet2 = rotation_coordinates(sheet2, class_axis[classes], np.pi)
+    sheet2 = _align_strand_xy(
+        sheet2, sheet1, same_direction=None, chain_length=chain_length
+    )
+
+    sheet1_center = _chain_center(sheet1, chain_length, chain_index=0)
+    sheet2_center = _chain_center(sheet2, chain_length, chain_index=0)
+    dx = (
+        _packing_axis_midpoint(sheet1, "x")
+        - _packing_axis_midpoint(sheet2, "x")
+        + sheet_x_shift
+    )
+    dz = -sheet_dist if (core_residues == "o" and classes in [1, 3, 5]) else sheet_dist
+    sheet2 = _translate_peptide(
+        sheet2,
+        dx,
+        sheet1_center[1] + sheet_y_shift - sheet2_center[1],
+        sheet1_center[2] + dz - sheet2_center[2],
+    )
+    sheet2["anum"] = sheet2["anum"] + chains_per_sheet * anum_max
+    sheet2["resid"] = sheet2["resid"] + chains_per_sheet * resid_max
+
+    peptides = pd.concat([sheet1, sheet2], ignore_index=True)
+    peptides["anum"] = range(1, len(peptides) + 1)
+    _write_packed_peptides(peptides, chain_length, format_flag, o_filename)
+    return peptides
+
+
+def _normalize_two_component_pattern(pattern, name):
+    """Function:
+        Clean and validate an A/B sheet pattern.
+
+    Parameters
+    ----------
+    pattern : str
+        Sequence of A and B letters that defines strand order in one sheet.
+    name : str
+        Parameter name used in pattern-validation error messages.
+
+    Returns
+    -------
+    str
+        String containing only upper-case A and B characters.
+    """
+    pattern = str(pattern).upper().replace(" ", "")
+    if not pattern:
+        raise ValueError(f"{name} cannot be empty")
+    if any(letter not in ["A", "B"] for letter in pattern):
+        raise ValueError(f"{name} can only contain A and B")
+    return pattern
+
+
+def _write_packed_peptides_two_component(peptides, chain_length, format_flag,
+                                         o_filename):
+    """Function:
+        Write a packed two-component sheet and its A/B component labels to a PDB file.
+
+    Parameters
+    ----------
+    peptides : pandas.DataFrame
+        All packed peptide atom rows.
+    chain_length : int
+        Number of residue records assigned to one packed chain, including caps when
+        present.
+    format_flag : int
+        Selects the normal or AMBER-style PDB residue-name format.
+    o_filename : str or pathlib.Path
+        Output PDB file.
+
+    Returns
+    -------
+    None
+        Writes a two-component PDB file.
+    """
+    with open(o_filename, "w") as f:
+        last_resid = None
+        for _, row in peptides.iterrows():
+            resid = int(row["resid"])
+            aa_name = (
+                row["aa_name"][1:]
+                if format_flag == 1 and len(row["aa_name"]) == 4
+                else row["aa_name"]
+            )
+            component = row["component"] if "component" in row else "A"
+            if format_flag == 1 and last_resid is not None:
+                if (last_resid % chain_length == 0) and (resid % chain_length == 1):
+                    f.write("TER\n")
+            output = "ATOM{:7d}{:^6}{:4}{:1}{:4d}{:12.3f}{:8.3f}{:8.3f}\n".format(
+                int(row["anum"]),
+                row["atom_name"],
+                aa_name,
+                component,
+                resid,
+                float(row["x"]),
+                float(row["y"]),
+                float(row["z"]),
+            )
+            f.write(output)
+            last_resid = resid
+
+
+def _build_aligned_peptide_template(
+    sequence: str, angles: Sequence[float],
+    aligned_file: Union[str, Path], cap_flag: int,
+    max_cb_tilt_deg: Optional[float] = None
+) -> Tuple[int, pd.DataFrame]:
+    """Function:
+        Build, terminate, and align one peptide using an in-memory DataFrame.
+
+    Parameters
+    ----------
+    sequence : str
+        Peptide sequence using one-letter amino-acid codes.
+    angles : list or tuple [phi, psi] in degrees
+        Backbone angles for this template.
+    aligned_file : str or pathlib.Path
+        Persistent checking PDB for the aligned single strand.
+    cap_flag : int
+        0 uses uncapped termini and 1 or 2 selects a cap style.
+    max_cb_tilt_deg : float or None
+        Maximum allowed middle CA-CB tilt in degrees.
+
+    Returns
+    -------
+    tuple
+        Tuple (length, aligned_df), where length is int and aligned_df is
+        pandas.DataFrame.
+    """
+    peptide_df = build_single_peptide_with_local_peptidebuilder(sequence, angles)
+    if cap_flag == 0:
+        peptide_df = add_NH_remove_OH(peptide_df)
+        length = len(sequence)
+    elif cap_flag in [1, 2]:
+        peptide_df = add_caps(peptide_df, cap_flag)
+        length = len(sequence) + 2
+    else:
+        raise ValueError("Cannot determine caps or not. Stop")
+
+    aligned_df = alignment(
+        length, 1, peptide_df, aligned_file, order=1,
+        max_cb_tilt_deg=max_cb_tilt_deg
+    )
+    return length, aligned_df
+
+def _two_component_variants(single_peptite, chain_length, classes,
+                            registry_direction="minus"):
+    """Function:
+        Prepare the base, reversed, or face-flipped strand variants needed for one
+        component.
+
+    Parameters
+    ----------
+    single_peptite : pandas.DataFrame
+        One aligned peptide strand used as a packing template.
+    chain_length : int
+        Number of residue records assigned to one packed chain, including caps when
+        present.
+    classes : int
+        Steric-zipper class number from 1 to 10.
+    registry_direction : str
+        'minus' or 'plus' selects the y direction of a one-residue registry shift.
+
+    Returns
+    -------
+    dict
+        Dictionary mapping variant names to pandas.DataFrame strand templates.
+    """
+    variants = {"base": single_peptite.copy()}
+    if classes in [5, 6, 7, 8]:
+        anti_axis = "z" if classes in [5, 6] else "x"
+        anti_pep = rotation_coordinates(single_peptite, anti_axis, np.pi)
+        anti_pep = _align_strand_xy(anti_pep, single_peptite, same_direction=False)
+        if classes in [5, 6]:
+            register_offset = 1 if chain_length % 2 == 0 else 0
+        else:
+            register_offset = 1 if chain_length % 2 == 1 else 0
+        anti_pep = _register_antiparallel_ca_y(
+            anti_pep,
+            single_peptite,
+            residue_offset=register_offset,
+            direction=registry_direction,
+        )
+        center_delta = _packing_center(single_peptite) - _packing_center(anti_pep)
+        variants["anti"] = _translate_peptide(
+            anti_pep, center_delta[0], 0.0, center_delta[2]
+        )
+    if classes in [9, 10]:
+        face_pep = rotation_coordinates(single_peptite, "y", np.pi)
+        face_pep = _align_strand_xy(face_pep, single_peptite, same_direction=True)
+        face_delta = _packing_center(single_peptite) - _packing_center(face_pep)
+        face_pep = _translate_peptide(face_pep, face_delta[0], 0.0, face_delta[2])
+        variants["face"] = _register_parallel_ca_yz(
+            face_pep, single_peptite, residue_offset=1, direction=registry_direction
+        )
+    return variants
+
+
+def _make_two_component_sheet(pattern, component_variants, classes, strand_dist,
+                              anum_max, resid_max):
+    """Function:
+        Construct one sheet by placing peptide A or B according to an A/B pattern.
+
+    Parameters
+    ----------
+    pattern : str
+        Sequence of A and B letters that defines strand order in one sheet.
+    component_variants : dict
+        Maps component A/B and variant names to pandas.DataFrame strand templates.
+    classes : int
+        Steric-zipper class number from 1 to 10.
+    strand_dist : float
+        Neighboring-strand distance along x in Angstrom.
+    anum_max : int
+        Atom-number offset reserved for each added chain.
+    resid_max : int
+        Residue-number offset reserved for each added chain.
+
+    Returns
+    -------
+    pandas.DataFrame
+        Atom table containing one two-component sheet.
+    """
+    sheet_parts = []
+    for chain, component in enumerate(pattern):
+        variants = component_variants[component]
+        if classes in [5, 6, 7, 8] and chain % 2 == 1:
+            new_peptide = variants["anti"].copy()
+        elif classes in [9, 10] and chain % 2 == 1:
+            new_peptide = variants["face"].copy()
+        else:
+            new_peptide = variants["base"].copy()
+        new_peptide["component"] = component
+        new_peptide["x"] = new_peptide["x"] + chain * strand_dist
+        new_peptide["anum"] = new_peptide["anum"] + chain * anum_max
+        new_peptide["resid"] = new_peptide["resid"] + chain * resid_max
+        sheet_parts.append(new_peptide)
+    return pd.concat(sheet_parts, ignore_index=True)
+
+
+def packpep_geometric_two_component(single_pep_A, single_pep_B, chain_length, classes,
+                                    shifts, sheet1_pattern, sheet2_pattern, format_flag,
+                                    o_filename, core_residues="e", strand_dist=4.8,
+                                    sheet_dist=11.5, sheet_shift=0.0,
+                                    registry_direction="minus"):
+    """Function:
+        Pack peptide A and peptide B into two uniform parallel or antiparallel sheets
+        using two A/B patterns.
+
+    Parameters
+    ----------
+    single_pep_A : pandas.DataFrame
+        Aligned peptide-A strand template.
+    single_pep_B : pandas.DataFrame
+        Aligned peptide-B strand template.
+    chain_length : int
+        Number of residue records assigned to one packed chain, including caps when
+        present.
+    classes : int
+        Steric-zipper class number from 1 to 10.
+    shifts : int or float
+        Move sheet 2 along y by this number of residue spacings.
+    sheet1_pattern : str
+        A/B strand pattern for sheet 1.
+    sheet2_pattern : str
+        A/B strand pattern for sheet 2.
+    format_flag : int
+        Selects the normal or AMBER-style PDB residue-name format.
+    o_filename : str or pathlib.Path
+        Output PDB file.
+    core_residues : str
+        'e' packs even-numbered residues inside and 'o' packs odd-numbered residues
+        inside.
+    strand_dist : float
+        Neighboring-strand distance along x in Angstrom.
+    sheet_dist : float
+        Sheet-to-sheet distance along z in Angstrom.
+    sheet_shift : float
+        Move sheet 2 along x in units of half the strand distance.
+    registry_direction : str
+        'minus' or 'plus' selects the y direction of a one-residue registry shift.
+
+    Returns
+    -------
+    pandas.DataFrame containing both packed two-component sheets
+        Also writes o_filename.
+    """
+    class_axis = {
+        1: "x",
+        2: "none",
+        3: "y",
+        4: "z",
+        5: "x",
+        6: "none",
+        7: "none",
+        8: "z",
+        9: "none",
+        10: "x",
+    }
+    if classes not in class_axis:
+        raise ValueError("classes must be an integer from 1 to 10")
+    sheet1_pattern = _normalize_two_component_pattern(sheet1_pattern, "sheet1_pattern")
+    sheet2_pattern = _normalize_two_component_pattern(sheet2_pattern, "sheet2_pattern")
+    if len(sheet1_pattern) != len(sheet2_pattern):
+        raise ValueError("sheet1_pattern and sheet2_pattern must have the same length")
+    if len(_ca_trace(single_pep_A)) != len(_ca_trace(single_pep_B)):
+        raise ValueError("Peptide A and peptide B must have the same residue length")
+    if registry_direction not in ["minus", "plus"]:
+        raise ValueError("registry_direction must be 'minus' or 'plus'")
+
+    single_pep_B = _register_parallel_ca_yz(
+        single_pep_B, single_pep_A, residue_offset=0
+    )
+    anum_max = max(int(single_pep_A["anum"].max()), int(single_pep_B["anum"].max()))
+    resid_max = max(int(single_pep_A["resid"].max()), int(single_pep_B["resid"].max()))
+    component_variants = {
+        "A": _two_component_variants(
+            single_pep_A, chain_length, classes, registry_direction
+        ),
+        "B": _two_component_variants(
+            single_pep_B, chain_length, classes, registry_direction
+        ),
+    }
+
+    sheet1 = _make_two_component_sheet(
+        sheet1_pattern, component_variants, classes, strand_dist, anum_max, resid_max
+    )
+    sheet2 = _make_two_component_sheet(
+        sheet2_pattern, component_variants, classes, strand_dist, anum_max, resid_max
+    )
+    if class_axis[classes] != "none":
+        sheet2 = rotation_coordinates(sheet2, class_axis[classes], np.pi)
+    sheet2 = _align_strand_xy(
+        sheet2, sheet1, same_direction=None, chain_length=chain_length
+    )
+
+    residue_spacing = _estimate_residue_spacing(single_pep_A)
+    sheet_y_shift = float(shifts) * residue_spacing
+    sheet_x_shift = float(sheet_shift) * float(strand_dist) * 0.5
+    sheet1_center = _chain_center(sheet1, chain_length, chain_index=0)
+    sheet2_center = _chain_center(sheet2, chain_length, chain_index=0)
+    dx = (
+        _packing_axis_midpoint(sheet1, "x")
+        - _packing_axis_midpoint(sheet2, "x")
+        + sheet_x_shift
+    )
+    dz = -sheet_dist if (core_residues == "o" and classes in [1, 3, 5]) else sheet_dist
+    sheet2 = _translate_peptide(
+        sheet2,
+        dx,
+        sheet1_center[1] + sheet_y_shift - sheet2_center[1],
+        sheet1_center[2] + dz - sheet2_center[2],
+    )
+    sheet2["anum"] = sheet2["anum"] + len(sheet1_pattern) * anum_max
+    sheet2["resid"] = sheet2["resid"] + len(sheet1_pattern) * resid_max
+
+    peptides = pd.concat([sheet1, sheet2], ignore_index=True)
+    peptides["anum"] = range(1, len(peptides) + 1)
+    _write_packed_peptides_two_component(
+        peptides, chain_length, format_flag, o_filename
+    )
+    return peptides
+
+
+def _make_two_component_hybrid_sheet(pattern, component_templates, strand_dist,
+                                     anum_max, resid_max, alternate=False):
+    """Function:
+        Construct one hybrid sheet from A/B component templates and an A/B pattern.
+
+    Parameters
+    ----------
+    pattern : str
+        Sequence of A and B letters that defines strand order in one sheet.
+    component_templates : dict
+        Maps component A/B and template roles to pandas.DataFrame strands.
+    strand_dist : float
+        Neighboring-strand distance along x in Angstrom.
+    anum_max : int
+        Atom-number offset reserved for each added chain.
+    resid_max : int
+        Residue-number offset reserved for each added chain.
+    alternate : bool
+        When True, alternating chains use the secondary template.
+
+    Returns
+    -------
+    pandas.DataFrame
+        Atom table containing one hybrid component sheet.
+    """
+    sheet_parts = []
+    for chain, component in enumerate(pattern):
+        template_name = "secondary" if alternate and chain % 2 == 1 else "primary"
+        new_peptide = component_templates[component][template_name].copy()
+        new_peptide["component"] = component
+        new_peptide["x"] = new_peptide["x"] + chain * strand_dist
+        new_peptide["anum"] = new_peptide["anum"] + chain * anum_max
+        new_peptide["resid"] = new_peptide["resid"] + chain * resid_max
+        sheet_parts.append(new_peptide)
+    return pd.concat(sheet_parts, ignore_index=True)
+
+
+def packpep_parallel_antiparallel_two_component(single_para_A, single_para_B,
+                                                single_anti_A, single_anti_B,
+                                                chain_length, hybrid_type, shifts,
+                                                sheet1_pattern, sheet2_pattern,
+                                                format_flag, o_filename,
+                                                core_residues="e", strand_dist=4.8,
+                                                sheet_dist=11.5, sheet_shift=0.0,
+                                                registry_direction="minus"):
+    """Function:
+        Pack two peptide components into one parallel sheet and one antiparallel sheet.
+
+    Parameters
+    ----------
+    single_para_A : pandas.DataFrame
+        Peptide-A template built with parallel angles.
+    single_para_B : pandas.DataFrame
+        Peptide-B template built with parallel angles.
+    single_anti_A : pandas.DataFrame
+        Peptide-A template built with antiparallel angles.
+    single_anti_B : pandas.DataFrame
+        Peptide-B template built with antiparallel angles.
+    chain_length : int
+        Number of residue records assigned to one packed chain, including caps when
+        present.
+    hybrid_type : int or None
+        Hybrid packing type from 1 to 6, or None for a uniform sheet.
+    shifts : int or float
+        Move sheet 2 along y by this number of residue spacings.
+    sheet1_pattern : str
+        A/B strand pattern for sheet 1.
+    sheet2_pattern : str
+        A/B strand pattern for sheet 2.
+    format_flag : int
+        Selects the normal or AMBER-style PDB residue-name format.
+    o_filename : str or pathlib.Path
+        Output PDB file.
+    core_residues : str
+        'e' packs even-numbered residues inside and 'o' packs odd-numbered residues
+        inside.
+    strand_dist : float
+        Neighboring-strand distance along x in Angstrom.
+    sheet_dist : float
+        Sheet-to-sheet distance along z in Angstrom.
+    sheet_shift : float
+        Move sheet 2 along x in units of half the strand distance.
+    registry_direction : str
+        'minus' or 'plus' selects the y direction of a one-residue registry shift.
+
+    Returns
+    -------
+    pandas.DataFrame containing the packed two-component hybrid
+        Also writes o_filename.
+    """
+    if hybrid_type not in [1, 2, 3, 4, 5, 6]:
+        raise ValueError("hybrid_type must be an integer from 1 to 6")
+    sheet1_pattern = _normalize_two_component_pattern(sheet1_pattern, "sheet1_pattern")
+    sheet2_pattern = _normalize_two_component_pattern(sheet2_pattern, "sheet2_pattern")
+    if len(sheet1_pattern) != len(sheet2_pattern):
+        raise ValueError("sheet1_pattern and sheet2_pattern must have the same length")
+    if registry_direction not in ["minus", "plus"]:
+        raise ValueError("registry_direction must be 'minus' or 'plus'")
+
+    templates = [single_para_A, single_para_B, single_anti_A, single_anti_B]
+    ca_counts = [len(_ca_trace(template)) for template in templates]
+    if len(set(ca_counts)) != 1:
+        raise ValueError(
+            "All two-component hybrid templates must have the same residue length"
+        )
+
+    single_para_B = _register_parallel_ca_yz(
+        single_para_B, single_para_A, residue_offset=0
+    )
+    single_anti_B = _register_parallel_ca_yz(
+        single_anti_B, single_anti_A, residue_offset=0
+    )
+    anum_max = max(int(template["anum"].max()) for template in templates)
+    resid_max = max(int(template["resid"].max()) for template in templates)
+    residue_spacing = _estimate_residue_spacing(single_para_A)
+    sheet_y_shift = float(shifts) * residue_spacing
+    sheet_x_shift = float(sheet_shift) * float(strand_dist) * 0.5
+
+    sheet1_templates = {
+        1: (False, False),
+        2: (False, False),
+        3: (False, False),
+        4: (False, True),
+        5: (True, False),
+        6: (True, True),
+    }
+    sheet1_face_flipped, sheet1_direction_reversed = sheet1_templates[hybrid_type]
+    sheet1_component_templates = {}
+    for component, template in [("A", single_para_A), ("B", single_para_B)]:
+        primary = _make_hybrid_strand_template(
+            template,
+            face_flipped=sheet1_face_flipped,
+            direction_reversed=sheet1_direction_reversed,
+        )
+        sheet1_component_templates[component] = {
+            "primary": primary,
+            "secondary": primary.copy(),
+        }
+
+    sheet2_component_templates = {}
+    for component, template in [("A", single_anti_A), ("B", single_anti_B)]:
+        if hybrid_type == 1:
+            primary = _make_hybrid_strand_template(
+                template, face_flipped=True, direction_reversed=False
+            )
+        elif hybrid_type == 2:
+            primary = template.copy()
+        else:
+            primary = _make_hybrid_strand_template(
+                template, face_flipped=True, direction_reversed=False
+            )
+        if hybrid_type in [1, 2]:
+            secondary = _class56_antiparallel_neighbor(
+                primary, chain_length, registry_direction=registry_direction
+            )
+        else:
+            secondary = _class78_antiparallel_neighbor(
+                primary, chain_length, registry_direction=registry_direction
+            )
+        sheet2_component_templates[component] = {
+            "primary": primary,
+            "secondary": secondary,
+        }
+
+    sheet1 = _make_two_component_hybrid_sheet(
+        sheet1_pattern,
+        sheet1_component_templates,
+        strand_dist,
+        anum_max,
+        resid_max,
+        alternate=False,
+    )
+    sheet2 = _make_two_component_hybrid_sheet(
+        sheet2_pattern,
+        sheet2_component_templates,
+        strand_dist,
+        anum_max,
+        resid_max,
+        alternate=True,
+    )
+
+    sheet1_center = _chain_center(sheet1, chain_length, chain_index=0)
+    sheet2_center = _chain_center(sheet2, chain_length, chain_index=0)
+    dx = (
+        _packing_axis_midpoint(sheet1, "x")
+        - _packing_axis_midpoint(sheet2, "x")
+        + sheet_x_shift
+    )
+    dz = -sheet_dist if core_residues == "o" else sheet_dist
+    sheet2 = _translate_peptide(
+        sheet2,
+        dx,
+        sheet1_center[1] + sheet_y_shift - sheet2_center[1],
+        sheet1_center[2] + dz - sheet2_center[2],
+    )
+    sheet2["anum"] = sheet2["anum"] + len(sheet1_pattern) * anum_max
+    sheet2["resid"] = sheet2["resid"] + len(sheet1_pattern) * resid_max
+
+    peptides = pd.concat([sheet1, sheet2], ignore_index=True)
+    peptides["anum"] = range(1, len(peptides) + 1)
+    _write_packed_peptides_two_component(
+        peptides, chain_length, format_flag, o_filename
+    )
+    return peptides
+
+
+def _register_parallel_ca_y(moving_df, target_df):
+    """Function:
+        Translate one parallel strand along y so its CA positions match a target strand.
+
+    Parameters
+    ----------
+    moving_df : pandas.DataFrame
+        Strand or sheet coordinates that will be moved.
+    target_df : pandas.DataFrame
+        Fixed reference strand or sheet coordinates.
+
+    Returns
+    -------
+    pandas.DataFrame
+        Peptide atom table translated to match the target CA y positions.
+    """
+    moving_y = _ca_trace(moving_df)["y"].to_numpy(dtype=np.float64)
+    target_y = _ca_trace(target_df)["y"].to_numpy(dtype=np.float64)
+    n = min(len(moving_y), len(target_y))
+    if n == 0:
+        return moving_df
+    return _translate_peptide(moving_df, dy=float(np.mean(target_y[:n] - moving_y[:n])))
+
+
+def _class56_antiparallel_neighbor(single_peptite, chain_length,
+                                   registry_direction="minus"):
+    """Function:
+        Create the neighboring antiparallel strand and registry required for Class 5 or 6.
+
+    Parameters
+    ----------
+    single_peptite : pandas.DataFrame
+        One aligned peptide strand used as a packing template.
+    chain_length : int
+        Number of residue records assigned to one packed chain, including caps when
+        present.
+    registry_direction : str
+        'minus' or 'plus' selects the y direction of a one-residue registry shift.
+
+    Returns
+    -------
+    pandas.DataFrame
+        Atom table containing the Class 5/6 neighboring strand.
+    """
+    anti_pep = rotation_coordinates(single_peptite, "z", np.pi)
+    anti_pep = _align_strand_xy(anti_pep, single_peptite, same_direction=False)
+    register_offset = 1 if chain_length % 2 == 0 else 0
+    anti_pep = _register_antiparallel_ca_y(
+        anti_pep,
+        single_peptite,
+        residue_offset=register_offset,
+        direction=registry_direction,
+    )
+    center_delta = _packing_center(single_peptite) - _packing_center(anti_pep)
+    return _translate_peptide(anti_pep, center_delta[0], 0.0, center_delta[2])
+
+
+def _class78_antiparallel_neighbor(single_peptite, chain_length,
+                                   registry_direction="minus"):
+    """Function:
+        Create the neighboring antiparallel strand and registry required for Class 7 or
+        8.
+
+    Parameters
+    ----------
+    single_peptite : pandas.DataFrame
+        One aligned peptide strand used as a packing template.
+    chain_length : int
+        Number of residue records assigned to one packed chain, including caps when
+        present.
+    registry_direction : str
+        'minus' or 'plus' selects the y direction of a one-residue registry shift.
+
+    Returns
+    -------
+    pandas.DataFrame
+        Atom table containing the Class 7/8 neighboring strand.
+    """
+    anti_pep = rotation_coordinates(single_peptite, "x", np.pi)
+    anti_pep = _align_strand_xy(anti_pep, single_peptite, same_direction=False)
+    register_offset = 1 if chain_length % 2 == 1 else 0
+    anti_pep = _register_antiparallel_ca_y(
+        anti_pep,
+        single_peptite,
+        residue_offset=register_offset,
+        direction=registry_direction,
+    )
+    center_delta = _packing_center(single_peptite) - _packing_center(anti_pep)
+    return _translate_peptide(anti_pep, center_delta[0], 0.0, center_delta[2])
+
+
+def _make_hybrid_strand_template(single_peptite, face_flipped=False,
+                                 direction_reversed=False):
+    """Function:
+        Flip the face or reverse the direction of one strand template for hybrid
+        packing.
+
+    Parameters
+    ----------
+    single_peptite : pandas.DataFrame
+        One aligned peptide strand used as a packing template.
+    face_flipped : bool
+        When True, turn the side-chain face to the opposite side.
+    direction_reversed : bool
+        When True, reverse the strand N-to-C direction.
+
+    Returns
+    -------
+    pandas.DataFrame
+        Atom table containing the transformed strand template.
+    """
+    if face_flipped and direction_reversed:
+        template = rotation_coordinates(single_peptite, "x", np.pi)
+    elif face_flipped:
+        template = rotation_coordinates(single_peptite, "y", np.pi)
+    elif direction_reversed:
+        template = rotation_coordinates(single_peptite, "z", np.pi)
+    else:
+        return single_peptite.copy()
+
+    template = _align_strand_xy(
+        template, single_peptite, same_direction=not direction_reversed
+    )
+    if direction_reversed:
+        template = _register_antiparallel_ca_y(template, single_peptite)
+    else:
+        template = _register_parallel_ca_y(template, single_peptite)
+    center_delta = _packing_center(single_peptite) - _packing_center(template)
+    return _translate_peptide(template, center_delta[0], 0.0, center_delta[2])
+
+
+def _make_sheet_from_templates(primary_pep, secondary_pep, chains_per_sheet,
+                               strand_dist, anum_max, resid_max):
+    """Function:
+        Build one sheet by alternating primary and secondary strand templates along x.
+
+    Parameters
+    ----------
+    primary_pep : pandas.DataFrame
+        Primary strand template.
+    secondary_pep : pandas.DataFrame
+        Secondary strand template used on alternating chains.
+    chains_per_sheet : int
+        Number of peptide strands placed in each sheet.
+    strand_dist : float
+        Neighboring-strand distance along x in Angstrom.
+    anum_max : int
+        Atom-number offset reserved for each added chain.
+    resid_max : int
+        Residue-number offset reserved for each added chain.
+
+    Returns
+    -------
+    pandas.DataFrame
+        Atom table containing one packed sheet.
+    """
+    sheet_parts = []
     for chain in range(chains_per_sheet):
-        new_peptide = temp_pep.copy()
-        new_peptide['x'] = new_peptide['x'] + chain * strand_dist
-        new_peptide['anum'] = new_peptide['anum'] + chain * anum_max
-        new_peptide['resid'] = new_peptide['resid'] + chain * resid_max
-        peptides = pd.concat([peptides, new_peptide])
+        new_peptide = primary_pep.copy() if chain % 2 == 0 else secondary_pep.copy()
+        new_peptide["x"] = new_peptide["x"] + chain * strand_dist
+        new_peptide["anum"] = new_peptide["anum"] + chain * anum_max
+        new_peptide["resid"] = new_peptide["resid"] + chain * resid_max
+        sheet_parts.append(new_peptide)
+    return pd.concat(sheet_parts, ignore_index=True)
 
 
+def packpep_parallel_antiparallel(single_pep_para, single_pep_anti=None,
+                                  chain_length=None, hybrid_type=None, shifts=None,
+                                  chains_per_sheet=None, format_flag=None,
+                                  o_filename=None, core_residues="e", strand_dist=4.8,
+                                  sheet_dist=11.5, sheet_shift=0.0,
+                                  registry_direction="minus"):
+    """Function:
+        Pack one parallel-angle template and one antiparallel-angle template into a
+        hybrid two-sheet structure.
 
-    if format_flag == 0:
-        last_resid = 1
-        with open(o_filename, 'w') as f:
-            for index, row in peptides.iterrows():
-                resid = int(row['resid'])
-                if len(row['aa_name'])==4:
-                    output= "ATOM{:7d}{:^6}{:4}{:5d}{:12.3f}{:8.3f}{:8.3f}\n".format(
-                        row['anum'],row['atom_name'],row['aa_name'],row['resid'],
-                        row['x'],row['y'],row['z'])
-                else:
-                    output= "ATOM{:7d}{:^6}{:4}{:5d}{:12.3f}{:8.3f}{:8.3f}\n".format(
-                        row['anum'],row['atom_name'],row['aa_name'],row['resid'],
-                        row['x'],row['y'],row['z'])
-    
-                f.write(output)
-                last_resid = resid
-    
-    elif format_flag == 1:
-        last_resid = 1
-        with open(o_filename, 'w') as f:
-            for index, row in peptides.iterrows():
-                resid = int(row['resid'])
-                
-                if len(row['aa_name'])==4:
-                    output= "ATOM{:7d}{:^6}{:4}{:5d}{:12.3f}{:8.3f}{:8.3f}\n".format(
-                        row['anum'],row['atom_name'],row['aa_name'][1:],row['resid'],
-                        row['x'],row['y'],row['z'])
-                else:
-                    output= "ATOM{:7d}{:^6}{:4}{:5d}{:12.3f}{:8.3f}{:8.3f}\n".format(
-                        row['anum'],row['atom_name'],row['aa_name'],row['resid'],
-                        row['x'],row['y'],row['z'])
-    
-                if (last_resid % chain_length == 0) & (resid % chain_length ==1):
-                     f.write('TER\n')
-                        
-                f.write(output)
-                last_resid = resid
-            
-def packpep_antiparallel(single_peptite, chain_length, classes, shifts, chains_per_sheet, 
-                         format_flag, o_filename, core_residues="e", strand_dist = 4.8, sheet_dist = 11.5, sheet_shift = 0):
-    # strand_dist = 4.8
-    # sheet_dist = 11.5
-    # sheet_shift = 2.4
-    
-    if (classes == 5):
-        class_axis = "x"
-        if (core_residues == "e"):
-        # sheet cross sectional view
+    Parameters
+    ----------
+    single_pep_para : pandas.DataFrame
+        Peptide template built with parallel beta-strand angles.
+    single_pep_anti : pandas.DataFrame
+        Peptide template built with antiparallel beta-strand angles.
+    chain_length : int
+        Number of residue records assigned to one packed chain, including caps when
+        present.
+    hybrid_type : int or None
+        Hybrid packing type from 1 to 6, or None for a uniform sheet.
+    shifts : int or float
+        Move sheet 2 along y by this number of residue spacings.
+    chains_per_sheet : int
+        Number of peptide strands placed in each sheet.
+    format_flag : int
+        Selects the normal or AMBER-style PDB residue-name format.
+    o_filename : str or pathlib.Path
+        Output PDB file.
+    core_residues : str
+        'e' packs even-numbered residues inside and 'o' packs odd-numbered residues
+        inside.
+    strand_dist : float
+        Neighboring-strand distance along x in Angstrom.
+    sheet_dist : float
+        Sheet-to-sheet distance along z in Angstrom.
+    sheet_shift : float
+        Move sheet 2 along x in units of half the strand distance.
+    registry_direction : str
+        'minus' or 'plus' selects the y direction of a one-residue registry shift.
 
-        ###### shifts = 0 ########                   ###### shifts = 1 ########                         
-        # Z                                          # z                                     
-        # |              1 3 5 7                     # |                1 3 5 7                      
-        # |     7 5 3 1 N--------C                   # |       7 5 3 1 N--------C                    
-        # |   C--------N  2 4 6 8     (SHEET 2)      # |     C--------N  2 4 6 8   (SHEET 2)         
-        # |    8 6 4 2    8 6 4 2                    # |      8 6 4 2   8 6 4 2                      
-        # |    2 4 6 8   C--------N                  # |     2 4 6 8   C--------N                    
-        # |  N--------C    7 5 3 1    (SHEET 1)      # |   N--------C    7 5 3 1   (SHEET 1)         
-        # |   1 3 5 7                                # |    1 3 5 7                  
-        # ---------------------------> y             # ----------------------------> y                        
-  
-        ###### shifts = -1 ########                            
-        # Z                                                        
-        # |            1 3 5 7                                   
-        # |   7 5 3 1 N--------C                          
-        # | C--------N  2 4 6 8       (SHEET 2)               
-        # |  8 6 4 2   8 6 4 2                                      
-        # |   2 4 6 8 C--------N                                 
-        # | N--------C  7 5 3 1       (SHEET 1)            
-        # |  1 3 5 7                                              
-        # ---------------------------> y 
-    
-            if (chain_length%2 == 0):
-                x_adjust = 0 + sheet_shift
-                y_adjust = 3.3 + shifts * 3.461
-                z_adjust = 0
-                tx_adjust = np.pi*(0/180)
-                ty_adjust = np.pi*(0/180)
-                tz_adjust = np.pi*(0/180)
-            
-            elif (chain_length%2 == 1):
-                x_adjust = 0 + sheet_shift
-                y_adjust = 0 + shifts * 3.461
-                z_adjust = 0
-                tx_adjust = np.pi*(0/180)
-                ty_adjust = np.pi*(0/180)
-                tz_adjust = np.pi*(0/180)                   
-                
-        if (core_residues == "o"):
-            sheet_dist = -sheet_dist
-        # sheet cross sectional view
+    Returns
+    -------
+    pandas.DataFrame containing the packed hybrid sheets
+        Also writes o_filename.
+    """
+    if not isinstance(single_pep_anti, pd.DataFrame):
+        old_chain_length = single_pep_anti
+        old_hybrid_type = chain_length
+        old_shifts = hybrid_type
+        old_chains_per_sheet = shifts
+        old_format_flag = chains_per_sheet
+        old_o_filename = format_flag
+        old_core_residues = o_filename
+        single_pep_anti = single_pep_para
+        chain_length = old_chain_length
+        hybrid_type = old_hybrid_type
+        shifts = old_shifts
+        chains_per_sheet = old_chains_per_sheet
+        format_flag = old_format_flag
+        o_filename = old_o_filename
+        if old_core_residues is not None:
+            core_residues = old_core_residues
 
-        ###### shifts = 0 ########                   ###### shifts = 1 ########                         
-        # Z                                          # z                                      
-        # |               2 4 6 8                    # |                 2 4 6 8                      
-        # |    8 6 4 2  N--------C                   # |      8 6 4 2  N--------C                    
-        # |   C--------N 1 3 5 7      (SHEET 1)      # |     C--------N 1 3 5 7     (SHEET 1)         
-        # |     7 5 3 1   7 5 3 1                    # |       7 5 3 1    7 5 3 1                     
-        # |   1 3 5 7   C--------N                   # |    1 3 5 7    C--------N                    
-        # |  N--------C  8 6 4 2      (SHEET 2)      # |   N--------C   8 6 4 2     (SHEET 2)         
-        # |    2 4 6 8                               # |     2 4 6 8                  
-        # ---------------------------> y             # ----------------------------> y                        
-  
-        ###### shifts = -1 ########                                           
-        # Z                                                                               
-        # |              2 4 6 8                                        
-        # |   8 6 4 2  N--------C                                     
-        # |  C--------N 1 3 5 7      (SHEET 1)            
-        # |    7 5 3 1   7 5 3 1                                   
-        # |   1 3 5 7  C--------N                         
-        # |  N--------C 8 6 4 2      (SHEET 2)        
-        # |    2 4 6 8                                               
-        # ---------------------------> y  
-    
-            if (chain_length%2 == 0):
-                x_adjust = 0 + sheet_shift
-                y_adjust = 3.3 + shifts * 3.461
-                z_adjust = 0
-                tx_adjust = np.pi*(0/180)
-                ty_adjust = np.pi*(0/180)
-                tz_adjust = np.pi*(0/180)
+    if hybrid_type not in [1, 2, 3, 4, 5, 6]:
+        raise ValueError("hybrid_type must be an integer from 1 to 6")
+    if registry_direction not in ["minus", "plus"]:
+        raise ValueError("registry_direction must be 'minus' or 'plus'")
+    if len(_ca_trace(single_pep_para)) != len(_ca_trace(single_pep_anti)):
+        raise ValueError(
+            "Parallel and antiparallel templates must have the same number of residues"
+        )
 
-            elif (chain_length%2 == 1):
-                x_adjust = 0 + sheet_shift
-                y_adjust = shifts * 3.461
-                z_adjust = 0
-                tx_adjust = np.pi*(0/180)
-                ty_adjust = np.pi*(0/180)
-                tz_adjust = np.pi*(0/180)
-        
-    ###### set parameter ###############
-        sheets=2
-        anum_max = single_peptite['anum'].max()
-        resid_max = single_peptite['resid'].max()
+    anum_max = max(
+        int(single_pep_para["anum"].max()), int(single_pep_anti["anum"].max())
+    )
+    resid_max = max(
+        int(single_pep_para["resid"].max()), int(single_pep_anti["resid"].max())
+    )
+    residue_spacing = _estimate_residue_spacing(single_pep_para)
+    sheet_y_shift = float(shifts) * residue_spacing
+    sheet_x_shift = float(sheet_shift) * float(strand_dist) * 0.5
 
-        anti_pep = single_peptite.copy()                     # construct antiparallel peptide in same sheet
-        theta = np.pi*(180/360)                                       
-        anti_pep = rotation_coordinates(anti_pep, "z", theta)
+    sheet1_templates = {
+        1: (False, False),
+        2: (False, False),
+        3: (False, False),
+        4: (False, True),
+        5: (True, False),
+        6: (True, True),
+    }
+    sheet1_face_flipped, sheet1_direction_reversed = sheet1_templates[hybrid_type]
+    sheet1_primary = _make_hybrid_strand_template(
+        single_pep_para,
+        face_flipped=sheet1_face_flipped,
+        direction_reversed=sheet1_direction_reversed,
+    )
+    sheet1_secondary = sheet1_primary.copy()
+    sheet1 = _make_sheet_from_templates(
+        sheet1_primary,
+        sheet1_secondary,
+        chains_per_sheet,
+        strand_dist,
+        anum_max,
+        resid_max,
+    )
 
-    ############################# align anti-peptide to single-pep ###############
-        filtered_df = anti_pep[(anti_pep['atom_name'].isin(['CA']))]
-        points = filtered_df[['x', 'y', 'z']].to_numpy()
-        m,n,p = linear_fitting(points)
-        anti_pep_vector = np.array([m, n, p])
-        if (anti_pep_vector[1] > 0):  # If y-component is positive, flip direction
-            anti_pep_vector = -anti_pep_vector
-
-        filtered_df = single_peptite[(single_peptite['atom_name'].isin(['CA']))]
-        points = filtered_df[['x', 'y', 'z']].to_numpy()
-        m,n,p = linear_fitting(points)
-        singple_pep_vector = np.array([m, n, p])
-        if (singple_pep_vector[1] > 0):  # If y-component is positive, flip direction
-            singple_pep_vector = -singple_pep_vector
-
-        v1=[anti_pep_vector[0],anti_pep_vector[1]]
-        v2=[singple_pep_vector[0],singple_pep_vector[1]]
-        tz = rotation_angle(v1,v2) # rotation from v1 to v2
-        anti_pep = rotation_coordinates(anti_pep, 'z', tz)
-        
-        first_resid = single_peptite[single_peptite['atom_name'] == 'CA']['resid'].min()
-        ca1_y = single_peptite[(single_peptite['atom_name'] == 'CA') & (single_peptite['resid'] == first_resid)].iloc[0]['y']
-        last_resid = anti_pep[anti_pep['atom_name'] == 'CA']['resid'].max()
-        ca2_y = anti_pep[(anti_pep['atom_name'] == 'CA') & (anti_pep['resid'] == last_resid)].iloc[0]['y']
-
-        
-        
-        anti_pep_adjust = ca1_y - ca2_y 
-        print(first_resid, last_resid, "ca1_y", ca1_y, "ca2_y",ca2_y, anti_pep_adjust)    
-        if (chain_length%2 == 0):
-            anti_pep_adjust += 3.461
-    ################### anti_pep adjustment ###############  
-        anti_pep['y']   = anti_pep['y'] + anti_pep_adjust
-        
-    ###### pack first sheet ##################
-        peptides = pd.DataFrame([]) # empty dataframe
-        for chain in range(chains_per_sheet):
-            if (chain % 2 == 0):
-                new_peptide = single_peptite.copy()
-            elif (chain % 2 == 1):
-                new_peptide = anti_pep.copy()
-
-            new_peptide['x']     = new_peptide['x']     + chain * strand_dist
-            new_peptide['anum']  = new_peptide['anum']  + chain * anum_max
-            new_peptide['resid'] = new_peptide['resid'] + chain * resid_max
-            peptides = pd.concat([peptides, new_peptide])
-            
-    ###### build peptide for second sheet
-        temp_sheet = peptides.copy()                                            # copy a original peptide
-        temp_sheet['anum']  = temp_sheet['anum'] + chains_per_sheet * anum_max                        # shift atom number 
-        temp_sheet['resid'] = temp_sheet['resid'] + chains_per_sheet * resid_max   # shift residue number
-        theta = -np.pi                                                         # build pep for 2nd sheet
-        temp_sheet = rotation_coordinates(temp_sheet, "x", theta)
-
-        temp_sheet['z'] = temp_sheet['z'] + sheet_dist
-        temp_sheet['x'] = temp_sheet['x'] + x_adjust
-        temp_sheet['y'] = temp_sheet['y'] + y_adjust
-        temp_sheet['z'] = temp_sheet['z'] + z_adjust
-        temp_sheet = rotation_coordinates(temp_sheet,'x',tx_adjust)
-        temp_sheet = rotation_coordinates(temp_sheet,'y',ty_adjust)
-        temp_sheet = rotation_coordinates(temp_sheet,'z',tz_adjust)
-        
-    ###### pack second sheet ####################
-        peptides = pd.concat([peptides, temp_sheet])
-
-        
-    elif (classes == 6):
-        class_axis = "none"
-
-        # sheet cross sectional view
-
-        ###### shifts = 0 ########                   ###### shifts = 1 ########                         
-        # Z                                          # z                                     
-        # |              8 6 4 2                     # |                8 6 4 2                      
-        # |     2 4 6 8 C--------N                   # |       2 4 6 8 C--------N                    
-        # |   N--------C  7 5 3 1     (SHEET 2)      # |     N--------C  7 5 3 1   (SHEET 2)         
-        # |    1 3 5 7    8 6 4 2                    # |      1 3 5 7   8 6 4 2                      
-        # |    2 4 6 8   C--------N                  # |     2 4 6 8   C--------N                    
-        # |  N--------C    7 5 3 1    (SHEET 1)      # |   N--------C    7 5 3 1   (SHEET 1)         
-        # |   1 3 5 7                                # |    1 3 5 7                  
-        # ---------------------------> y             # ----------------------------> y                        
-  
-        ###### shifts = -1 ########                            
-        # Z                                                        
-        # |            8 6 4 2                                   
-        # |   2 4 6 8 C--------N                          
-        # | N--------C  7 5 3 1       (SHEET 2)               
-        # |  1 3 5 7   8 6 4 2                                      
-        # |   2 4 6 8 C--------N                                 
-        # | N--------C  7 5 3 1       (SHEET 1)            
-        # |  1 3 5 7                                              
-        # ---------------------------> y 
-    
-        if (chain_length%2 == 0):
-            x_adjust = 0 + sheet_shift
-            y_adjust = 3.461 + shifts * 3.461
-            z_adjust = 0
-            tx_adjust = np.pi*(0/180)
-            ty_adjust = np.pi*(0/180)
-            tz_adjust = np.pi*(0/180)
-            
-        elif (chain_length%2 == 1):
-            x_adjust = 0 + sheet_shift
-            y_adjust = 3.461 + shifts * 3.461
-            z_adjust = 0
-            tx_adjust = np.pi*(0/180)
-            ty_adjust = np.pi*(0/180)
-            tz_adjust = np.pi*(0/180)                
-            
-    ###### set parameter ###############
-        sheets=2
-        anum_max = single_peptite['anum'].max()
-        resid_max = single_peptite['resid'].max()
-
-        anti_pep = single_peptite.copy()                     # construct antiparallel peptide in same sheet
-        theta = np.pi                               
-        anti_pep = rotation_coordinates(anti_pep, "z", theta)
-
-    ############################# align anti-peptide to single-pep ###############
-        filtered_df = anti_pep[(anti_pep['atom_name'].isin(['CA']))]
-        points = filtered_df[['x', 'y', 'z']].to_numpy()
-        m,n,p = linear_fitting(points)
-        anti_pep_vector = np.array([m, n, p])
-        if (anti_pep_vector[1] > 0):  # If y-component is positive, flip direction
-            anti_pep_vector = -anti_pep_vector
-
-        filtered_df = single_peptite[(single_peptite['atom_name'].isin(['CA']))]
-        points = filtered_df[['x', 'y', 'z']].to_numpy()
-        m,n,p = linear_fitting(points)
-        singple_pep_vector = np.array([m, n, p])
-        if (singple_pep_vector[1] > 0):  # If y-component is positive, flip direction
-            singple_pep_vector = -singple_pep_vector
-
-        v1=[anti_pep_vector[0],anti_pep_vector[1]]
-        v2=[singple_pep_vector[0],singple_pep_vector[1]]
-        tz = rotation_angle(v1,v2) # rotation from v1 to v2
-        anti_pep = rotation_coordinates(anti_pep, 'z', tz)
-        
-        first_resid = single_peptite[single_peptite['atom_name'] == 'CA']['resid'].min()
-        ca1_y = single_peptite[(single_peptite['atom_name'] == 'CA') & (single_peptite['resid'] == first_resid)].iloc[0]['y']
-        last_resid = anti_pep[anti_pep['atom_name'] == 'CA']['resid'].max()
-        ca2_y = anti_pep[(anti_pep['atom_name'] == 'CA') & (anti_pep['resid'] == last_resid)].iloc[0]['y']
-        
-        anti_pep_adjust = ca1_y - ca2_y
-        if (chain_length%2 == 0):
-            anti_pep_adjust += 3.461
-    ################### anti_pep adjustment ###############  
-        anti_pep['y']   = anti_pep['y'] + anti_pep_adjust
-
-        peptides = pd.DataFrame([]) # empty dataframe
-
-    ###### pack first sheet ##################
-        for chain in range(chains_per_sheet):
-            if (chain % 2 == 0):
-                new_peptide = single_peptite.copy()
-            elif (chain % 2 == 1):
-                new_peptide = anti_pep.copy()
-
-            new_peptide['x']     = new_peptide['x']     + chain * strand_dist
-            new_peptide['anum']  = new_peptide['anum']  + chain * anum_max
-            new_peptide['resid'] = new_peptide['resid'] + chain * resid_max
-            peptides = pd.concat([peptides, new_peptide])
-    ###### build peptide for second sheet        
-        temp_pep = single_peptite.copy()                                       # copy a original peptide
-        temp_pep['anum']  = temp_pep['anum'] + chains_per_sheet * anum_max                        # shift atom number 
-        temp_pep['resid'] = temp_pep['resid'] + chains_per_sheet * resid_max   # shift residue number
-
-        temp_anti_pep = anti_pep.copy()                                        # build anti-pep in 2nd sheet
-        temp_anti_pep['anum']  = temp_anti_pep['anum'] * anum_max                        # shift atom number 
-        temp_anti_pep['resid'] = temp_anti_pep['resid'] + chains_per_sheet * resid_max   # shift residue number
-
-    ###### build peptide for second sheet
-        temp_sheet = peptides.copy()                                            # copy a original peptide
-        temp_sheet['anum']  = temp_sheet['anum'] + chains_per_sheet * anum_max                        # shift atom number 
-        temp_sheet['resid'] = temp_sheet['resid'] + chains_per_sheet * resid_max   # shift residue number
-
-        temp_sheet['z'] = temp_sheet['z'] + sheet_dist
-        temp_sheet['x'] = temp_sheet['x'] + x_adjust
-        temp_sheet['y'] = temp_sheet['y'] + y_adjust
-        temp_sheet['z'] = temp_sheet['z'] + z_adjust
-        temp_sheet = rotation_coordinates(temp_sheet,'x',tx_adjust)
-        temp_sheet = rotation_coordinates(temp_sheet,'y',ty_adjust)
-        temp_sheet = rotation_coordinates(temp_sheet,'z',tz_adjust)
-        
-    ###### pack second sheet ####################
-        peptides = pd.concat([peptides, temp_sheet])
-    
-    elif (classes == 7):
-        class_axis = "none"
-
-        # sheet cross sectional view
-
-        ###### shifts = 0 ########                   ###### shifts = 1 ########                         
-        # Z                                          # z                                     
-        # |               7 5 3 1                    # |                  7 5 3 1                      
-        # |     2 4 6 8 C--------N                   # |       2 4 6 8  C--------N                    
-        # |   N--------C 8 6 4 2     (SHEET 2)       # |     N--------C  8 6 4 2   (SHEET 2)         
-        # |    1 3 5 7   7 5 3 1                     # |      1 3 5 7   7 5 3 1                      
-        # |    2 4 6 8 C--------N                    # |     2 4 6 8  C--------N                    
-        # |  N--------C 8 6 4 2    (SHEET 1)         # |   N--------C  8 6 4 2     (SHEET 1)         
-        # |   1 3 5 7                                # |    1 3 5 7                  
-        # ---------------------------> y             # ----------------------------> y                        
-  
-        ###### shifts = -1 ########                            
-        # Z                                                        
-        # |             7 5 3 1                                   
-        # |   2 4 6 8 C--------N                          
-        # | N--------C 8 6 4 2        (SHEET 2)               
-        # |  1 3 5 7    7 5 3 1                                      
-        # |   2 4 6 8 C--------N                                 
-        # | N--------C 8 6 4 2        (SHEET 1)            
-        # |  1 3 5 7                                              
-        # ---------------------------> y 
-    
-        if (chain_length%2 == 0):
-            x_adjust = 0 + sheet_shift
-            y_adjust = 3.461 + shifts * 3.461
-            z_adjust = 0
-            tx_adjust = np.pi*(0/180)
-            ty_adjust = np.pi*(0/180)
-            tz_adjust = np.pi*(0/180)
-            
-        elif (chain_length%2 == 1):
-            x_adjust = 0 + sheet_shift
-            y_adjust = 3.461 + shifts * 3.461
-            z_adjust = 0
-            tx_adjust = np.pi*(0/180)
-            ty_adjust = np.pi*(0/180)
-            tz_adjust = np.pi*(0/180)                
-            
-    ###### set parameter ###############
-        sheets=2
-        anum_max = single_peptite['anum'].max()
-        resid_max = single_peptite['resid'].max()
-
-        anti_pep = single_peptite.copy()                     # construct antiparallel peptide in same sheet
-        theta = np.pi                                      
-        anti_pep = rotation_coordinates(anti_pep, "x", theta)
-
-    ############################# align anti-peptide to single-pep ###############
-        filtered_df = anti_pep[(anti_pep['atom_name'].isin(['CA']))]
-        points = filtered_df[['x', 'y', 'z']].to_numpy()
-        m,n,p = linear_fitting(points)
-        anti_pep_vector = np.array([m, n, p])
-        if (anti_pep_vector[1] > 0):  # If y-component is positive, flip direction
-            anti_pep_vector = -anti_pep_vector
-
-        filtered_df = single_peptite[(single_peptite['atom_name'].isin(['CA']))]
-        points = filtered_df[['x', 'y', 'z']].to_numpy()
-        m,n,p = linear_fitting(points)
-        singple_pep_vector = np.array([m, n, p])
-        if (singple_pep_vector[1] > 0):  # If y-component is positive, flip direction
-            singple_pep_vector = -singple_pep_vector
-
-        v1=[anti_pep_vector[0],anti_pep_vector[1]]
-        v2=[singple_pep_vector[0],singple_pep_vector[1]]
-        tz = rotation_angle(v1,v2) # rotation from v1 to v2
-        anti_pep = rotation_coordinates(anti_pep, 'z', tz)
-        
-#         ca1_y = single_peptite[(single_peptite['atom_name'] == 'CA') & (single_peptite['resid'] == 1)].iloc[0][['y']]
-#         ca2_y = anti_pep[(anti_pep['atom_name'] == 'CA') & (anti_pep['resid'] == resid_max)].iloc[0][['y']]
-#         anti_pep_adjust = ca2_y.values[0] - ca1_y.values[0] 
-
-        first_resid = single_peptite[single_peptite['atom_name'] == 'CA']['resid'].min()
-        ca1_y = single_peptite[(single_peptite['atom_name'] == 'CA') & (single_peptite['resid'] == first_resid)].iloc[0]['y']
-        last_resid = anti_pep[anti_pep['atom_name'] == 'CA']['resid'].max()
-        ca2_y = anti_pep[(anti_pep['atom_name'] == 'CA') & (anti_pep['resid'] == last_resid)].iloc[0]['y']
-
-        anti_pep_adjust = ca1_y - ca2_y
-
-        if (chain_length%2 == 1):
-            anti_pep_adjust += 3.461
-    ################### anti_pep adjustment ###############  
-        anti_pep['y']   = anti_pep['y'] + anti_pep_adjust
-
-        peptides = pd.DataFrame([]) # empty dataframe
-
-    ###### pack first sheet ##################
-        for chain in range(chains_per_sheet):
-            if (chain % 2 == 0):
-                new_peptide = single_peptite.copy()
-            elif (chain % 2 == 1):
-                new_peptide = anti_pep.copy()
-
-            new_peptide['x']     = new_peptide['x']     + chain * strand_dist
-            new_peptide['anum']  = new_peptide['anum']  + chain * anum_max
-            new_peptide['resid'] = new_peptide['resid'] + chain * resid_max
-            peptides = pd.concat([peptides, new_peptide])
-    ###### build peptide for second sheet        
-        temp_pep = single_peptite.copy()                                       # copy a original peptide
-        temp_pep['anum']  = temp_pep['anum'] + chains_per_sheet * anum_max                        # shift atom number 
-        temp_pep['resid'] = temp_pep['resid'] + chains_per_sheet * resid_max   # shift residue number
-
-        temp_anti_pep = anti_pep.copy()                                        # build anti-pep in 2nd sheet
-        temp_anti_pep['anum']  = temp_anti_pep['anum'] * anum_max                        # shift atom number 
-        temp_anti_pep['resid'] = temp_anti_pep['resid'] + chains_per_sheet * resid_max   # shift residue number
-
-    ###### build peptide for second sheet
-        temp_sheet = peptides.copy()                                            # copy a original peptide
-        temp_sheet['anum']  = temp_sheet['anum'] + chains_per_sheet * anum_max                        # shift atom number 
-        temp_sheet['resid'] = temp_sheet['resid'] + chains_per_sheet * resid_max   # shift residue number
-
-        temp_sheet['z'] = temp_sheet['z'] + sheet_dist
-        temp_sheet['x'] = temp_sheet['x'] + x_adjust
-        temp_sheet['y'] = temp_sheet['y'] + y_adjust
-        temp_sheet['z'] = temp_sheet['z'] + z_adjust
-        temp_sheet = rotation_coordinates(temp_sheet,'x',tx_adjust)
-        temp_sheet = rotation_coordinates(temp_sheet,'y',ty_adjust)
-        temp_sheet = rotation_coordinates(temp_sheet,'z',tz_adjust)
-        
-    ###### pack second sheet ####################
-        peptides = pd.concat([peptides, temp_sheet])   
-    elif (classes == 8):
-        class_axis = "z"
-
-        # sheet cross sectional view
-
-        ###### shifts = 0 ########                   ###### shifts = 1 ########                         
-        # Z                                          # z                                     
-        # |             8 6 4 2                      # |               8 6 4 2                      
-        # |   1 3 5 7  C--------N                    # |     1 3 5 7  C--------N                    
-        # |  N--------C  7 5 3 1    (SHEET 2)        # |    N--------C  7 5 3 1   (SHEET 2)         
-        # |    2 4 6 8   7 5 3 1                     # |      2 4 6 8  7 5 3 1                      
-        # |    2 4 6 8 C--------N                    # |     2 4 6 8 C--------N                    
-        # |  N--------C 8 6 4 2      (SHEET 1)       # |   N--------C 8 6 4 2     (SHEET 1)         
-        # |   1 3 5 7                                # |    1 3 5 7                  
-        # ---------------------------> y             # ----------------------------> y                        
-  
-        ###### shifts = -1 ########                            
-        # Z                                                        
-        # |            8 6 4 2                                   
-        # |  1 3 5 7  C--------N                          
-        # | N--------C  7 5 3 1        (SHEET 2)               
-        # |   2 4 6 8    7 5 3 1                                      
-        # |    2 4 6 8 C--------N                                 
-        # |  N--------C 8 6 4 2        (SHEET 1)            
-        # |   1 3 5 7                                              
-        # ---------------------------> y 
-    
-        if (chain_length%2 == 0):
-            x_adjust = 0 + sheet_shift
-            y_adjust = 0.2 + shifts * 3.461
-            z_adjust = 0
-            tx_adjust = np.pi*(0/180)
-            ty_adjust = np.pi*(0/180)
-            tz_adjust = np.pi*(0/180)
-            
-        elif (chain_length%2 == 1):
-            x_adjust = 0 + sheet_shift
-            y_adjust = 3.461 + shifts * 3.461
-            z_adjust = 0
-            tx_adjust = np.pi*(0/180)
-            ty_adjust = np.pi*(0/180)
-            tz_adjust = np.pi*(0/180)                
-            
-    ###### set parameter ###############
-        sheets=2
-        anum_max = single_peptite['anum'].max()
-        resid_max = single_peptite['resid'].max()
-
-        anti_pep = single_peptite.copy()                     # construct antiparallel peptide in same sheet
-        theta = np.pi                                      
-        anti_pep = rotation_coordinates(anti_pep, "x", theta)
-
-    ############################# align anti-peptide to single-pep ###############
-        filtered_df = anti_pep[(anti_pep['atom_name'].isin(['CA']))]
-        points = filtered_df[['x', 'y', 'z']].to_numpy()
-        m,n,p = linear_fitting(points)
-        anti_pep_vector = np.array([m, n, p])
-        if (anti_pep_vector[1] > 0):  # If y-component is positive, flip direction
-            anti_pep_vector = -anti_pep_vector
-
-        filtered_df = single_peptite[(single_peptite['atom_name'].isin(['CA']))]
-        points = filtered_df[['x', 'y', 'z']].to_numpy()
-        m,n,p = linear_fitting(points)
-        singple_pep_vector = np.array([m, n, p])
-        if (singple_pep_vector[1] > 0):  # If y-component is positive, flip direction
-            singple_pep_vector = -singple_pep_vector
-
-        v1=[anti_pep_vector[0],anti_pep_vector[1]]
-        v2=[singple_pep_vector[0],singple_pep_vector[1]]
-        tz = rotation_angle(v1,v2) # rotation from v1 to v2
-        anti_pep = rotation_coordinates(anti_pep, 'z', tz)
-        
-        first_resid = single_peptite[single_peptite['atom_name'] == 'CA']['resid'].min()
-        ca1_y = single_peptite[(single_peptite['atom_name'] == 'CA') & (single_peptite['resid'] == first_resid)].iloc[0]['y']
-        last_resid = anti_pep[anti_pep['atom_name'] == 'CA']['resid'].max()
-        ca2_y = anti_pep[(anti_pep['atom_name'] == 'CA') & (anti_pep['resid'] == last_resid)].iloc[0]['y']
-        
-        anti_pep_adjust = ca1_y - ca2_y
-        if (chain_length%2 == 1):
-            anti_pep_adjust += 3.461
-    ################### anti_pep adjustment ###############  
-        anti_pep['y']   = anti_pep['y'] + anti_pep_adjust
-
-        peptides = pd.DataFrame([]) # empty dataframe
-
-    ###### pack first sheet ##################
-        for chain in range(chains_per_sheet):
-            if (chain % 2 == 0):
-                new_peptide = single_peptite.copy()
-            elif (chain % 2 == 1):
-                new_peptide = anti_pep.copy()
-
-            new_peptide['x']     = new_peptide['x']     + chain * strand_dist
-            new_peptide['anum']  = new_peptide['anum']  + chain * anum_max
-            new_peptide['resid'] = new_peptide['resid'] + chain * resid_max
-            peptides = pd.concat([peptides, new_peptide])
-    ###### build peptide for second sheet        
-        temp_pep = single_peptite.copy()                                       # copy a original peptide
-        temp_pep['anum']  = temp_pep['anum'] + chains_per_sheet * anum_max                        # shift atom number 
-        temp_pep['resid'] = temp_pep['resid'] + chains_per_sheet * resid_max   # shift residue number
-
-        temp_anti_pep = anti_pep.copy()                                        # build anti-pep in 2nd sheet
-        temp_anti_pep['anum']  = temp_anti_pep['anum'] * anum_max                        # shift atom number 
-        temp_anti_pep['resid'] = temp_anti_pep['resid'] + chains_per_sheet * resid_max   # shift residue number
-
-    ###### build peptide for second sheet
-        temp_sheet = peptides.copy()                                            # copy a original peptide
-        temp_sheet['anum']  = temp_sheet['anum'] + chains_per_sheet * anum_max                        # shift atom number 
-        temp_sheet['resid'] = temp_sheet['resid'] + chains_per_sheet * resid_max   # shift residue number
-
-        theta = -np.pi                                                         # build pep for 2nd sheet
-        temp_sheet = rotation_coordinates(temp_sheet, class_axis, theta)
-        
-        temp_sheet['z'] = temp_sheet['z'] + sheet_dist
-        temp_sheet['x'] = temp_sheet['x'] + x_adjust + (chains_per_sheet-1) * strand_dist
-        temp_sheet['y'] = temp_sheet['y'] + y_adjust
-        temp_sheet['z'] = temp_sheet['z'] + z_adjust
-        temp_sheet = rotation_coordinates(temp_sheet,'x',tx_adjust)
-        temp_sheet = rotation_coordinates(temp_sheet,'y',ty_adjust)
-        temp_sheet = rotation_coordinates(temp_sheet,'z',tz_adjust)
-        
-    ###### pack second sheet ####################
-        peptides = pd.concat([peptides, temp_sheet])    
-    
-
-    ###### output sheets ####################
-    if format_flag == 0:
-        last_resid = 1
-        with open(o_filename, 'w') as f:
-            for index, row in peptides.iterrows():
-                if len(row['aa_name'])==4:
-                    output= "ATOM{:7d}{:^6}{:4}{:5d}{:12.3f}{:8.3f}{:8.3f}\n".format(
-                        row['anum'],row['atom_name'],row['aa_name'],row['resid'],
-                        row['x'],row['y'],row['z'])
-                else:
-                    output= "ATOM{:7d}{:^6}{:4}{:5d}{:12.3f}{:8.3f}{:8.3f}\n".format(
-                        row['anum'],row['atom_name'],row['aa_name'],row['resid'],
-                        row['x'],row['y'],row['z'])
-                f.write(output)
-    
-    elif format_flag == 1:
-        last_resid = 1
-        with open(o_filename, 'w') as f:
-            for index, row in peptides.iterrows():
-                resid = int(row['resid'])
-                
-                if len(row['aa_name'])==4:
-                    output= "ATOM{:7d}{:^6}{:4}{:5d}{:12.3f}{:8.3f}{:8.3f}\n".format(
-                        row['anum'],row['atom_name'],row['aa_name'][1:],row['resid'],
-                        row['x'],row['y'],row['z'])
-                else:
-                    output= "ATOM{:7d}{:^6}{:4}{:5d}{:12.3f}{:8.3f}{:8.3f}\n".format(
-                        row['anum'],row['atom_name'],row['aa_name'],row['resid'],
-                        row['x'],row['y'],row['z'])
-    
-                if (last_resid % chain_length == 0) & (resid % chain_length ==1):
-                     f.write('TER\n')
-                        
-                f.write(output)
-                last_resid = resid       
-
- 
-
-
-# In[67]:
-
-
-def main():
-    parser = argparse.ArgumentParser(description="Peptide builder")
-
-    parser.add_argument('-seq', type=str, required=True, help="Peptide sequence (e.g., GNNQQNY)")
-    parser.add_argument('-c', type=int, required=True, choices=range(1, 9), help="Class (1-8 only)")
-    parser.add_argument('-sh', type=float, default=0.0, help="Shift value: -1, 0, or 1")
-    parser.add_argument('-n', type=int, default=8, help="Number of chains (default: 8)")
-    parser.add_argument('-p', type=int, default=0, help="terminal patch uncap = 0 (default), NME capped=1, NHE cappped=2")
-    parser.add_argument('-r', type=str, default="e", help="residue number to be packed in the sheets even = e (default), odd = o")
-    parser.add_argument('-f', type=int, default=0, help="format flag Pep AD = 0 (default), AMBER = 1")
-    parser.add_argument('-d1', type=float, default=4.8, help="strand-strand distance (default=4.8)")
-    parser.add_argument('-d2', type=float, default=11.5, help="sheet-sheet distance (default=11.5)")
-    parser.add_argument('-d3', type=float, default=0, help="sheet2 moves along fibril axis (default = 0)")
-    parser.add_argument('-o', type=str, default="default", help="output file name")
-    
-    args = parser.parse_args()
-
-    print("Sequence:", args.seq)
-    print("Class:", args.c)
-    print("Shift:", args.sh)
-    print("Number of chains:", args.n)
-    print("Cap flag:", args.p)
-   
-    sequence = args.seq
-    classes  = args.c
-    shift    = args.sh
-    chains   = args.n 
-    cap_flag = args.p
-    residue_num = args.r
-    format_flag = args.f
-    strand_dist = args.d1
-    sheet_dist = args.d2
-    sheet_shift = args.d3
-    final_filename  = args.o
-    
-    if final_filename == "default":
-        final_filename = "Class{}_{}mer.pdb".format(classes,residue_num)
-    elif final_filename[-4:].lower() == ".pdb":
-        pass
+    if hybrid_type == 1:
+        sheet2_primary = _make_hybrid_strand_template(
+            single_pep_anti, face_flipped=True, direction_reversed=False
+        )
     else:
-        final_filename = final_filename + ".pdb"
-    
-    if classes in [1, 2, 3, 4]: #parallel sheets
-        angles = [-119, 113]
-    elif classes in [5, 6, 7, 8]:
-        angles = [-139, 135]
+        sheet2_primary = (
+            single_pep_anti.copy()
+            if hybrid_type == 2
+            else _make_hybrid_strand_template(
+                single_pep_anti, face_flipped=True, direction_reversed=False
+            )
+        )
+
+    if hybrid_type in [1, 2]:
+        sheet2_secondary = _class56_antiparallel_neighbor(
+            sheet2_primary, chain_length, registry_direction=registry_direction
+        )
     else:
-        raise SystemExit("Cannot determine Class. Stop.")
+        sheet2_secondary = _class78_antiparallel_neighbor(
+            sheet2_primary, chain_length, registry_direction=registry_direction
+        )
+    sheet2 = _make_sheet_from_templates(
+        sheet2_primary,
+        sheet2_secondary,
+        chains_per_sheet,
+        strand_dist,
+        anum_max,
+        resid_max,
+    )
 
-    ###########################################
-    ########## create single pep ##############
-    ###########################################
-    build_single_peptide_with_local_peptidebuilder(sequence, angles, output_file="temp_pep.pdb")
+    sheet1_center = _chain_center(sheet1, chain_length, chain_index=0)
+    sheet2_center = _chain_center(sheet2, chain_length, chain_index=0)
+    dx = (
+        _packing_axis_midpoint(sheet1, "x")
+        - _packing_axis_midpoint(sheet2, "x")
+        + sheet_x_shift
+    )
+    dz = -sheet_dist if core_residues == "o" else sheet_dist
+    sheet2 = _translate_peptide(
+        sheet2,
+        dx,
+        sheet1_center[1] + sheet_y_shift - sheet2_center[1],
+        sheet1_center[2] + dz - sheet2_center[2],
+    )
+    sheet2["anum"] = sheet2["anum"] + chains_per_sheet * anum_max
+    sheet2["resid"] = sheet2["resid"] + chains_per_sheet * resid_max
 
-    ###########################################
-    ############# Modify termini ##############
-    ###########################################
-    if cap_flag == 0:      # Add hydrogen at N-terminus and remove H at C-terminus
-        add_NH_remove_OH("temp_pep.pdb", "pep.pdb")
-        length=len(sequence)
-        
-    elif cap_flag in [1, 2]:    # Add Caps to peptide
-        add_caps("temp_pep.pdb", "pep.pdb", cap_flag)
-        length=len(sequence) + 2
+    peptides = pd.concat([sheet1, sheet2], ignore_index=True)
+    peptides["anum"] = range(1, len(peptides) + 1)
+    _write_packed_peptides(peptides, chain_length, format_flag, o_filename)
+    return peptides
+
+
+# %% Cell v122-input-help-system
+SHEET_INPUT_SCHEMA = {
+    "sequence": {
+        "type": "str",
+        "default": "required",
+        "description": "Only peptide sequence, or peptide A in a two-sequence build.",
+    },
+    "output_name": {
+        "type": "str",
+        "default": "peptide_sheets",
+        "description": "Output PDB filename. The .pdb suffix is added when absent.",
+    },
+    "sequence_b": {
+        "type": "str or None",
+        "default": None,
+        "description": "Optional peptide B. It must have the same length as peptide A.",
+    },
+    "pattern1": {
+        "type": "str or None",
+        "default": None,
+        "description": "Sheet-1 A/B strand pattern. Required with sequence_b.",
+    },
+    "pattern2": {
+        "type": "str or None",
+        "default": None,
+        "description": "Sheet-2 A/B strand pattern. Required with sequence_b.",
+    },
+    "classes": {
+        "type": "int or None",
+        "default": None,
+        "choices": tuple(range(1, 11)),
+        "description": "Steric-zipper class. Do not combine with hybrid_type.",
+    },
+    "hybrid_type": {
+        "type": "int or None",
+        "default": None,
+        "choices": tuple(range(1, 7)),
+        "description": "Parallel-antiparallel type. Do not combine with classes.",
+    },
+    "core_residues": {
+        "type": "{'e', 'o'}",
+        "default": "e",
+        "choices": ("e", "o"),
+        "description": "Residue parity packed inside: 'e' for even or 'o' for odd.",
+    },
+    "chains": {
+        "type": "int",
+        "default": 8,
+        "description": "Strands per sheet for one sequence. Patterns replace this.",
+    },
+    "format_flag": {
+        "type": "{0, 1}",
+        "default": 0,
+        "choices": (0, 1),
+        "description": "0 writes standard PDB format; 1 writes AMBER-style format.",
+    },
+    "cap_flag": {
+        "type": "{0, 1, 2}",
+        "default": 0,
+        "choices": (0, 1, 2),
+        "description": "0 is uncapped; 1 adds ACE+NME; 2 adds ACE+NHE.",
+    },
+    "y_shift": {
+        "type": "float",
+        "default": 0.0,
+        "description": "Sheet-2 registry shift along y, in residue-spacing units.",
+    },
+    "registry_direction": {
+        "type": "{'minus', 'plus'}",
+        "default": "minus",
+        "choices": ("minus", "plus"),
+        "description": "Direction used when a one-residue registry shift is required.",
+    },
+    "x_spacing": {
+        "type": "float",
+        "default": 4.8,
+        "description": "Neighboring-strand spacing along x, in Angstrom.",
+    },
+    "z_spacing": {
+        "type": "float",
+        "default": 11.5,
+        "description": "Sheet-to-sheet spacing along z, in Angstrom.",
+    },
+    "x_shift": {
+        "type": "float",
+        "default": 0.0,
+        "description": "Extra sheet-2 offset along x, in half-x_spacing units.",
+    },
+    "max_cb_tilt_deg": {
+        "type": "float or None",
+        "default": 10.0,
+        "description": (
+            "Middle CA-CB tilt limit for parallel-angle strands. "
+            "None disables the limit."
+        ),
+    },
+}
+
+
+UNIFORM_CLASS_HELP = {
+    1: "parallel strands; sheet 2 is rotated 180 degrees around x",
+    2: "parallel strands; sheet 2 keeps the same xyz orientation",
+    3: "parallel strands; sheet 2 is rotated 180 degrees around y",
+    4: "parallel strands; sheet 2 is rotated 180 degrees around z",
+    5: (
+        "antiparallel neighboring strands with Class 5/6 registry; "
+        "sheet 2 rotates around x"
+    ),
+    6: (
+        "antiparallel neighboring strands with Class 5/6 registry; "
+        "sheet 2 keeps its orientation"
+    ),
+    7: (
+        "antiparallel neighboring strands with Class 7/8 registry; "
+        "sheet 2 keeps its orientation"
+    ),
+    8: (
+        "antiparallel neighboring strands with Class 7/8 registry; "
+        "sheet 2 rotates around z"
+    ),
+    9: (
+        "parallel neighboring strands with alternating faces; "
+        "sheet 2 keeps its orientation"
+    ),
+    10: "parallel neighboring strands with alternating faces; sheet 2 rotates around x",
+}
+
+
+HYBRID_TYPE_HELP = {
+    1: "standard parallel sheet + face-flipped Class 5/6-style antiparallel sheet",
+    2: "standard parallel sheet + unflipped Class 5/6-style antiparallel sheet",
+    3: "standard parallel sheet + face-flipped Class 7/8-style antiparallel sheet",
+    4: (
+        "direction-reversed parallel sheet + face-flipped "
+        "Class 7/8-style antiparallel sheet"
+    ),
+    5: "face-flipped parallel sheet + face-flipped Class 7/8-style antiparallel sheet",
+    6: (
+        "face-flipped and direction-reversed parallel sheet + "
+        "face-flipped Class 7/8-style antiparallel sheet"
+    ),
+}
+
+
+def get_sheet_builder_help():
+    """Function:
+        Create complete help text for one- or two-sequence sheet building.
+
+    Returns
+    -------
+    str
+        Parameter descriptions, packing-type descriptions, and usage examples.
+    """
+    lines = [
+        "Initial Structure Builder v1.23",
+        "",
+        "Supported builds:",
+        "  1. One sequence with a steric-zipper class from 1 to 10.",
+        "  2. One sequence with a parallel-antiparallel type from 1 to 6.",
+        "  3. Two sequences with A/B patterns and a class from 1 to 10.",
+        "  4. Two sequences with A/B patterns and a hybrid type from 1 to 6.",
+        "",
+        "Geometry selection:",
+        "  Supply either classes or hybrid_type, but not both.",
+        "  A direct notebook call uses Class 1 when both are omitted.",
+        "  The terminal requires -c/--class or -H/--hybrid.",
+        "",
+        "Parameters:",
+    ]
+    for name, info in SHEET_INPUT_SCHEMA.items():
+        choices = info.get("choices")
+        choice_text = "" if choices is None else f"; choices={list(choices)}"
+        lines.append(
+            f"  {name} [{info['type']}; default={info['default']}{choice_text}]"
+        )
+        lines.append(f"      {info['description']}")
+
+    lines.extend(["", "Steric-zipper classes:"])
+    lines.extend(
+        f"  {number}: {description}"
+        for number, description in UNIFORM_CLASS_HELP.items()
+    )
+    lines.extend(["", "Parallel-antiparallel hybrid types:"])
+    lines.extend(
+        f"  {number}: {description}"
+        for number, description in HYBRID_TYPE_HELP.items()
+    )
+
+    lines.extend(
+        [
+            "",
+            "Notebook help:",
+            "  show_sheet_builder_help()",
+            "  show_input_help()",
+            "  show_input_help('y_shift')",
+            "",
+            "Notebook builds:",
+            "  build_sheets('GNNQQNY', 'class1', classes=1, chains=4)",
+            "  build_sheets('GNNQQNY', 'hybrid1', hybrid_type=1, chains=4)",
+            "  build_sheets('GNNQQNY', 'two_class', sequence_b='AAAAAAA',",
+            "               pattern1='ABAB', pattern2='ABAB', classes=1)",
+            "  build_sheets('GNNQQNY', 'two_hybrid', sequence_b='AAAAAAA',",
+            "               pattern1='AAAA', pattern2='BBBB', hybrid_type=1)",
+            "",
+            "Terminal help after exporting to Python:",
+            "  python initial_structure_builder.py -h",
+            "  python initial_structure_builder.py -s GNNQQNY -c 1",
+            "  python initial_structure_builder.py -s GNNQQNY -H 1",
+            "  python initial_structure_builder.py -s GNNQQNY -b AAAAAAA",
+            "      -p1 ABAB -p2 ABAB -c 1",
+            "  python initial_structure_builder.py -s GNNQQNY -b AAAAAAA",
+            "      -p1 AAAA -p2 BBBB -H 1",
+        ]
+    )
+    return "\n".join(lines)
+
+
+def show_sheet_builder_help():
+    """Function:
+        Print complete help for one- or two-sequence sheet building.
+
+    Returns
+    -------
+    None
+        The help text is printed in the notebook.
+    """
+    print(get_sheet_builder_help())
+
+
+def show_input_help(parameter=None):
+    """Function:
+        Print help for one sheet-builder input.
+
+    Parameters
+    ----------
+    parameter : str or None, default=None
+        Input name, such as 'y_shift' or 'x_spacing'. None lists all input names.
+
+    Returns
+    -------
+    None
+        The requested input help is printed in the notebook.
+    """
+    if parameter is None:
+        print("Available inputs:")
+        print("  " + "\n  ".join(SHEET_INPUT_SCHEMA))
+        print("\nUse show_input_help('input_name') for one detailed description.")
+        return
+
+    parameter = str(parameter).strip()
+    if parameter not in SHEET_INPUT_SCHEMA:
+        available = ", ".join(SHEET_INPUT_SCHEMA)
+        raise ValueError(f"Unknown input '{parameter}'. Available inputs: {available}")
+
+    info = SHEET_INPUT_SCHEMA[parameter]
+    print(parameter)
+    print(f"  type: {info['type']}")
+    print(f"  default: {info['default']}")
+    if "choices" in info:
+        print(f"  choices: {list(info['choices'])}")
+    print(f"  meaning: {info['description']}")
+
+
+def _finite_float(value: Union[int, float], name: str) -> float:
+    """Function:
+        Convert one numeric builder input to a finite float.
+
+    Parameters
+    ----------
+    value : int or float
+        Numeric value to convert.
+    name : str
+        Parameter name used in an error message.
+
+    Returns
+    -------
+    float
+        Validated finite value.
+    """
+    try:
+        converted = float(value)
+    except (TypeError, ValueError) as exc:
+        raise ValueError(f"{name} must be a number") from exc
+    if not np.isfinite(converted):
+        raise ValueError(f"{name} must be finite")
+    return converted
+
+
+def validate_sheet_inputs(
+    sequence: str, output_name: Union[str, Path] = "peptide_sheets", *,
+    mode: str = "uniform", classes: Optional[int] = 1,
+    hybrid_type: Optional[int] = None, core_residues: str = "e",
+    chains: int = 8, format_flag: int = 0, cap_flag: int = 0,
+    y_shift: float = 0.0, registry_direction: str = "minus",
+    x_spacing: float = 4.8, z_spacing: float = 11.5,
+    x_shift: float = 0.0, max_cb_tilt_deg: Optional[float] = 10.0
+) -> dict:
+    """Function:
+        Validate and normalize inputs for sheet building.
+
+    Parameters
+    ----------
+    sequence : str
+        Peptide sequence in one-letter amino-acid codes.
+    output_name : str, default='peptide_sheets'
+        Output PDB filename.
+    mode : {'uniform', 'hybrid'}, default='uniform'
+        Builder execution mode.
+    classes : int, default=1
+        Uniform class from 1 to 10. Ignored when mode='hybrid'.
+    hybrid_type : int or None, default=None
+        Hybrid classification from 1 to 6.
+    core_residues : {'e', 'o'}, default='e'
+        Residue parity packed inside: 'e' for even or 'o' for odd.
+    chains : int, default=8
+        Number of strands per sheet.
+    format_flag : {0, 1}, default=0
+        0 writes standard PDB format; 1 writes AMBER-style format.
+    cap_flag : {0, 1, 2}, default=0
+        0 is uncapped; 1 adds ACE+NME; 2 adds ACE+NHE.
+    y_shift : float, default=0.0
+        Sheet-2 registry shift along y, in residue-spacing units.
+    registry_direction : {'minus', 'plus'}, default='minus'
+        Direction used when a one-residue registry shift is required.
+    x_spacing : float, default=4.8
+        Neighboring-strand spacing along x, in Angstrom.
+    z_spacing : float, default=11.5
+        Sheet-to-sheet spacing along z, in Angstrom.
+    x_shift : float, default=0.0
+        Extra sheet-2 offset along x, in half-x_spacing units.
+    max_cb_tilt_deg : float or None, default=10.0
+        Middle CA-CB tilt limit for parallel-angle strands.
+
+    Returns
+    -------
+    dict
+        Normalized values ready for build_sheets().
+    """
+    mode = str(mode).lower().strip()
+    if mode not in ("uniform", "hybrid"):
+        raise ValueError("mode must be 'uniform' or 'hybrid'")
+
+    sequence = "".join(str(sequence).split()).upper()
+    if not sequence:
+        raise ValueError("sequence cannot be empty")
+    allowed = set("ARNDCQEGHILKMFPSTWYV")
+    invalid = sorted(set(sequence) - allowed)
+    if invalid:
+        raise ValueError(
+            f"sequence contains invalid one-letter amino-acid codes: {invalid}"
+        )
+
+    output_name = str(output_name).strip()
+    if not output_name:
+        raise ValueError("output_name cannot be empty")
+
+    if (
+        isinstance(chains, bool)
+        or not isinstance(chains, (int, np.integer))
+        or int(chains) < 1
+    ):
+        raise ValueError("chains must be a positive integer")
+    chains = int(chains)
+
+    if mode == "uniform":
+        if isinstance(classes, bool) or not isinstance(classes, (int, np.integer)):
+            raise ValueError("classes must be an integer from 1 to 10 in uniform mode")
+        classes = int(classes)
+        if classes not in UNIFORM_CLASS_HELP:
+            raise ValueError("classes must be an integer from 1 to 10 in uniform mode")
+        if hybrid_type is not None:
+            raise ValueError("hybrid_type must be None in uniform mode")
     else:
-        raise SystemExit("Cannot determine caps or not. Stop")
-        
-    ###########################################
-    ############# PEP ALIGNMENT ###############
-    ###########################################
-    single_pep = alignment(length,1,"pep.pdb", "pep_aligned.pdb", order = 1)
-    
-    ###########################################
-    ############## Pack sheets ################
-    ###########################################
-    if classes in [1, 2, 3, 4]: #parallel sheets
-        packpep(single_pep, length, classes, shift, chains, format_flag,
-                final_filename, residue_num,
-                strand_dist=strand_dist, sheet_dist=sheet_dist, sheet_shift=sheet_shift)
-        
-    elif classes in [5, 6, 7, 8]:
-        packpep_antiparallel(single_pep, length, classes, shift, chains, format_flag,
-                             final_filename, residue_num,
-                             strand_dist=strand_dist, sheet_dist=sheet_dist, sheet_shift=sheet_shift)
+        if isinstance(hybrid_type, bool) or not isinstance(
+            hybrid_type, (int, np.integer)
+        ):
+            raise ValueError(
+                "hybrid_type must be an integer from 1 to 6 in hybrid mode"
+            )
+        hybrid_type = int(hybrid_type)
+        if hybrid_type not in HYBRID_TYPE_HELP:
+            raise ValueError(
+                "hybrid_type must be an integer from 1 to 6 in hybrid mode"
+            )
+        classes = None
+
+    core_residues = str(core_residues).lower().strip()
+    if core_residues not in ("e", "o"):
+        raise ValueError("core_residues must be 'e' or 'o'")
+    if format_flag not in (0, 1):
+        raise ValueError("format_flag must be 0 or 1")
+    if cap_flag not in (0, 1, 2):
+        raise ValueError("cap_flag must be 0, 1, or 2")
+
+    registry_direction = str(registry_direction).lower().strip()
+    if registry_direction not in ("minus", "plus"):
+        raise ValueError("registry_direction must be 'minus' or 'plus'")
+
+    y_shift = _finite_float(y_shift, "y_shift")
+    x_spacing = _finite_float(x_spacing, "x_spacing")
+    z_spacing = _finite_float(z_spacing, "z_spacing")
+    x_shift = _finite_float(x_shift, "x_shift")
+    if x_spacing <= 0.0:
+        raise ValueError("x_spacing must be larger than 0 Angstrom")
+    if z_spacing <= 0.0:
+        raise ValueError("z_spacing must be larger than 0 Angstrom")
+
+    if max_cb_tilt_deg is not None:
+        max_cb_tilt_deg = _finite_float(max_cb_tilt_deg, "max_cb_tilt_deg")
+        if not 0.0 <= max_cb_tilt_deg <= 90.0:
+            raise ValueError(
+                "max_cb_tilt_deg must be between 0 and 90 degrees, or None"
+            )
+
+    return {
+        "sequence": sequence,
+        "output_name": output_name,
+        "mode": mode,
+        "classes": classes,
+        "hybrid_type": hybrid_type,
+        "core_residues": core_residues,
+        "chains": chains,
+        "format_flag": int(format_flag),
+        "cap_flag": int(cap_flag),
+        "y_shift": y_shift,
+        "registry_direction": registry_direction,
+        "x_spacing": x_spacing,
+        "z_spacing": z_spacing,
+        "x_shift": x_shift,
+        "max_cb_tilt_deg": max_cb_tilt_deg,
+    }
 
 
-if __name__ == "__main__":
+def build_sheets(
+    sequence: str, output_name: Union[str, Path] = "peptide_sheets", *,
+    sequence_b: Optional[str] = None, pattern1: Optional[str] = None,
+    pattern2: Optional[str] = None, classes: Optional[int] = None,
+    hybrid_type: Optional[int] = None, core_residues: str = "e",
+    chains: int = 8, format_flag: int = 0, cap_flag: int = 0,
+    y_shift: float = 0.0, registry_direction: str = "minus",
+    x_spacing: float = 4.8, z_spacing: float = 11.5,
+    x_shift: float = 0.0, max_cb_tilt_deg: Optional[float] = 10.0
+) -> pd.DataFrame:
+    """Function:
+        Build one- or two-sequence uniform or hybrid peptide sheets.
+
+    Parameters
+    ----------
+    sequence : str
+        Only peptide sequence, or peptide A when sequence_b is supplied.
+    output_name : str, default='peptide_sheets'
+        Output PDB filename.
+    sequence_b : str or None, default=None
+        Optional peptide B sequence with the same residue length as peptide A.
+    pattern1 : str or None, default=None
+        Sheet-1 A/B pattern. Required when sequence_b is supplied.
+    pattern2 : str or None, default=None
+        Sheet-2 A/B pattern. Required when sequence_b is supplied.
+    classes : int or None, default=None
+        Steric-zipper class from 1 to 10. Class 1 is used when neither geometry
+        selector is supplied.
+    hybrid_type : int or None, default=None
+        Parallel-antiparallel hybrid type from 1 to 6.
+    core_residues : {'e', 'o'}, default='e'
+        Residue parity packed inside.
+    chains : int, default=8
+        Number of strands per sheet for a one-sequence build. Pattern lengths
+        set the strand counts for a two-sequence build.
+    format_flag : {0, 1}, default=0
+        Standard or AMBER-style PDB format.
+    cap_flag : {0, 1, 2}, default=0
+        Uncapped, ACE+NME, or ACE+NHE termini.
+    y_shift : float, default=0.0
+        Sheet-2 registry shift along y, in residue-spacing units.
+    registry_direction : {'minus', 'plus'}, default='minus'
+        Direction used for a required one-residue registry shift.
+    x_spacing : float, default=4.8
+        Neighboring-strand spacing along x, in Angstrom.
+    z_spacing : float, default=11.5
+        Sheet-to-sheet spacing along z, in Angstrom.
+    x_shift : float, default=0.0
+        Extra sheet-2 offset along x, in half-x_spacing units.
+    max_cb_tilt_deg : float or None, default=10.0
+        Middle CA-CB tilt limit for parallel-angle strands.
+
+    Returns
+    -------
+    pandas.DataFrame
+        Packed atoms from both sheets. The function also writes the output PDB file.
+    """
+    if classes is None and hybrid_type is None:
+        classes = 1
+    elif classes is not None and hybrid_type is not None:
+        raise ValueError("Use either classes or hybrid_type, not both")
+
+    if sequence_b and not (pattern1 and pattern2):
+        raise ValueError("sequence_b requires both pattern1 and pattern2")
+    if not sequence_b and (pattern1 or pattern2):
+        raise ValueError("pattern1 and pattern2 require sequence_b")
+
+    mode = "hybrid" if hybrid_type is not None else "uniform"
+    validation_chains = 1 if sequence_b else chains
+    config = validate_sheet_inputs(
+        sequence,
+        output_name, # after the second term, must enter inputs by names
+        mode=mode,
+        classes=classes,
+        hybrid_type=hybrid_type,
+        core_residues=core_residues,
+        chains=validation_chains,
+        format_flag=format_flag,
+        cap_flag=cap_flag,
+        y_shift=y_shift,
+        registry_direction=registry_direction,
+        x_spacing=x_spacing,
+        z_spacing=z_spacing,
+        x_shift=x_shift,
+        max_cb_tilt_deg=max_cb_tilt_deg,
+    )
+
+    sequence_a = config["sequence"]
+    if sequence_b:
+        config_b = validate_sheet_inputs(
+            sequence_b,
+            output_name,
+            mode=mode,
+            classes=classes,
+            hybrid_type=hybrid_type,
+            core_residues=core_residues,
+            chains=1,
+            format_flag=format_flag,
+            cap_flag=cap_flag,
+            y_shift=y_shift,
+            registry_direction=registry_direction,
+            x_spacing=x_spacing,
+            z_spacing=z_spacing,
+            x_shift=x_shift,
+            max_cb_tilt_deg=max_cb_tilt_deg,
+        )
+        sequence_b = config_b["sequence"]
+        if len(sequence_a) != len(sequence_b):
+            raise ValueError("Peptide A and peptide B must have equal lengths")
+        pattern1 = _normalize_two_component_pattern(pattern1, "pattern1")
+        pattern2 = _normalize_two_component_pattern(pattern2, "pattern2")
+
+    output_file = config["output_name"]
+    if not output_file.lower().endswith(".pdb"):
+        output_file += ".pdb"
+
+    if mode == "uniform":
+        parallel_classes = (1, 2, 3, 4, 9, 10)
+        angles = [-119, 113] if config["classes"] in parallel_classes else [-139, 135]
+        tilt_limit = (
+            config["max_cb_tilt_deg"] if config["classes"] in parallel_classes else None
+        )
+        template_name = "para" if config["classes"] in parallel_classes else "anti"
+        length, peptide_a = _build_aligned_peptide_template(
+            sequence_a, angles, f"{template_name}_A.pdb", config["cap_flag"],
+            max_cb_tilt_deg=tilt_limit
+        )
+
+        if not sequence_b:
+            result = packpep_geometric(
+                peptide_a,
+                length,
+                config["classes"],
+                config["y_shift"],
+                config["chains"],
+                config["format_flag"],
+                output_file,
+                core_residues=config["core_residues"],
+                strand_dist=config["x_spacing"],
+                sheet_dist=config["z_spacing"],
+                sheet_shift=config["x_shift"],
+                registry_direction=config["registry_direction"],
+            )
+        else:
+            length_b, peptide_b = _build_aligned_peptide_template(
+                sequence_b, angles, f"{template_name}_B.pdb",
+                config["cap_flag"], max_cb_tilt_deg=tilt_limit
+            )
+            if length != length_b:
+                raise ValueError("Peptide A and peptide B have different lengths")
+            result = packpep_geometric_two_component(
+                peptide_a,
+                peptide_b,
+                length,
+                config["classes"],
+                config["y_shift"],
+                pattern1,
+                pattern2,
+                config["format_flag"],
+                output_file,
+                core_residues=config["core_residues"],
+                strand_dist=config["x_spacing"],
+                sheet_dist=config["z_spacing"],
+                sheet_shift=config["x_shift"],
+                registry_direction=config["registry_direction"],
+            )
+    else:
+        length, parallel_a = _build_aligned_peptide_template(
+            sequence_a, [-119, 113], "para_A.pdb", config["cap_flag"],
+            max_cb_tilt_deg=config["max_cb_tilt_deg"]
+        )
+        anti_length, antiparallel_a = _build_aligned_peptide_template(
+            sequence_a, [-139, 135], "anti_A.pdb", config["cap_flag"],
+            max_cb_tilt_deg=None
+        )
+        if length != anti_length:
+            raise ValueError(
+                "Parallel and antiparallel templates have different lengths"
+            )
+
+        if not sequence_b:
+            result = packpep_parallel_antiparallel(
+                parallel_a,
+                antiparallel_a,
+                length,
+                config["hybrid_type"],
+                config["y_shift"],
+                config["chains"],
+                config["format_flag"],
+                output_file,
+                core_residues=config["core_residues"],
+                strand_dist=config["x_spacing"],
+                sheet_dist=config["z_spacing"],
+                sheet_shift=config["x_shift"],
+                registry_direction=config["registry_direction"],
+            )
+        else:
+            para_length_b, parallel_b = _build_aligned_peptide_template(
+                sequence_b, [-119, 113], "para_B.pdb", config["cap_flag"],
+                max_cb_tilt_deg=config["max_cb_tilt_deg"]
+            )
+            anti_length_b, antiparallel_b = _build_aligned_peptide_template(
+                sequence_b, [-139, 135], "anti_B.pdb", config["cap_flag"],
+                max_cb_tilt_deg=None
+            )
+            template_lengths = {
+                length,
+                anti_length,
+                para_length_b,
+                anti_length_b,
+            }
+            if len(template_lengths) != 1:
+                raise ValueError("The hybrid peptide templates have different lengths")
+            result = packpep_parallel_antiparallel_two_component(
+                parallel_a,
+                parallel_b,
+                antiparallel_a,
+                antiparallel_b,
+                length,
+                config["hybrid_type"],
+                config["y_shift"],
+                pattern1,
+                pattern2,
+                config["format_flag"],
+                output_file,
+                core_residues=config["core_residues"],
+                strand_dist=config["x_spacing"],
+                sheet_dist=config["z_spacing"],
+                sheet_shift=config["x_shift"],
+                registry_direction=config["registry_direction"],
+            )
+
+    output_path = Path(output_file).resolve()
+    if mode == "uniform":
+        print(f"Sheets structure: Class {config['classes']}")
+    else:
+        print(f"Sheets structure: Hybrid {config['hybrid_type']}")
+
+    if sequence_b:
+        print(f'Sequence A: "{sequence_a}"')
+        print(f'Sequence B: "{sequence_b}"')
+        if len(pattern1) == len(pattern2):
+            print(f"Strands per sheet: {len(pattern1)}")
+        else:
+            print(f"Strands in sheet 1: {len(pattern1)}")
+            print(f"Strands in sheet 2: {len(pattern2)}")
+    else:
+        print(f'Sequence: "{sequence_a}"')
+        print(f"Strands per sheet: {config['chains']}")
+
+    print(f"Atoms: {len(result)}")
+    print(f"Output PDB: {output_path}")
+    return result
+
+
+# %% Cell fcf611e5-e4a4-487c-914e-a4ce74087bdb
+def read_arguments(
+    argv: Optional[Sequence[str]] = None
+) -> argparse.Namespace:
+    """Function:
+        Read inputs from the terminal.
+
+    Parameters
+    ----------
+    argv : list of str or None, default=None
+        Argument list used for testing. None reads the real terminal command line.
+
+    Returns
+    -------
+    argparse.Namespace
+        Parsed and conditionally validated sheet-builder inputs.
+    """
+    parser = argparse.ArgumentParser(
+        description=("Initial Structure Builder v1.23: build beta sheets."),
+        formatter_class=argparse.ArgumentDefaultsHelpFormatter,
+    )
+    parser.add_argument(
+        "-s",
+        "--seq",
+        "--seqA",
+        dest="sequence_a",
+        required=True,
+        default=argparse.SUPPRESS,
+        help="Only peptide sequence, or peptide A when peptide B is supplied.",
+    )
+    parser.add_argument(
+        "-b",
+        "--seqB",
+        dest="sequence_b",
+        default=argparse.SUPPRESS,
+        help="Optional peptide B sequence. It must have the same length as peptide A.",
+    )
+    parser.add_argument(
+        "-p1",
+        "--pattern1",
+        default=argparse.SUPPRESS,
+        help="Sheet-1 A/B pattern. Required when peptide B is supplied.",
+    )
+    parser.add_argument(
+        "-p2",
+        "--pattern2",
+        default=argparse.SUPPRESS,
+        help="Sheet-2 A/B pattern. Required when peptide B is supplied.",
+    )
+
+    geometry = parser.add_mutually_exclusive_group(required=True)
+    geometry.add_argument(
+        "-c",
+        "--class",
+        dest="classes",
+        type=int,
+        choices=range(1, 11),
+        default=argparse.SUPPRESS,
+        help="Steric-zipper class from 1 to 10.",
+    )
+    geometry.add_argument(
+        "-H",
+        "--hybrid",
+        dest="hybrid_type",
+        type=int,
+        choices=range(1, 7),
+        default=argparse.SUPPRESS,
+        help="Parallel-antiparallel hybrid type from 1 to 6.",
+    )
+
+    parser.add_argument(
+        "-dx",
+        "--dx",
+        type=float,
+        default=4.8,
+        help="Neighboring-strand distance along x, in Angstrom.",
+    )
+    parser.add_argument(
+        "-x",
+        "--x",
+        type=float,
+        default=0.0,
+        help="Sheet-2 x shift, in half-dx units.",
+    )
+    parser.add_argument(
+        "-y",
+        "--y",
+        type=float,
+        default=0.0,
+        help="Sheet-2 y shift, in residue-spacing units.",
+    )
+    parser.add_argument(
+        "-dz",
+        "--dz",
+        type=float,
+        default=11.5,
+        help="Sheet-to-sheet distance along z, in Angstrom.",
+    )
+    parser.add_argument(
+        "-n",
+        "--chains",
+        type=int,
+        default=argparse.SUPPRESS,
+        help="Strands per sheet for a one-sequence build; default is 8.",
+    )
+    parser.add_argument(
+        "-r",
+        "--core",
+        choices=("e", "o"),
+        default="e",
+        help="Residue parity packed inside: e for even or o for odd.",
+    )
+    parser.add_argument(
+        "-g",
+        "--registry",
+        choices=("minus", "plus"),
+        default="minus",
+        help="Direction of a required one-residue registry shift.",
+    )
+    parser.add_argument(
+        "-f",
+        "--format",
+        dest="format_flag",
+        type=int,
+        choices=(0, 1),
+        default=0,
+        help="PDB format: 0 for standard or 1 for AMBER style.",
+    )
+    parser.add_argument(
+        "-C",
+        "--cap",
+        dest="cap_flag",
+        type=int,
+        choices=(0, 1, 2),
+        default=0,
+        help="Terminal caps: 0 uncapped, 1 ACE+NME, or 2 ACE+NHE.",
+    )
+    parser.add_argument(
+        "-o",
+        "--output",
+        default="peptide_sheets",
+        help="Output PDB filename.",
+    )
+    parser.add_argument(
+        "-t",
+        "--tilt",
+        dest="max_cb_tilt",
+        type=float,
+        default=10.0,
+        help="Middle CA-CB tilt limit for parallel-angle strands, in degrees.",
+    )
+    parser.add_argument(
+        "--no-tilt",
+        dest="max_cb_tilt",
+        action="store_const",
+        const=None,
+        default=argparse.SUPPRESS,
+        help="Disable the middle CA-CB tilt limit.",
+    )
+
+    args = parser.parse_args(argv)
+    args.sequence_b = getattr(args, "sequence_b", None)
+    args.pattern1 = getattr(args, "pattern1", None)
+    args.pattern2 = getattr(args, "pattern2", None)
+    args.classes = getattr(args, "classes", None)
+    args.hybrid_type = getattr(args, "hybrid_type", None)
+    chains_given = hasattr(args, "chains")
+    has_sequence_b = args.sequence_b is not None
+    has_pattern1 = args.pattern1 is not None
+    has_pattern2 = args.pattern2 is not None
+
+    if has_sequence_b and not (has_pattern1 and has_pattern2):
+        parser.error("--seqB requires both --pattern1 and --pattern2")
+    if not has_sequence_b and (has_pattern1 or has_pattern2):
+        parser.error("--pattern1 and --pattern2 require --seqB")
+    if not has_sequence_b:
+        args.chains = args.chains if chains_given else 8
+    elif chains_given:
+        parser.error(
+            "--chains is not used with --seqB; pattern lengths set strand counts"
+        )
+    return args
+
+
+def main(argv=None):
+    """Function:
+        Build a peptide sheet from the concise terminal inputs.
+
+    Parameters
+    ----------
+    argv : list of str or None, default=None
+        Argument list used for testing. None reads the real terminal command line.
+
+    Returns
+    -------
+    pandas.DataFrame
+        Packed atoms from both sheets. The function also writes the output PDB file.
+    """
+    args = read_arguments(argv)
+    return build_sheets(
+        args.sequence_a,
+        args.output,
+        sequence_b=args.sequence_b,
+        pattern1=args.pattern1,
+        pattern2=args.pattern2,
+        classes=args.classes,
+        hybrid_type=args.hybrid_type,
+        core_residues=args.core,
+        chains=getattr(args, "chains", 8),
+        format_flag=args.format_flag,
+        cap_flag=args.cap_flag,
+        y_shift=args.y,
+        registry_direction=args.registry,
+        x_spacing=args.dx,
+        z_spacing=args.dz,
+        x_shift=args.x,
+        max_cb_tilt_deg=args.max_cb_tilt,
+    )
+
+if __name__ == "__main__" and "get_ipython" not in globals():
     main()
-
-

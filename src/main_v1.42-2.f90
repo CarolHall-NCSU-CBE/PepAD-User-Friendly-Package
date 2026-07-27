@@ -2423,27 +2423,83 @@ module input
         return
 	end subroutine read_restraints_input
     
-    subroutine readdir()
-    integer :: realpath
-    character(len=1000) :: path, rundir
-    logical :: back=.true.
-    character(len=100) :: os_name
-    character*1 :: sep
-    
-    call get_environment_variable("OS",os_name)    ! get platform name
-    call getcwd(rundir)                            ! path to working directory
-	call get_command_argument(0,path)              ! path of the executable file (contains exe file name)
-    
-    if (index(trim(os_name), "Windows_NT") > 0) then
-            sep =  '\'
-    else
-            sep = '/'
-    end if
-    
-	realpath = scan (path,sep,back)                
-	mydir = path(1:realpath)                       ! path to where the executable file located
-    
-    return
+subroutine readdir()
+	implicit none
+	integer :: slash_pos,path_length,path_status,path_start,path_end,dir_length
+	character(len=1000) :: path,name,directory,candidate,os_name
+	character(len=:), allocatable :: path_list
+	character(len=1) :: sep,path_sep
+	logical :: executable_found,library_found
+
+	call get_environment_variable("OS",os_name)
+	call get_command_argument(0,path)
+
+	if (index(trim(os_name),"Windows_NT") > 0) then
+		sep='\'
+		path_sep=';'
+	else
+		sep='/'
+		path_sep=':'
+	endif
+
+	! First use the directory included in argument 0, if it contains the PepAD library.
+	slash_pos=scan(trim(path),sep,back=.true.)
+	name=trim(path)
+	if (slash_pos > 0) then
+		name=path(slash_pos+1:len_trim(path))
+		mydir=path(1:slash_pos)
+		inquire(file=trim(mydir)//'lib'//sep//'rotamer',exist=library_found)
+		if (library_found) return
+	endif
+
+	! If PepAD was called only by name, find its installation directory in PATH.
+	call get_environment_variable("PATH",length=path_length,status=path_status)
+	if (path_status /= 0 .or. path_length == 0) goto 90
+	allocate(character(len=path_length) :: path_list)
+	call get_environment_variable("PATH",path_list,status=path_status)
+	if (path_status /= 0) goto 90
+
+	path_start=1
+	do while(path_start <= path_length)
+		path_end=index(path_list(path_start:),path_sep)
+		if (path_end == 0) then
+			directory=adjustl(path_list(path_start:path_length))
+			path_start=path_length+1
+		elseif (path_end == 1) then
+			directory='.'
+			path_start=path_start+1
+		else
+			directory=adjustl(path_list(path_start:path_start+path_end-2))
+			path_start=path_start+path_end
+		endif
+
+		dir_length=len_trim(directory)
+		if (dir_length == 0) then
+			directory='.'
+			dir_length=1
+		endif
+		if (directory(dir_length:dir_length) /= sep) directory=trim(directory)//sep
+
+		candidate=trim(directory)//trim(name)
+		inquire(file=trim(candidate),exist=executable_found)
+		if (.not.executable_found .and. sep == '\' .and. index(trim(name),'.') == 0) then
+			candidate=trim(candidate)//'.exe'
+			inquire(file=trim(candidate),exist=executable_found)
+		endif
+
+		if (executable_found) then
+			inquire(file=trim(directory)//'lib'//sep//'rotamer',exist=library_found)
+			if (library_found) then
+				mydir=trim(directory)
+				return
+			endif
+		endif
+	enddo
+
+90	continue
+	write(*,'(2A)') 'ERROR: cannot locate the PepAD library for executable: ',trim(path)
+	write(*,'(A)') 'The PepAD executable and lib directory must be installed in the same directory.'
+	stop 1
 end subroutine readdir
     
 subroutine check_help

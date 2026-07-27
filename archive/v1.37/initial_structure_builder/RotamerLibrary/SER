@@ -1,0 +1,11 @@
+ATOM     21  N   SER A   4       2.118   0.810   0.249
+ATOM     22  H   SER A   4       2.377  -0.147   0.350
+ATOM     23  CA  SER A   4       1.628   1.197  -1.027
+ATOM     24  HA  SER A   4       1.214   2.215  -0.978
+ATOM     25  CB  SER A   4       2.704   1.144  -2.114
+ATOM     26  HB2 SER A   4       3.533   1.815  -1.847
+ATOM     27  HB3 SER A   4       2.288   1.509  -3.064
+ATOM     28  OG  SER A   4       3.193  -0.175  -2.282
+ATOM     29  HG  SER A   4       2.657  -0.641  -2.987
+ATOM     30  C   SER A   4       0.546   0.230  -1.264
+ATOM     31  O   SER A   4       0.195  -0.624  -0.429

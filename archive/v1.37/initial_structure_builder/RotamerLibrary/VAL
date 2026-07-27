@@ -1,0 +1,16 @@
+ATOM     21  N   VAL A   4       1.849   0.497  -1.256
+ATOM     22  H   VAL A   4       2.296   0.075  -0.444
+ATOM     23  CA  VAL A   4       1.093  -0.237  -2.280
+ATOM     24  HA  VAL A   4       1.293   0.197  -3.271
+ATOM     25  CB  VAL A   4       1.467  -1.731  -2.299
+ATOM     26  HB  VAL A   4       2.553  -1.802  -2.465
+ATOM     27  CG1 VAL A   4       1.102  -2.389  -0.976
+ATOM     28 HG11 VAL A   4       1.376  -3.453  -1.008
+ATOM     29 HG12 VAL A   4       1.647  -1.894  -0.159
+ATOM     30 HG13 VAL A   4       0.020  -2.293  -0.806
+ATOM     31  CG2 VAL A   4       0.725  -2.451  -3.415
+ATOM     32 HG21 VAL A   4       1.005  -3.516  -3.414
+ATOM     33 HG22 VAL A   4      -0.359  -2.355  -3.256
+ATOM     34 HG23 VAL A   4       0.994  -2.003  -4.383
+ATOM     35  C   VAL A   4      -0.398   0.007  -1.895
+ATOM     36  O   VAL A   4      -1.104   0.607  -2.677
