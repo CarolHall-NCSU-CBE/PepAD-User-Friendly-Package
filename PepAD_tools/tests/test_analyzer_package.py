@@ -150,6 +150,26 @@ class PepADAnalyzerPythonTests(unittest.TestCase):
         self.assertIs(report.call_args.args[1], parameters)
         self.assertEqual(report.call_args.args[2], 200)
 
+    def test_profile_report_uses_underscore_filename(self) -> None:
+        profile = pd.DataFrame(
+            {
+                "Sequence": ["GNN", "GNN", "NNG"],
+                "Score": [-1.0, -2.0, -0.5],
+            }
+        )
+        with tempfile.TemporaryDirectory() as temp_dir:
+            parameters = {"BASE_DIR": temp_dir}
+            self.analyzer["generate_pepad_report"](
+                profile, parameters, top=2
+            )
+
+            self.assertTrue(
+                (Path(temp_dir) / "PepAD_report.txt").is_file()
+            )
+            self.assertFalse(
+                (Path(temp_dir) / "PepAD report.txt").exists()
+            )
+
     def test_read_energy_detail_includes_rotamer_rejection(self) -> None:
         content = (
             "1 1 -1 1 2 3 4 5 6 -1 -2 -3 -4 5 6 trial Accept\n"

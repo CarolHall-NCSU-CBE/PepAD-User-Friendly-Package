@@ -682,7 +682,7 @@ def generate_pepad_report(
 ) -> pd.DataFrame:
     """
     Function:
-        Select the best unique sequences and write PepAD report.txt.
+        Select the best unique sequences and write PepAD_report.txt.
 
     Parameters
     ----------
@@ -702,7 +702,7 @@ def generate_pepad_report(
 
     Outputs
     -------
-    PepAD report.txt
+    PepAD_report.txt
         Table of the selected unique peptide sequences.
     """
     # Validate the report option.
@@ -718,14 +718,14 @@ def generate_pepad_report(
     )
     df_min_unique = df_unique_best.head(top)
 
-    # Write the PepAD report.
-    filename = os.path.join(parameters["BASE_DIR"], "PepAD report.txt")
+    # Write PepAD_report.txt.
+    filename = os.path.join(parameters["BASE_DIR"], "PepAD_report.txt")
     with open(filename, "w", encoding="utf-8") as f:
         f.write(f"---{top} unique peptides with best score (energy profile)---\n")
         f.write(df_min_unique.to_string(index=False, float_format="%.2f"))
         f.write("\n\n")
 
-    # print("Saved: PepAD report.txt")
+    # print("Saved: PepAD_report.txt")
     # print(df_min_unique.to_string(index=False, float_format="%.2f"))
 
     return df_min_unique
@@ -762,13 +762,13 @@ def get_parser() -> argparse.ArgumentParser:
     parser.add_argument(
         "--profiles",
         action="store_true",
-        help="Analyze energyprofile.txt and output unique peptides to PepAD_report",
+        help="Analyze energyprofile.txt and write PepAD_report.txt",
     )
     parser.add_argument(
         "--top",
         type=int,
         default=10,
-        help="Integer. Number of unique peptides written to PepAD_report",
+        help="Integer. Number of unique peptides written to PepAD_report.txt",
     )
     parser.add_argument(
         "--details",
@@ -1495,7 +1495,7 @@ def main(argv: list[str] | None = None) -> None:
 
     Outputs
     -------
-    PepAD report.txt
+    PepAD_report.txt
         Written when --profiles is selected.
 
     Detail_report.txt
