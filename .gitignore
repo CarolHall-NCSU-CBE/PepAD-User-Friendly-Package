@@ -39,3 +39,13 @@
 
 # debug information files
 *.dwo
+
+# Python package output
+**/__pycache__/
+**/*.py[cod]
+**/.ipynb_checkpoints/
+**/.venv/
+**/.tmp_*/
+**/build/
+**/dist/
+**/*.egg-info/

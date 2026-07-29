@@ -1,0 +1,36 @@
+[build-system]
+requires = ["setuptools>=68"]
+build-backend = "setuptools.build_meta"
+
+[project]
+name = "pepad-tools"
+version = "1.42"
+description = "Initial structure building tool and analysis tool for PepAD."
+readme = "README.md"
+requires-python = ">=3.10"
+authors = [
+    {name = "Haoyu Wang", email = "hwang226@ncsu.edu"},
+]
+license = {text = "MIT License; Copyright (c) 2025 Carol K. Hall"}
+dependencies = [
+    "numpy",
+    "pandas",
+    "matplotlib",
+]
+
+[project.urls]
+Homepage = "https://github.com/CarolHall-NCSU-CBE/PepAD-User-Friendly-Package"
+
+[project.scripts]
+builder = "pepad_tools.builder:cli"
+analyzer = "pepad_tools.analyzer:cli"
+
+[tool.setuptools]
+include-package-data = true
+
+[tool.setuptools.packages.find]
+where = ["."]
+include = ["pepad_tools*"]
+
+[tool.setuptools.package-data]
+pepad_tools = ["RotamerLibrary/*"]

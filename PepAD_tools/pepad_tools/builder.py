@@ -13,6 +13,9 @@ import math, warnings
 from pathlib import Path
 
 
+DEFAULT_ROTAMER_DIR = Path(__file__).resolve().parent / "RotamerLibrary"
+
+
 # %% Cell 79accf39-9c01-4f68-ae10-575e04ccb1bd
 def linear_fitting(data):
     #      reference:
@@ -3954,7 +3957,7 @@ def structure_to_simple_dataframe(structure):
 
 
 def read_rotamer_template(
-    residue_name: str, rotamer_dir: Union[str, Path] = "RotamerLibrary"
+    residue_name: str, rotamer_dir: Union[str, Path] = DEFAULT_ROTAMER_DIR
 ) -> pd.DataFrame:
     """Function:
         Read one amino-acid template, including side-chain hydrogens, from
@@ -4338,7 +4341,7 @@ def _cb_local_frame(residue_df):
 
 def Transplant(
     backbone_df: pd.DataFrame, sequence: str,
-    rotamer_dir: Union[str, Path] = "RotamerLibrary",
+    rotamer_dir: Union[str, Path] = DEFAULT_ROTAMER_DIR,
     residue_map: Optional[dict] = None
 ) -> pd.DataFrame:
     # Keep the builder backbone/CB atoms, then add side-chain atoms from RotamerLibrary.
@@ -4429,7 +4432,7 @@ def Transplant(
 
 def build_single_peptide_with_local_peptidebuilder(
     sequence: str, angles: Sequence[float],
-    rotamer_dir: Union[str, Path] = "RotamerLibrary",
+    rotamer_dir: Union[str, Path] = DEFAULT_ROTAMER_DIR,
     residue_map: Optional[dict] = None
 ) -> pd.DataFrame:
     """Function:
@@ -7148,6 +7151,13 @@ def build_sheets(
 
 
 # %% Cell fcf611e5-e4a4-487c-914e-a4ce74087bdb
+class RawDefaultsHelpFormatter(
+    argparse.ArgumentDefaultsHelpFormatter,
+    argparse.RawTextHelpFormatter,
+):
+    pass
+
+
 def read_arguments(
     argv: Optional[Sequence[str]] = None
 ) -> argparse.Namespace:
@@ -7166,7 +7176,7 @@ def read_arguments(
     """
     parser = argparse.ArgumentParser(
         description=("Initial Structure Builder v1.23: build beta sheets."),
-        formatter_class=argparse.ArgumentDefaultsHelpFormatter,
+        formatter_class=RawDefaultsHelpFormatter,
     )
     parser.add_argument(
         "-s",
@@ -7175,26 +7185,26 @@ def read_arguments(
         dest="sequence_a",
         required=True,
         default=argparse.SUPPRESS,
-        help="Only peptide sequence, or peptide A when peptide B is supplied.",
+        help="Input peptide sequence. Or sequence-A when sequence-B is given.",
     )
     parser.add_argument(
         "-b",
         "--seqB",
         dest="sequence_b",
         default=argparse.SUPPRESS,
-        help="Optional peptide B sequence. It must have the same length as peptide A.",
+        help="Optional peptide sequence-B. It must have the same length as peptide A for this code verison.",
     )
     parser.add_argument(
         "-p1",
         "--pattern1",
         default=argparse.SUPPRESS,
-        help="Sheet-1 A/B pattern. Required when peptide B is supplied.",
+        help="Sheet-1 A/B pattern. Required when peptide B is given.",
     )
     parser.add_argument(
         "-p2",
         "--pattern2",
         default=argparse.SUPPRESS,
-        help="Sheet-2 A/B pattern. Required when peptide B is supplied.",
+        help="Sheet-2 A/B pattern. Required when peptide B is given.",
     )
 
     geometry = parser.add_mutually_exclusive_group(required=True)
@@ -7214,7 +7224,7 @@ def read_arguments(
         type=int,
         choices=range(1, 7),
         default=argparse.SUPPRESS,
-        help="Parallel-antiparallel hybrid type from 1 to 6.",
+        help="Parallel-antiparallel hybrid sheet type from 1 to 6.",
     )
 
     parser.add_argument(
@@ -7222,28 +7232,28 @@ def read_arguments(
         "--dx",
         type=float,
         default=4.8,
-        help="Neighboring-strand distance along x, in Angstrom.",
-    )
-    parser.add_argument(
-        "-x",
-        "--x",
-        type=float,
-        default=0.0,
-        help="Sheet-2 x shift, in half-dx units.",
-    )
-    parser.add_argument(
-        "-y",
-        "--y",
-        type=float,
-        default=0.0,
-        help="Sheet-2 y shift, in residue-spacing units.",
+        help="Strand-strand distance along x, in Angstrom.",
     )
     parser.add_argument(
         "-dz",
         "--dz",
         type=float,
         default=11.5,
-        help="Sheet-to-sheet distance along z, in Angstrom.",
+        help="Sheet-sheet distance along z, in Angstrom.",
+    )
+    parser.add_argument(
+        "-x",
+        "--x",
+        type=float,
+        default=0.0,
+        help="Sheet-2 shifts in x direction in unit of [0.5*dx].",
+    )
+    parser.add_argument(
+        "-y",
+        "--y",
+        type=float,
+        default=0.0,
+        help="Sheet-2 shifts in y direction in unit of residue spacing (3.465 Angstrom).",
     )
     parser.add_argument(
         "-n",
@@ -7257,14 +7267,22 @@ def read_arguments(
         "--core",
         choices=("e", "o"),
         default="e",
-        help="Residue parity packed inside: e for even or o for odd.",
+        help="packing e = even number packed inside, o = odd number packed inside.",
     )
     parser.add_argument(
         "-g",
         "--registry",
         choices=("minus", "plus"),
         default="minus",
-        help="Direction of a required one-residue registry shift.",
+        help=(
+            "Relative direction of registry shift.\n"
+            "Plus:\n"
+            "Strand 1: 1 2 3 4 5 6\n"
+            "Strand 2:   6 5 4 3 2 1\n"
+            "Minus:\n"
+            "Strand 1:   1 2 3 4 5 6\n"
+            "Strand 2: 6 5 4 3 2 1\n"
+        ),
     )
     parser.add_argument(
         "-f",
@@ -7296,7 +7314,7 @@ def read_arguments(
         dest="max_cb_tilt",
         type=float,
         default=10.0,
-        help="Middle CA-CB tilt limit for parallel-angle strands, in degrees.",
+        help="Maximum angle between the middle-residue CA->CB vector and z-axis, in degrees.",
     )
     parser.add_argument(
         "--no-tilt",
@@ -7304,7 +7322,7 @@ def read_arguments(
         action="store_const",
         const=None,
         default=argparse.SUPPRESS,
-        help="Disable the middle CA-CB tilt limit.",
+        help="Unlimit the CA->CB vector and z-axis angle.",
     )
 
     args = parser.parse_args(argv)
@@ -7366,5 +7384,11 @@ def main(argv=None):
         max_cb_tilt_deg=args.max_cb_tilt,
     )
 
-if __name__ == "__main__" and "get_ipython" not in globals():
+
+def cli() -> None:
+    """Run the installed ``builder`` terminal command."""
     main()
+
+
+if __name__ == "__main__" and "get_ipython" not in globals():
+    cli()
