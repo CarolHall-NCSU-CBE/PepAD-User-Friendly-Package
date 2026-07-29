@@ -512,9 +512,10 @@ At least one of `--profiles` or `--details` is needed. Both can be used in the s
 #### Example
 Once PepAD outputs are generated, user can submit the following example script to run PepAD analysis:
 >
-	python pepad_analyzer.py --top 10 --plot score rmsd --rolling 100
+	analyzer --top 10 --plot score rmsd --rolling 100
 
 output:
+PepAD_report.txt
 >
 ```text
 --- 10 unique peptides with best score (energy profile) ---
@@ -530,7 +531,7 @@ output:
  2083  VIKIMGE   -18.28  -18.85  -0.57   0.22      13
   711  KVIIVGD   -18.18  -18.47  -0.29   0.10       3
 ```
-
+Score and RMSD vs steps plot
 <p align="center">
   <img width="800" alt="PepAD score and RMSD evolution" src="https://github.com/user-attachments/assets/15786422-7758-4cfb-a3e5-2ff3c10b5856" />
 </p>
