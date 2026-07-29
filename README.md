@@ -275,10 +275,10 @@ RESTART    = 0        # Can be omitted
 | `N_STEPS` | Number of Monte Carlo steps | **Required** |
 | `KBT_SEQ` | Sequence-move kBT when annealing is off | `1.0` |
 | `KBT_SHEETMOVE` | Sheet-move kBT when annealing is off | `0.6` |
-| `KBT_SEQ_HIGH` | Initial sequence kBT during annealing | `2.0` |
-| `KBT_SEQ_LOW` | Final sequence kBT during annealing | `0.5` |
-| `KBT_SHEETMOVE_HIGH` | Initial sheet-move kBT during annealing | `1.2` |
-| `KBT_SHEETMOVE_LOW` | Final sheet-move kBT during annealing | `0.3` |
+| `KBT_SEQ_HIGH` | Initial sequence kBT when annealing is on | `2.0` |
+| `KBT_SEQ_LOW` | Final sequence kBT when annealing is on | `0.5` |
+| `KBT_SHEETMOVE_HIGH` | Initial sheet-move kBT when annealing is on | `1.2` |
+| `KBT_SHEETMOVE_LOW` | Final sheet-move kBT when annealing is on | `0.3` |
 | `ANNEAL_STAGES` | `0` disables annealing; a positive integer sets its stage count | `0` |
 | `RMSD_MAX` | Maximum sheet-move RMSD in angstroms | `3.0` |
 | `PAGG_WEIGHT` | Aggregation-propensity weight, lambda | `2.0` |
