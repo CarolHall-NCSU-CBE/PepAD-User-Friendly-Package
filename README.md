@@ -394,34 +394,20 @@ Here, `ALA` may appear on sites 2, 3, and 5 at most twice.
 
 ### Annotated input.txt template
 
-The maintained template is [`src/input.example.txt`](src/input.example.txt). Use it as the starting point for new designs.
+The template is [`src/input.example.txt`](src/input.example.txt). Use it as the starting point for new designs.
 
 ## Initial structure requirements
 
-Users must provide an initial structure PDB file for PepAD. The structure usually
-consists of individual peptides in a configuration of cross-β spine. Prepared
-structures are available in [`Initial_structures/`](Initial_structures/). Two
-recommended approaches for preparing the initial structure are as follows.
+Users must provide an initial structure PDB file for PepAD. The structure usually consists of individual peptides in a configuration of cross-β spine. Prepared structures are available in [`Initial_structures/`](Initial_structures/). Two recommended approaches for preparing the initial structure are as follows.
 
-First, users can search for existing amyloid fibril structures in the
-[RCSB Protein Data Bank](https://www.rcsb.org/). For example, the Sup35 prion
-segment GNNQQNY structure (PDB ID: 2OMM) can be replicated to generate a larger
-Class-1 cross-β spine. The resulting structure should be relaxed using
-explicit-solvent atomistic molecular dynamics simulation to remove atomic
-overlaps and then converted to PepAD's required PDB format.
+First, users can search for existing amyloid fibril structures in the [RCSB Protein Data Bank](https://www.rcsb.org/). For example, the Sup35 prion segment GNNQQNY structure (PDB ID: 2OMM) can be replicated to generate a larger Class-1 cross-β spine. The resulting structure should be relaxed using explicit-solvent atomistic molecular dynamics simulation to remove atomic overlaps and then converted to PepAD's required PDB format.
 
 <p align="center">
   <img width="650" alt="Preparing a PepAD structure from a Protein Data Bank fibril" src="https://github.com/user-attachments/assets/c476b3f8-90dd-411e-837f-1fc97d476770" />
 </p>
 <p align="center"><b>Fig. 3.</b> Prepare initial structure using existing fibril structure from Protein Data Bank.</p>
 
-Second, users can build artificial amyloid backbones using molecular modeling
-tools such as UCSF Chimera and Packmol. For example, Aβ(16–22) KLVFFAE was built
-with UCSF Chimera, packed into a two-layer Class-8 antiparallel β-sheet fibril
-using Packmol, and relaxed by explicit-solvent molecular dynamics simulation. To
-reduce PepAD computational cost, the middle eight peptides were extracted from
-the relaxed fibril and saved as `comp1.pdb`. The amyloid backbone can also be
-generated using the Initial Structure Builder provided in this package.
+Second, users can build artificial amyloid backbones using molecular modeling tools such as UCSF Chimera and Packmol. For example, Aβ(16–22) KLVFFAE was built with UCSF Chimera, packed into a two-layer Class-8 antiparallel β-sheet fibril using Packmol, and relaxed by explicit-solvent molecular dynamics simulation. To reduce PepAD computational cost, the middle eight peptides were extracted from the relaxed fibril and saved as `comp1.pdb`. The amyloid backbone can also be generated using the Initial Structure Builder provided in this package.
 
 <p align="center">
   <img width="800" alt="Preparing an artificial amyloid backbone with molecular modeling tools" src="https://github.com/user-attachments/assets/3b1b6026-a947-4a42-98e6-0e8600c831d6" />
@@ -434,37 +420,91 @@ PepAD writes output into the run directory.
 
 | Output | Contents |
 | --- | --- |
-| `energyprofile.txt` | Step, sequence, score, binding free energy, weighted aggregation propensity, and sheet RMSD |
-| `energydetails.txt` | Detailed trial energies, Monte Carlo move, and acceptance result |
+| `energyprofile.txt` | Steps, Sequences, Γ<sub>score</sub>, ΔG<sub>binding</sub>, $$\lambda \times P_{aggregation}$$, and RMSD |
+| `energydetails.txt` | Steps, Trials, Sequences, Γ<sub>score</sub>, ΔE<sub>VDW</sub>, ΔE<sub>ELE</sub>,ΔE<sub>SGB</sub>,ΔE<sub>SURF</sub>, ΔTS<sub>conf</sub>, $$\lambda P_{aggregation}$$, ΔΔE<sub>VDW</sub>, ΔΔE<sub>ELE</sub>, ΔΔE<sub>SGB</sub>, ΔΔE<sub>SURF</sub>, ΔΔTS<sub>conf</sub>, Δ $$\lambda P_{aggregation}$$, MC moves, and Trial results|
 | `minimum_energy.txt` | Lowest-score sequences encountered during the search |
 | `backup4backbone.txt` | Restart information |
 | `pdbfiles/` | Structures saved for minimum-score designs |
 
-Run settings and progress are printed to standard output; an HPC submission
-script can redirect that stream to a job report. Energy quantities are reported
-in kcal/mol. RMSD is reported in angstroms.
+Run settings and progress are printed to standard output; an HPC submission script can redirect that stream to a job report. Energy quantities are reported in kcal/mol. RMSD is reported in angstroms.
 
 <p align="center">
   <img width="800" alt="PepAD score and RMSD evolution" src="https://github.com/user-attachments/assets/15786422-7758-4cfb-a3e5-2ff3c10b5856" />
 </p>
 <p align="center"><b>Fig. 5.</b> The Γ<sub>score</sub> and RMSD evolution in a 10,000-step PepAD run of designing 7-mer antiparallel peptides.</p>
 
-### Initial Structure Builder
+## PepAD tools
+We provide a PepAD-related Python package that contains two modules: `builder` and `analyzer`. These tools are helpful but are not required to run PepAD.
+- `builder`: create the β-cross spine in one of the ten steric zipper classes [4,14].
+- `analyzer`: analyze PepAD results (energy profile and energy details) and derive best-scoring peptides, plotting score change over steps, as well as how individual energy terms contribute to the MC acceptance or rejection.
 
-We provide a supplemental **Initial Structure Builder** to build two β-sheet
-fibril backbones suitable for PepAD. The Initial Structure Builder can create the
-β-cross spine in one of the eight steric zipper classes [4]. It uses
-PeptideBuilder to construct peptides and Hydride to add hydrogens [12,13].
+### Install PepAD tools
+The installation only needs to be done once.
+Clone the PepAD repository if it has not already been downloaded:
+ ```bash
+git clone https://github.com/CarolHall-NCSU-CBE/PepAD-User-Friendly-Package.git
+cd PepAD-User-Friendly-Package
+ ```
 
+Create and activate a Conda environment, then install PepAD tools via `pip`:
+```bash
+conda create -n pepad-tools python=3.12 pip
+conda activate pepad-tools
+python -m pip install ./PepAD_tools/
+```
+On HPC systems, users may create the environment to a specified path
+```bash
+conda create -p /path/to/env_pepad_tools python=3.12 pip
+conda activate /path/to/env_pepad_tools
+python -m pip install ./PepAD_tools/
+```
+
+Both builder and the analyzer can be called in the "pepad-tools" environment
+```bash
+builder --help
+analyzer --help
+```
+### Load PepAD Tools Later
+After opening a new terminal session, users need to activate the environment again:
+```bash
+conda activate pepad-tools
+```
+On HPC systems
+```bash
+conda activate /path/to/env_pepad_tools
+```
+
+### Use Initial Structure Builder (builder)
+#### Arguments
+  - `h`,  --`help`            Show help message.
+  - `s`,  --`seq`             Input peptide sequence. 
+  - `c`,  --`class`           Integer from 1 to 10, corresponding to the 10 classes of steric zipper. (required)
+  - `dx`, --`dx`           Strand-strand distance (Å) along x. (default: 4.8 Å)
+  - `dz`, --`dz`         Sheet-sheet distance (Å) along z. (default: 11.5 Å)
+  - `x`,  --`x`              Sheet-2 shifts in x direction in unit of [0.5*dx]. (default: 0.0)
+  - `y`, --`y`             Sheet-2 shifts in y direction in unit of residue spacing (3.465 Å). (default: 0.0)
+  - `n`, --`chains`          Integer. Strands per sheet; default = 8.
+  - `r`, --`core`            {e,o}. Packing e = even number packed inside, o = odd number packed inside. (default: e)
+  - `g`, --`registry`        {minus,plus}. Relative direction of registry shift.
+  - `f`, --`format`          {0,1}. PDB format. 0 = PepAD format; 1 = AMBER format. (default: 0)
+  - `C`, --`cap`             {0,1,2}. Terminal caps: 0 uncapped, 1 ACE+NME, or 2 ACE+NHE. (default: 0)
+  - `o`, --`output`          Output PDB filename.
+
+#### Example
+User can submit the following example script to run build an initial structure:
+```bash
+builder --seq GNNQQNY --class 1 --dx 4.8 --dz 11.0 --x -1 --y 1 --chains 4 --cap 2 --core e --format 1 --output pep2.pdb
+```
+output:
 <p align="center">
   <img width="800" alt="Parallel 7-mer peptide backbone generated by the Initial Structure Builder" src="https://github.com/user-attachments/assets/2c485625-af0e-4c3f-8a94-31fa2de56725" />
 </p>
 <p align="center"><b>Fig. 6.</b> A 7-mer parallel peptide backbone generated by the Initial Structure Builder.</p>
 
-## Citation and references
+### Use PepAD Analyzer (analyzer)
 
-If PepAD contributes to published work, please cite the relevant PepAD design
-papers [1–3].
+
+## References
 
 1. S. Sarma, T.R. Sudarshan, V. Nguyen, A.S. Robang, X. Xiao, J.V. Le,
    M.E. Helmicki, A.K. Paravastu, and C.K. Hall, “Design of parallel β-sheet
@@ -518,7 +558,9 @@ papers [1–3].
 13. P. Kunzmann, J.M. Anter, and K. Hamacher, “Adding hydrogen atoms to molecular
     models via fragment superimposition,” *Algorithms for Molecular Biology*
     **17** (2022), 7. https://doi.org/10.1186/s13015-022-00215-x
+14. Stroud, J. C. The Zipper Groups of the Amyloid State of Proteins. Acta Cryst D 2013, 69 (4), 540–545. https://doi.org/10.1107/S0907444912050548.
 
+    
 ## License
 
 This project is distributed under the terms in [`LICENSE`](LICENSE).
