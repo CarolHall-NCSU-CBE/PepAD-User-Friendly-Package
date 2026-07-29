@@ -38,6 +38,19 @@ class PepadToolsPackageTests(unittest.TestCase):
         self.assertIsInstance(alanine, pd.DataFrame)
         self.assertFalse(alanine.empty)
 
+    def test_help_names_pepad_and_amber_formats(self):
+        output = io.StringIO()
+        with contextlib.redirect_stdout(output):
+            with self.assertRaises(SystemExit) as exit_context:
+                builder_module.read_arguments(["--help"])
+
+        self.assertEqual(exit_context.exception.code, 0)
+        self.assertIn(
+            "PDB format: 0 = PepAD format; 1 = AMBER format.",
+            output.getvalue(),
+        )
+        self.assertNotIn("style", output.getvalue())
+
     def test_public_build_function_uses_packaged_rotamers(self):
         output = io.StringIO()
         with contextlib.redirect_stdout(output):

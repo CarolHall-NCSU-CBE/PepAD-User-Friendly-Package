@@ -5422,7 +5422,7 @@ def _write_packed_peptides(peptides, chain_length, format_flag, o_filename):
         Number of residue records assigned to one packed chain, including caps when
         present.
     format_flag : int
-        Selects the normal or AMBER-style PDB residue-name format.
+        0 selects PepAD format; 1 selects AMBER format.
     o_filename : str or pathlib.Path
         Output PDB file.
 
@@ -5476,7 +5476,7 @@ def packpep_geometric(single_peptite, chain_length, classes, shifts, chains_per_
     chains_per_sheet : int
         Number of peptide strands placed in each sheet.
     format_flag : int
-        Selects the normal or AMBER-style PDB residue-name format.
+        0 selects PepAD format; 1 selects AMBER format.
     o_filename : str or pathlib.Path
         Output PDB file.
     core_residues : str
@@ -5632,7 +5632,7 @@ def _write_packed_peptides_two_component(peptides, chain_length, format_flag,
         Number of residue records assigned to one packed chain, including caps when
         present.
     format_flag : int
-        Selects the normal or AMBER-style PDB residue-name format.
+        0 selects PepAD format; 1 selects AMBER format.
     o_filename : str or pathlib.Path
         Output PDB file.
 
@@ -5833,7 +5833,7 @@ def packpep_geometric_two_component(single_pep_A, single_pep_B, chain_length, cl
     sheet2_pattern : str
         A/B strand pattern for sheet 2.
     format_flag : int
-        Selects the normal or AMBER-style PDB residue-name format.
+        0 selects PepAD format; 1 selects AMBER format.
     o_filename : str or pathlib.Path
         Output PDB file.
     core_residues : str
@@ -6000,7 +6000,7 @@ def packpep_parallel_antiparallel_two_component(single_para_A, single_para_B,
     sheet2_pattern : str
         A/B strand pattern for sheet 2.
     format_flag : int
-        Selects the normal or AMBER-style PDB residue-name format.
+        0 selects PepAD format; 1 selects AMBER format.
     o_filename : str or pathlib.Path
         Output PDB file.
     core_residues : str
@@ -6328,7 +6328,7 @@ def packpep_parallel_antiparallel(single_pep_para, single_pep_anti=None,
     chains_per_sheet : int
         Number of peptide strands placed in each sheet.
     format_flag : int
-        Selects the normal or AMBER-style PDB residue-name format.
+        0 selects PepAD format; 1 selects AMBER format.
     o_filename : str or pathlib.Path
         Output PDB file.
     core_residues : str
@@ -6516,7 +6516,7 @@ SHEET_INPUT_SCHEMA = {
         "type": "{0, 1}",
         "default": 0,
         "choices": (0, 1),
-        "description": "0 writes standard PDB format; 1 writes AMBER-style format.",
+        "description": "0 writes PepAD format; 1 writes AMBER format.",
     },
     "cap_flag": {
         "type": "{0, 1, 2}",
@@ -6779,7 +6779,7 @@ def validate_sheet_inputs(
     chains : int, default=8
         Number of strands per sheet.
     format_flag : {0, 1}, default=0
-        0 writes standard PDB format; 1 writes AMBER-style format.
+        0 writes PepAD format; 1 writes AMBER format.
     cap_flag : {0, 1, 2}, default=0
         0 is uncapped; 1 adds ACE+NME; 2 adds ACE+NHE.
     y_shift : float, default=0.0
@@ -6931,7 +6931,7 @@ def build_sheets(
         Number of strands per sheet for a one-sequence build. Pattern lengths
         set the strand counts for a two-sequence build.
     format_flag : {0, 1}, default=0
-        Standard or AMBER-style PDB format.
+        PepAD or AMBER format.
     cap_flag : {0, 1, 2}, default=0
         Uncapped, ACE+NME, or ACE+NHE termini.
     y_shift : float, default=0.0
@@ -7291,7 +7291,7 @@ def read_arguments(
         type=int,
         choices=(0, 1),
         default=0,
-        help="PDB format: 0 for standard or 1 for AMBER style.",
+        help="PDB format: 0 = PepAD format; 1 = AMBER format.",
     )
     parser.add_argument(
         "-C",
