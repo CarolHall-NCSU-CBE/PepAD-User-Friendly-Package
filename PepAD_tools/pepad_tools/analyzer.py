@@ -1104,16 +1104,19 @@ def analyze_delta_energy(
         raise ValueError(f"Unknown detail plot option(s): {invalid_text}")
     percentage_ylabel = (
         r"$\mathrm{Accept}:\ "
-        r"|\Delta E_k^{(-)}|\,/\,\sum_i |\Delta E_i^{(-)}|\times 100\%$"
+        r"|\Delta\Delta E_k^{(-)}|\,/\,"
+        r"\sum_i |\Delta\Delta E_i^{(-)}|\times 100\%$"
         "\n"
         r"$\mathrm{Reject\!\!-\!\!MC}:\ "
-        r"|\Delta E_k^{(+)}|\,/\,\sum_i |\Delta E_i^{(+)}|\times 100\%$"
+        r"|\Delta\Delta E_k^{(+)}|\,/\,"
+        r"\sum_i |\Delta\Delta E_i^{(+)}|\times 100\%$"
     )
     raw_ylabel = (
-        r"$\mathrm{Accept}:\ \Delta E_k^{(-)}\ (\mathrm{kcal/mol})$"
+        r"$\mathrm{Accept}:\ \Delta\Delta E_k^{(-)}\ "
+        r"(\mathrm{kcal/mol})$"
         "\n"
         r"$\mathrm{Reject\!\!-\!\!MC}:\ "
-        r"\Delta E_k^{(+)}\ (\mathrm{kcal/mol})$"
+        r"\Delta\Delta E_k^{(+)}\ (\mathrm{kcal/mol})$"
     )
 
     # These are signed contributions to Score. TS and PAGG enter Score with minus signs.
@@ -1164,20 +1167,24 @@ def analyze_delta_energy(
 
     contribution_summary = pd.DataFrame(
         {
-            "Median_negative_dEi_when_accepted(kcal/mol)": accepted_negative_median,
-            "Median_positive_dEi_when_rejected(kcal/mol)": rejected_positive_median,
-            "Frequency_of_negative_value_when_accepted(%)": (
+            "Median_negative_ddEi_when_accepted(kcal/mol)": (
+                accepted_negative_median
+            ),
+            "Median_positive_ddEi_when_rejected(kcal/mol)": (
+                rejected_positive_median
+            ),
+            "Frequency_of_negative_ddEi_when_accepted(%)": (
                 negative.gt(0).mean().mul(100)
             ),
-            "Median_negative_contribution_when_accepted(%)": negative_percentage.mask(
-                negative_percentage.eq(0)
-            ).median(),
-            "Frequency_of_positive_value_when_rejected(%)": (
+            "Median_negative_ddEi_contribution_when_accepted(%)": (
+                negative_percentage.mask(negative_percentage.eq(0)).median()
+            ),
+            "Frequency_of_positive_ddEi_when_rejected(%)": (
                 positive.gt(0).mean().mul(100)
             ),
-            "Median_positive_contribution_when_rejected(%)": positive_percentage.mask(
-                positive_percentage.eq(0)
-            ).median(),
+            "Median_positive_ddEi_contribution_when_rejected(%)": (
+                positive_percentage.mask(positive_percentage.eq(0)).median()
+            ),
         }
     ).round(2)
 
@@ -1412,12 +1419,12 @@ def analyze_delta_energy(
             "trials:\n"
         )
         f.write(
-            "Energy_term\tMedian_negative_dEi_when_accepted(kcal/mol)\t"
-            "Median_positive_dEi_when_rejected(kcal/mol)\t"
-            "Frequency_of_negative_value_when_accepted(%)\t"
-            "Median_negative_contribution_when_accepted(%)\t"
-            "Frequency_of_positive_value_when_rejected(%)\t"
-            "Median_positive_contribution_when_rejected(%)\n"
+            "Energy_term\tMedian_negative_ddEi_when_accepted(kcal/mol)\t"
+            "Median_positive_ddEi_when_rejected(kcal/mol)\t"
+            "Frequency_of_negative_ddEi_when_accepted(%)\t"
+            "Median_negative_ddEi_contribution_when_accepted(%)\t"
+            "Frequency_of_positive_ddEi_when_rejected(%)\t"
+            "Median_positive_ddEi_contribution_when_rejected(%)\n"
         )
         for energy, row in contribution_summary.iterrows():
             values = [

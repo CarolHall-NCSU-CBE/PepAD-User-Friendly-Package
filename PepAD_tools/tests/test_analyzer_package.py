@@ -327,6 +327,18 @@ class PepADAnalyzerPythonTests(unittest.TestCase):
             self.assertFalse(
                 (Path(temp_dir) / "Delta_energy_contribution.png").exists()
             )
+            expected_header = (
+                "Energy_term\t"
+                "Median_negative_ddEi_when_accepted(kcal/mol)\t"
+                "Median_positive_ddEi_when_rejected(kcal/mol)\t"
+                "Frequency_of_negative_ddEi_when_accepted(%)\t"
+                "Median_negative_ddEi_contribution_when_accepted(%)\t"
+                "Frequency_of_positive_ddEi_when_rejected(%)\t"
+                "Median_positive_ddEi_contribution_when_rejected(%)"
+            )
+            self.assertIn(
+                expected_header, report.read_text(encoding="utf-8")
+            )
 
         self.assertEqual(len(result), 3)
         self.assertTrue(all(isinstance(item, pd.DataFrame) for item in result))
