@@ -51,7 +51,7 @@ More negative scores indicate stronger predicted binding at the evaluated config
 PepAD can be run with a precompiled container or compiled in the local
 environment.
 
-## Method 1: Use the Docker image with Apptainer
+## Method 1: Use Docker image with Apptainer
 
 The container includes a precompiled PepAD executable. Users do not need an Intel Fortran compiler for this method.
 
