@@ -121,6 +121,14 @@ If this parameter is omitted, PepAD generates a seed from the current
 system clock time.
 If it is supplied, PepAD uses the user-provided seed.
 .TP
+.B N_TOP
+Integer.
+Number of lowest-scoring unique sequences recorded.
+The records are written to
+.BR minimum_energy.txt .
+The default is 10.
+The current one-letter sequence field supports up to 30 amino acids.
+.TP
 .B KBT_SEQ
 Real.
 Sequence kBT used when
@@ -383,6 +391,15 @@ It must be present in the directory where PepAD is started.
 .I pdbfiles/
 Directory containing generated PDB structures and SCMF diagnostic
 structures.
+.TP
+.I minimum_energy.txt
+The dynamically updated list of the lowest-scoring unique sequences.
+Each record contains its rank, Monte Carlo step, trial, one-letter
+sequence, score, binding free energy, and weighted aggregation term.
+The corresponding PDB filename contains the step, trial, and sequence.
+When an entry leaves the list, its PDB file is removed.
+PepAD reloads this file when
+.BR RESTART " = 1."
 .
 .SH AUTHORS
 Haoyu Wang, Sudeep Sarma, and Carol K. Hall.
