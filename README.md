@@ -72,13 +72,13 @@ This creates `PepAD_package.sif` in `/path/to/PepAD_container`.
 
 Each run needs:
 
-- an initial structure in PDB format; and
-- a text file named exactly `input.txt`.
+- an initial structure PDB file
+- `input.txt`.
 
-From the root of the downloaded PepAD repository, create a run directory. Copy
-the input template into the run directory as `input.txt`, copy the initial
+Then create a run directory and change to the run directory. Copy the input template into the run directory as `input.txt`, copy the initial
 structure, and edit `input.txt`:
 
+Example: if a run directory is created in the `/PepAD-User-Friendly-Package`
 ```bash
 mkdir -p run1
 cp src/input.example.txt run1/input.txt
@@ -88,8 +88,7 @@ cd run1
 
 ### 3. Run PepAD
 
-Bind the run directory to `/work` inside the container. PepAD reads `input.txt`
-and writes its output files in the run directory:
+Bind the run directory to `/work` inside the container. PepAD reads `input.txt` and writes its output files in the run directory:
 
 ```bash
 
@@ -116,8 +115,7 @@ or
 apptainer exec "$PEPAD_SIF" man PepAD
 ```
 
-When using a batch script, load the Apptainer module in the script if it is
-required on the local system.
+When using a batch script, load the Apptainer module in the script if it is required on the local system.
 
 ## Method 2: Download and compile PepAD
 
@@ -128,10 +126,7 @@ required on the local system.
 
 ### 1. Download and compile PepAD
 
-Download or clone this repository. PepAD is written in Fortran 90 and requires
-the Intel `ifx` compiler. The provided compilation script locates the source,
-runtime library, and manual relative to its own location, so it can be called
-from the repository root:
+Download or clone this repository. PepAD is written in Fortran 90 and requires the Intel Fortran compiler `ifx`. The provided script `compile_code.sh`, which locates the `src/`, compiles the PepAD code: 
 
 ```bash
 git clone https://github.com/CarolHall-NCSU-CBE/PepAD-User-Friendly-Package.git
@@ -160,7 +155,7 @@ bash src/compile_code.sh /path/to/PepAD_install
 
 ### 2. Add PepAD to `PATH`
 
-For the default installation, run these commands from the repository root:
+For the default installation, run these commands from `PepAD-User-Friendly-Package/`:
 
 ```bash
 PEPAD_INSTALL="$(pwd -P)/src/PepAD"
@@ -168,11 +163,9 @@ export PATH="$PEPAD_INSTALL:$PATH"
 export MANPATH="$PEPAD_INSTALL/man:${MANPATH:-}"
 ```
 
-These commands affect the current shell. To make them permanent, add the two
-`export` commands, using the absolute installation path, to the shell startup
-file.
+These commands affect the current shell. To make them permanent, add the two `export` commands, using the absolute installation path, to the shell startup file.
 
-Test the executable and manual:
+Test whether the executable is working by referring to manual:
 
 ```bash
 module load PrgEnv-intel # Load Intel Compilers if necessary
@@ -184,11 +177,13 @@ man PepAD
 
 Each run needs:
 
-- an initial structure in PDB format; and
-- a text file named exactly `input.txt`.
+- an initial structure PDB file
+- `input.txt`.
 
-From the repository root, create the run directory using the same paths as in Method 1:
+Then create a run directory and change to the run directory. Copy the input template into the run directory as `input.txt`, copy the initial
+structure, and edit `input.txt`:
 
+Example: if a run directory is created in the `PepAD-User-Friendly-Package/`
 ```bash
 mkdir -p run1
 cp src/input.example.txt run1/input.txt
@@ -198,7 +193,7 @@ cd run1
 
 ### 4. Run PepAD
 
-From `run1`, execute PepAD. It reads `input.txt` and writes the results in the working directory:
+In `run1`, execute PepAD. It reads `input.txt` and writes the results in the run directory:
 
 ```bash
 PepAD
@@ -223,7 +218,7 @@ PARAMETER = value
 - Parameter order does not matter.
 - Parameter names are case-insensitive; uppercase is recommended.
 - Blank lines are allowed.
-- Comments may begin with `#` or `!`, including after a value.
+- Comments must begin with `#` or `!`, including after a value.
 - Each parameter may appear at most once.
 - Unknown parameters and invalid or duplicate values stop the run with an error.
 - List values may be separated by spaces or commas.
@@ -294,7 +289,7 @@ RESTART    = 0        # Can be omitted
 
 ### Amino acid compositions
 
-The input uses minimum and maximum counts instead of the exact counts for four amino acid types:
+The input uses minimum and maximum counts to define ranges for four amino acid types:
 
 | Parameter | Meaning | Default |
 | --- | --- | --- |
@@ -310,8 +305,7 @@ The input uses minimum and maximum counts instead of the exact counts for four a
 - Equal minimum and maximum values impose an exact count.
 - Composition totals exclude `ACE`, `NME`, and `NHE` caps, but include residues at sites defined by single-site positional constraints and grouped-site positional constraints.
 
-Example allowing a range of polar and charged content while fixing the
-hydrophobic count:
+Example 1: Designing 7-mer peptides with dynamic amino acid compositions
 
 ```text
 N_HYDROPHOBIC_MIN = 0
@@ -319,6 +313,19 @@ N_HYDROPHOBIC_MAX = 7
 N_POLAR_MIN       = 0
 N_POLAR_MAX       = 7
 N_CHARGED_MIN     = 0
+N_CHARGED_MAX     = 2
+N_OTHER_MIN       = 0
+N_OTHER_MAX       = 0
+```
+
+Example 2: Designing 7-mer peptides with fixed compositions:
+
+```text
+N_HYDROPHOBIC_MIN = 5
+N_HYDROPHOBIC_MAX = 5
+N_POLAR_MIN       = 0
+N_POLAR_MAX       = 0
+N_CHARGED_MIN     = 2
 N_CHARGED_MAX     = 2
 N_OTHER_MIN       = 0
 N_OTHER_MAX       = 0
@@ -351,18 +358,18 @@ N_SER_MAX = 3
 ### Positional constraints
 
 - Cap positions (`ACE`, `NME`, and `NHE`) are recognized automatically and should not be listed as constraints. 
-- Residue numbers here refer only to amino-acid positions.
-- Caps are omitted when numbering. For a capped peptide, #3 is amino acid 3, which is at chain site 4 (since site 1 is an ACE cap).
+- Site numbers here refer only to amino-acid positions.
 
 #### Single-site positional constraint
 
-`SINGLE_SITE_CONSTRAINTS` accepts space-separated entries:
+`SINGLE_SITE_CONSTRAINTS` accepts following values separated by spaces:
 
 - `site_num` keeps the amino acid already present at that site.
 - `site_num:AA` first changes the site to the named amino acid, then keeps it fixed.
 
 **Do not place spaces around the colon:**
 
+Example:
 ```text
 SINGLE_SITE_CONSTRAINTS = 5:ASN 6
 ```
@@ -371,15 +378,15 @@ Use `NONE` or omit the parameter when no single-site positional constraint is ne
 
 #### Grouped-site positional constraint
 
-Grouped-site constraints assign amino acids to selected positions from a user-defined pool:
+Grouped-site constraints assign amino acids to selected positions from a user-defined pool. Example:
 
 ```text
 GROUPED_SITE_AA_POOL     = ASN SER THR ALA VAL
 GROUPED_SITE_CONSTRAINTS = 1 2 3
 ```
-Here, sites 1, 2, and 3 are assigned amino acids from the `GROUPED_SITE_AA_POOL`.
+Here, sites 1, 2, and 3 are assigned amino acids from the `GROUPED_SITE_AA_POOL`, and each amino acid can be selected up to once.
 
-PepAD allows duplicate amino acids in the pool:
+PepAD allows duplicate amino acids in the pool. Example: 
 ```text
 GROUPED_SITE_AA_POOL     = ASN SER ALA ALA VAL
 GROUPED_SITE_CONSTRAINTS = 2 3 5
@@ -388,7 +395,7 @@ Here, `ALA` may appear on sites 2, 3, and 5 at most twice.
 
 - The number of amino acids in `GROUPED_SITE_AA_POOL` must not be less than the number of sites in `GROUPED_SITE_CONSTRAINTS`.
 - To allow an amino acid to appear one additional time, enter it one additional time in the pool.
-- Grouped sites cannot overlap with sites listed in `SINGLE_SITE_CONSTRAINTS`.
+- `GROUPED_SITE_CONSTRAINTS` cannot overlap with sites listed in `SINGLE_SITE_CONSTRAINTS`.
 - PepAD checks whether the grouped-site pool is compatible with the overall composition limits and compositional constraints.
 
 
