@@ -43,6 +43,15 @@ module constant
 		integer, allocatable :: peptideID(:)
     end type
 
+    type minimum_energy
+        character*30	:: seq_name
+        integer			:: step
+        integer			:: trial
+        real(kind=8)	:: score
+        real(kind=8)	:: gbind
+        real(kind=8)	:: lpagg
+    end type
+    
 	type sasa_cache_type
 		logical :: valid=.false.
 		integer :: n_atoms=0
@@ -77,7 +86,6 @@ module constant
 	integer					:: amino_acid_residue_count
 	integer					:: atom_num
 
-	integer, parameter		:: num4pdbsave=10
 	integer, parameter		:: maximum_nmr_site_num=10
 	integer, parameter		:: maximum_void_site_num=30
 	integer					:: void_site(maximum_void_site_num)
@@ -86,6 +94,7 @@ module constant
 	integer					:: nmr_site_num, nmr_site_ID(maximum_nmr_site_num)
     integer					:: restraint_num, exclusion_num, NMR_pool_size
 	integer					:: nstep_start, nstep_terminal, idum, recalcu_switch, flag4sheet
+	integer					:: n_top, n_top_found
 	integer					:: fpho,fpol,fchg,foth
 	integer					:: fpho_min, fpho_max, fpol_min, fpol_max
 	integer					:: fchg_min, fchg_max, foth_min, foth_max
@@ -110,7 +119,6 @@ module constant
 
 	real					:: ekt_seq, ekt_seq_low, ekt_seq_high
     real					:: ekt_sheet, ekt_sheet_low, ekt_sheet_high
-	real					:: energy_min(num4pdbsave)
     real         			:: sheet_switch
     real, parameter			:: CONROT_switch=0.6
 	real					:: rmsd_max, rmsd_max_x, rmsd_max_y, rmsd_max_z
@@ -125,6 +133,7 @@ module constant
 	type(hydration_types)   :: hydrationprop
 	type(peptideassembly), allocatable 	:: selfassembly(:)
     type(peptideassembly), allocatable 	:: betasheets(:)
+	type(minimum_energy), allocatable	:: minimum_energies(:)
 	type(sasa_cache_type) :: sasa_current,sasa_trial
 	integer :: sasa_validation_count=0
 	character*50			:: filename							! The input PDB file
@@ -495,16 +504,23 @@ module pdbfile
 	end subroutine readpdb
 
 
-	subroutine generatepdb(step, attempt, group)
+	subroutine generatepdb(step, attempt, group, output_name)
 	implicit none
-	integer							:: step, attempt
+	integer, intent(in)				:: step, attempt
 	integer							:: i, j, k, atomnum
-	character*5						:: stepchar, attemptchar
+	character(len=*), intent(in), optional :: output_name
+	character(len=32)				:: stepchar, attemptchar
+	character(len=512)				:: output_path
 	type(groupdetails)				:: group(repeated_unit,gnum)
 
-	write(stepchar,"(i5)") step
-	write(attemptchar,"(i4)") attempt
-            open(10,file='pdbfiles/'//trim(adjustl(stepchar))//'_'//trim(adjustl(attemptchar))//'.pdb', status="replace", access="sequential")
+	if (present(output_name)) then
+		output_path='pdbfiles/'//trim(output_name)
+	else
+		write(stepchar,'(I0)') step
+		write(attemptchar,'(I0)') attempt
+		output_path='pdbfiles/'//trim(stepchar)//'_'//trim(attemptchar)//'.pdb'
+	endif
+	open(10,file=trim(output_path),status='replace',access='sequential')
 		atomnum=1
 		do i=1, repeated_unit
 			do j=1, gnum
@@ -1004,7 +1020,7 @@ module input
 	subroutine inputfile(input_name)
 	implicit none
 	integer, parameter :: maximum_user_sheets=100
-	integer, parameter :: number_of_counted_flags=37
+	integer, parameter :: number_of_counted_flags=38
 	character(len=3), parameter :: amino_acid_names(20) = (/ &
 		'GLY','ALA','VAL','LEU','ILE','MET','PHE','TYR','TRP','SER', &
 		'ASN','GLN','THR','HIE','ARG','LYS','GLU','ASP','CYS','PRO' /)
@@ -1013,7 +1029,7 @@ module input
 	character(len=32), parameter :: counted_flag_names(number_of_counted_flags) = &
 		(/ character(len=32) :: &
 		'PDBFILE','N_AA','N_CHAINS','GROUP_1','GROUP_2','RESTART', &
-		'RANSEED','N_STEPS','KBT_SEQ','KBT_SEQ_HIGH','KBT_SEQ_LOW', &
+		'RANSEED','N_STEPS','N_TOP','KBT_SEQ','KBT_SEQ_HIGH','KBT_SEQ_LOW', &
 		'KBT_SHEETMOVE','KBT_SHEETMOVE_HIGH','KBT_SHEETMOVE_LOW', &
 		'RMSD_MAX','PAGG_WEIGHT','SHEETMOVE','ANNEAL_STAGES','ESURF_MODE', &
 		'STEPS_BEFORE_SHEETMOVE','STEPS_BETWEEN_SHEETMOVE', &
@@ -1076,6 +1092,7 @@ module input
 	recalcu_switch=0
 	idum=0
 	nstep_terminal=-1
+	n_top=10
 	ekt_seq=1.0
     ekt_seq_high=2.0
     ekt_seq_low=0.5
@@ -1238,6 +1255,8 @@ module input
 			seed_switch=1
 		case('N_STEPS')
 			read(value,*,iostat=ios) nstep_terminal
+		case('N_TOP')
+			read(value,*,iostat=ios) n_top
 		case('KBT_SEQ')
 			read(value,*,iostat=ios) ekt_seq
 		case('KBT_SEQ_HIGH')
@@ -1347,6 +1366,10 @@ module input
 		write(*,*) 'ERROR: N_STEPS is required and must be positive.'
 		stop
 	endif
+	if (n_top < 1) then
+		write(*,*) 'ERROR: N_TOP must be a positive integer.'
+		stop
+	endif
 	if (anneal_stages < 0 .or. rmsd_max < 0.0 .or. &
 		propensity_weighting_factor < 0.0) then
 		write(*,*) 'ERROR: invalid MC input.'
@@ -1413,6 +1436,11 @@ module input
 		write(*,*) 'ERROR: enter both N_AA and N_CHAINS, or omit both.'
 		stop
     endif
+	if (amino_acid_residue_count > 30) then
+		write(*,'(A,I0,A)') 'ERROR: N_AA = ',amino_acid_residue_count, &
+			' exceeds the 30-character minimum-energy sequence capacity.'
+		stop
+	endif
 
 	! Determine the hydrogen-bond network before assigning peptide groups or sheets.
 	call Hbond_matrix
@@ -1923,6 +1951,7 @@ module input
 		write(6,'(1X,A,T38,"= ",I0)') 'Random seed (system clock)',idum
 	endif
 	write(6,'(1X,A,T38,"= ",I0)') 'Monte Carlo steps',nstep_terminal
+	write(6,'(1X,A,T38,"= ",I0)') 'Record lowest unique sequences ',n_top
 	if (anneal_stages >= 1) then
 		write(6,'(1X,A,T38,"= ",F5.3," to ",F5.3)') &
 			'kBT (sequence), high to low',ekt_seq_high,ekt_seq_low
@@ -2556,6 +2585,8 @@ subroutine check_help
 	write(*,'(A)') 'Monte Carlo and energy parameters:'
 	write(*,'(A)') '  RANSEED                       Integer; random seed'
 	write(*,'(A)') '                                (default: system clock)'
+	write(*,'(A)') '  N_TOP                         Integer; number of lowest unique'
+	write(*,'(A)') '                                sequences recorded (default 10)'
 	write(*,'(A)') '  KBT_SEQ                       Real; sequence kBT used when'
 	write(*,'(A)') '                                ANNEAL_STAGES = 0 (default 1.0)'
 	write(*,'(A)') '  KBT_SEQ_HIGH                  Real; initial sequence kBT when'
@@ -9249,6 +9280,162 @@ module optimization_techniques
 	return
 	end subroutine ensure_optimization_workspace
 
+	subroutine update_minimum_energy(step,trial,group,score,gbind,lpagg)
+	implicit none
+	integer, intent(in) :: step,trial
+	integer :: i,position,existing,unit,ios
+	real(kind=8), intent(in) :: score,gbind,lpagg
+	character(len=gnum) :: pep_name
+	character(len=32) :: step_text,trial_text
+	character(len=512) :: pdb_name,pdb_path
+	logical :: removed_entry,old_pdb_exists
+	type(minimum_energy) :: new_entry,old_entry
+	type(groupdetails), intent(in) :: group(repeated_unit,gnum)
+
+	call convert_AA_name(group,pep_name)
+	pep_name=trim(adjustl(pep_name))
+
+	existing=0
+	do i=1,n_top_found
+		if (trim(minimum_energies(i)%seq_name) == trim(pep_name)) then
+			existing=i
+			exit
+		endif
+	enddo
+
+	removed_entry=.false.
+	if (existing > 0) then
+		if (score >= minimum_energies(existing)%score) return
+		old_entry=minimum_energies(existing)
+		removed_entry=.true.
+		do i=existing,n_top_found-1
+			minimum_energies(i)=minimum_energies(i+1)
+		enddo
+		n_top_found=n_top_found-1
+	elseif (n_top_found == n_top) then
+		if (score >= minimum_energies(n_top_found)%score) return
+		old_entry=minimum_energies(n_top_found)
+		removed_entry=.true.
+		n_top_found=n_top_found-1
+	endif
+
+	position=n_top_found+1
+	do i=1,n_top_found
+		if (score < minimum_energies(i)%score) then
+			position=i
+			exit
+		endif
+	enddo
+	do i=n_top_found,position,-1
+		minimum_energies(i+1)=minimum_energies(i)
+	enddo
+
+	new_entry%seq_name=trim(pep_name)
+	new_entry%step=step
+	new_entry%trial=trial
+	new_entry%score=score
+	new_entry%gbind=gbind
+	new_entry%lpagg=lpagg
+	minimum_energies(position)=new_entry
+	n_top_found=n_top_found+1
+
+	write(step_text,'(I0)') step
+	write(trial_text,'(I0)') trial
+	pdb_name=trim(step_text)//'_'//trim(trial_text)//'_'//trim(pep_name)//'.pdb'
+	call generatepdb(step,trial,group,trim(pdb_name))
+
+	if (removed_entry) then
+		write(step_text,'(I0)') old_entry%step
+		write(trial_text,'(I0)') old_entry%trial
+		pdb_path='pdbfiles/'//trim(step_text)//'_'//trim(trial_text)//'_'// trim(old_entry%seq_name)//'.pdb'
+		inquire(file=trim(pdb_path),exist=old_pdb_exists)
+		if (old_pdb_exists) then
+			open(newunit=unit,file=trim(pdb_path),status='old',iostat=ios)
+			if (ios == 0) then
+				close(unit,status='delete',iostat=ios)
+				if (ios /= 0) write(*,'(2A)') 'WARNING: cannot remove displaced minimum-energy PDB: ',trim(pdb_path)
+			else
+				write(*,'(2A)') 'WARNING: cannot remove displaced minimum-energy PDB: ', trim(pdb_path)
+			endif
+		endif
+	endif
+
+	open(newunit=unit,file='minimum_energy.txt',status='replace',action='write',iostat=ios)
+	if (ios /= 0) stop 'ERROR: cannot write minimum_energy.txt.'
+	write(unit,'(A10,A10,A10,5X,A,22X,3A15)') '#Rank','Step','Trial', 'Sequence','Score','Gbind','Lambda_Pagg'
+	do i=1,n_top_found
+		write(unit,'(3I10,5X,A30,3F15.4)') i, &
+			minimum_energies(i)%step,minimum_energies(i)%trial, &
+			minimum_energies(i)%seq_name,minimum_energies(i)%score, &
+			minimum_energies(i)%gbind,minimum_energies(i)%lpagg
+	enddo
+	close(unit)
+
+	end subroutine update_minimum_energy
+
+	subroutine load_minimum_energy()
+	implicit none
+	integer :: unit,ios,rank,step,trial
+	real(kind=8) :: score,gbind,lpagg
+	character(len=512) :: line
+	character(len=30) :: pep_name
+	logical :: file_exists,format_header_found
+
+	inquire(file='minimum_energy.txt',exist=file_exists)
+	if (.not.file_exists) then
+		write(*,'(A)') 'WARNING: minimum_energy.txt was not found; the restart list is empty.'
+		return
+	endif
+
+	open(newunit=unit,file='minimum_energy.txt',status='old',action='read',iostat=ios)
+	if (ios /= 0) stop 'ERROR: cannot read minimum_energy.txt.'
+	format_header_found=.false.
+	do
+		read(unit,'(A)',iostat=ios) line
+		if (ios < 0) exit
+		if (ios > 0) stop 'ERROR: cannot read minimum_energy.txt.'
+		line=adjustl(line)
+		if (len_trim(line) == 0) cycle
+		if (line(1:1) == '#') then
+			if (index(line,'Rank') > 0 .and. index(line,'Step') > 0 .and. &
+				index(line,'Trial') > 0 .and. index(line,'Sequence') > 0) &
+				format_header_found=.true.
+			cycle
+		endif
+		if (.not.format_header_found) then
+			write(*,'(A)') 'WARNING: legacy minimum_energy.txt format cannot be restored.'
+			write(*,'(A)') 'The restart will begin with an empty minimum-energy list.'
+			close(unit)
+			return
+		endif
+		read(line,*,iostat=ios) rank,step,trial,pep_name,score,gbind,lpagg
+		if (ios /= 0) stop 'ERROR: invalid record in minimum_energy.txt.'
+		if (rank /= n_top_found+1) stop 'ERROR: invalid rank in minimum_energy.txt.'
+		if (n_top_found == n_top) then
+			write(*,'(A,I0,A)') 'ERROR: minimum_energy.txt contains more than N_TOP = ', &
+				n_top,' records.'
+			stop
+		endif
+		!do i=1,n_top_found
+		!	if (trim(pep_name) == trim(minimum_energies(i)%seq_name)) &
+		!		stop 'ERROR: duplicate sequence in minimum_energy.txt.'
+		!enddo
+		!if (n_top_found > 0) then
+		!	if (score < minimum_energies(n_top_found)%score) &
+		!		stop 'ERROR: minimum_energy.txt is not sorted by score.'
+		!endif
+		n_top_found=n_top_found+1
+		minimum_energies(n_top_found)%seq_name=trim(pep_name)
+		minimum_energies(n_top_found)%step=step
+		minimum_energies(n_top_found)%trial=trial
+		minimum_energies(n_top_found)%score=score
+		minimum_energies(n_top_found)%gbind=gbind
+		minimum_energies(n_top_found)%lpagg=lpagg
+	enddo
+	close(unit)
+	write(*,'(A,I0,A)') 'Loaded ',n_top_found,' minimum-energy sequences for restart.'
+	end subroutine load_minimum_energy
+
 	subroutine replace_single_site_aa(group)
 	implicit none
 	integer							:: i, ic, feedback
@@ -10183,7 +10370,6 @@ module optimization_techniques
 	character*4						:: group_name_1(3), group_name_2(3)
 	character*4						:: rest_AA(maximum_nmr_site_num)
 	logical							:: ic_1_NMR, ic_2_NMR, trial_energy_available
-    character(len=:), allocatable   :: pep_name
 	type(groupdetails)				:: group(repeated_unit,gnum), temp_group(repeated_unit,gnum), tgroup(repeated_unit,gnum)
 	type(energyparameters), dimension(:,:), allocatable &
 									:: group_para
@@ -10362,34 +10548,9 @@ module optimization_techniques
 			endif
 		endif
 		
-		if(score_old.lt.energy_min(1)) then
-			do i=(num4pdbsave-1),1,-1
-				energy_min(i+1)=energy_min(i)
-			enddo
-			energy_min(1)=score_old
-            allocate(character(len=gnum) :: pep_name)
-            call convert_AA_name(group, pep_name)
-			open(2, file="minimum_energy.txt", access="append")
-				write(2,*) step, attempt, score_old, pep_name
-			close(2)
-			call generatepdb(step, attempt, group)
-            deallocate(pep_name)
-		elseif(score_old.lt.energy_min(num4pdbsave)) then
-			do i=1,num4pdbsave
-				if(score_old.eq.energy_min(i)) then
-					goto 50
-				elseif(score_old.lt.energy_min(i)) then
-					do j=(num4pdbsave-1),i,-1
-						energy_min(j+1)=energy_min(j)
-					enddo
-					energy_min(i)=score_old
-					goto 60
-				endif
-			enddo
-60			continue
-			call generatepdb(step, attempt, group)
-50			continue
-        endif
+		if (feedback_3 == 1) call update_minimum_energy(step,attempt,group,score_old, &
+			binding_energy_old-real(entropy_old,kind=8),real(propensity_weighting_factor,kind=8)* &
+			real(score4hydration_old+Pagg_old,kind=8))
         !if (accpt=="Accept") exit
 	enddo
 4	format(i7,i7,13f15.4,a15,a15)
@@ -10912,7 +11073,6 @@ module optimization_techniques
 	character*20				:: backbone_change, accpt
 	character*4					:: aminoacid_name_1
 	character*4					:: group_name_1(3)
-	character(len=:), allocatable   :: pep_name
 	type(groupdetails)			:: group(repeated_unit,gnum), temp_group(repeated_unit,gnum), Tgroup(repeated_unit,gnum)
 	type(groupdetails)			:: repack_group(repeated_unit,gnum)
 
@@ -10979,34 +11139,9 @@ module optimization_techniques
 		write(3,'(*(A5))') (group(1,j)%gtype, j=1, gnum)
 		close(3)
 
-		if(score_old.lt.energy_min(1)) then
-			do i=(num4pdbsave-1),1,-1
-				energy_min(i+1)=energy_min(i)
-			enddo
-			energy_min(1)=score_old
-			allocate(character(len=gnum) :: pep_name)
-			call convert_AA_name(group, pep_name)
-			open(2, file="minimum_energy.txt", access="append")
-				write(2,*) step, attempt, score_old, pep_name
-			close(2)
-			call generatepdb(step, attempt, group)
-			deallocate(pep_name)
-		elseif(score_old.lt.energy_min(num4pdbsave)) then
-			do i=1,num4pdbsave
-				if(score_old.eq.energy_min(i)) then
-					goto 50
-				elseif(score_old.lt.energy_min(i)) then
-					do j=(num4pdbsave-1),i,-1
-						energy_min(j+1)=energy_min(j)
-					enddo
-					energy_min(i)=score_old
-					goto 60
-				endif
-			enddo
-60			continue
-			call generatepdb(step, attempt, group)
-50			continue
-		endif
+		if (feedback_2 == 1) call update_minimum_energy(step,attempt,group,score_old, &
+			binding_energy_old-real(entropy_old,kind=8),real(propensity_weighting_factor,kind=8)* &
+			real(score4hydration_old+Pagg_old,kind=8))
 	enddo
 
 4	format(i7,i7,7f15.4,a15,a15)
@@ -11035,7 +11170,6 @@ module optimization_techniques
 	character*20				:: sheet_change, accpt
 	character*4					:: aminoacid_name_1
 	character*4					:: group_name_1(3)
-	character(len=:), allocatable   :: pep_name
 	logical						:: trial_energy_available
 	type(groupdetails)			:: group(repeated_unit,gnum), temp_group(repeated_unit,gnum), Tgroup(repeated_unit,gnum)
 	type(groupdetails)			:: repack_group(repeated_unit,gnum)
@@ -11173,35 +11307,9 @@ module optimization_techniques
 			close(3)
 		endif
 	
-		if(score_old.lt.energy_min(1)) then
-			do i=(num4pdbsave-1),1,-1
-				energy_min(i+1)=energy_min(i)
-			enddo
-			energy_min(1)=score_old
-            
-            allocate(character(len=gnum) :: pep_name)
-            call convert_AA_name(group, pep_name)
-			open(2, file="minimum_energy.txt", access="append")
-				write(2,*) step, attempt, score_old, pep_name
-			close(2)
-                    deallocate(pep_name)
-                    call generatepdb(step, attempt, group)
-		elseif(score_old.lt.energy_min(num4pdbsave)) then
-			do i=1,num4pdbsave
-				if(score_old.eq.energy_min(i)) then
-					goto 50
-				elseif(score_old.lt.energy_min(i)) then
-					do j=(num4pdbsave-1),i,-1
-						energy_min(j+1)=energy_min(j)
-					enddo
-					energy_min(i)=score_old
-					goto 60
-				endif
-			enddo
-60			continue
-			call generatepdb(step, attempt, group)
-50			continue
-        endif
+		if (feedback_2 == 1) call update_minimum_energy(step,attempt,group,score_old, &
+			binding_energy_old-real(entropy_old,kind=8),real(propensity_weighting_factor,kind=8)* &
+			real(score4hydration_old+Pagg_old,kind=8))
         !if (accpt=="Accept") exit
 	enddo
 	
@@ -11229,7 +11337,7 @@ Program ProteinDesign
 
 	implicit none
 	integer, parameter				:: max_scmf_attempts=3
-	integer							:: step, sub_circle, i, j, k
+	integer							:: step, sub_circle, i, j, k, backup_ios
 	integer							:: stage_i, previous_stage_steps, local_stage_step
 	integer							:: mc_step_count, scmf_attempt, scmf_feedback, failed_scmf_site
 	integer, allocatable			:: stage_steps(:)
@@ -11241,6 +11349,7 @@ Program ProteinDesign
     real							:: entropy_old, score4hydration_old, Pagg_old
 	real							:: anneal_factor, dekt_seq, dekt_sheet
 	real(kind=8)					:: init_seconds, mc_seconds
+	real(kind=8)					:: legacy_minimum_score
     !real							:: entropy4individual(repeated_unit,gnum)
 	!type(groupdetails)				:: group(repeated_unit,gnum)
     character(len=:), allocatable   :: pep_name
@@ -11255,6 +11364,7 @@ Program ProteinDesign
 	character(len=4)				:: failed_scmf_aminoacid
     character(len=100)				:: os_name
 	character(len=32)				:: init_time,mc_time
+	character(len=256)				:: backup_header
 	logical :: pdbfiles_exists
     
 	call system_clock(count_rate=clk_rate)
@@ -11267,6 +11377,14 @@ Program ProteinDesign
     call check_help
     call banner
 	call inputfile
+	allocate(minimum_energies(n_top))
+	minimum_energies%seq_name='None'
+	minimum_energies%step=0
+	minimum_energies%trial=0
+	minimum_energies%score=1000.0d0
+	minimum_energies%gbind=2000.0d0
+	minimum_energies%lpagg=-1000.0d0
+	n_top_found=0
     call setparameter
     call readdir
 	
@@ -11283,9 +11401,13 @@ Program ProteinDesign
         call execute_command_line('mkdir -p pdbfiles')
 	endif
 	call readpdb(group) ! load PDB files
-    call rotamerlib
+	call rotamerlib
 
 	if(recalcu_switch==0) then
+		open(5,file='minimum_energy.txt',status='replace',action='write')
+			write(5,'(A10,A10,A10,1X,A,22X,3A15)') '# Rank','Step','Trial', &
+				'Sequence','Score','Gbind','Lambda_Pagg'
+		close(5)
 		allocate(temp_group(repeated_unit,gnum))
 		allocate(scmf_start_group(repeated_unit,gnum))
 		call replace_single_site_aa(group)
@@ -11328,7 +11450,6 @@ Program ProteinDesign
 		call generatepdb(0, 0, group)
 		!write(*,*) 'CHECK: initial generatepdb finished'
 		!flush(6)
-		energy_min=0.0
 		
 		allocate(group_para(repeated_unit,gnum))
 		allocate(W_numex(repeated_unit*atom_num)); allocate(W_numex4(repeated_unit*atom_num))
@@ -11351,14 +11472,19 @@ Program ProteinDesign
 					(score4hydration_old+Pagg_old)*propensity_weighting_factor, 0.0
 		close(5)
         
-		if(score_old.lt.0) energy_min(1)=score_old		
-        
         flag4sheet=0 ! sheet move flag, 0 = enters judgement of sheet move, >0, need to reach a setpoint to reset
 	else
 		open(5, file="backup4backbone.txt", status="old")
-			do i=1, num4pdbsave
-				read(5,*) energy_min(i)
-			enddo
+			read(5,'(A)',iostat=backup_ios) backup_header
+			if (backup_ios /= 0) stop 'ERROR: cannot read backup4backbone.txt.'
+			if (trim(backup_header) /= '# PepAD backup format 2') then
+				rewind(5)
+				do i=1,10
+					read(5,*,iostat=backup_ios) legacy_minimum_score
+					if (backup_ios /= 0) stop 'ERROR: invalid legacy backup4backbone.txt.'
+				enddo
+				write(*,'(A)') 'Legacy backup detected; old minimum-score entries are ignored.'
+			endif
 			read(5,*) score_old
 			read(5,*) binding_energy_old
 			read(5,*) entropy_old
@@ -11374,6 +11500,7 @@ Program ProteinDesign
             nstep_start = nstep_start + 1           ! the next step is the starting step
             write(*,*) "restart at", nstep_start, "step"
 		close(5)
+		call load_minimum_energy()
 
 		allocate(group_para(repeated_unit,gnum))
 		allocate(W_numex(repeated_unit*atom_num)); allocate(W_numex4(repeated_unit*atom_num))
@@ -11500,9 +11627,7 @@ Program ProteinDesign
 		call generatebackup4pdb(group) ! The start pdb for next step or final pdb for current step
 		call ran_gen(ran2,1)	
 		open(5, file="backup4backbone.txt", status="replace")
-			do i=1, num4pdbsave
-				write(5,*) energy_min(i)
-			enddo
+			write(5,'(A)') '# PepAD backup format 2'
 			write(5,*) score_old
 			write(5,*) binding_energy_old
 			write(5,*) entropy_old
