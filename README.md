@@ -437,7 +437,7 @@ Run settings and progress are printed to standard output; an HPC submission scri
 
 ## PepAD tools
 We provide a PepAD-related Python package that contains two modules: `builder` and `analyzer`. These tools are helpful but are not required to run PepAD.
-- `builder`: create the β-cross spine in one of the ten steric zipper classes [4,14].
+- `builder`: create the β-cross spine in one of the ten steric zipper classes [4,13].
 - `analyzer`: analyze PepAD results (energy profile and energy details) and derive best-scoring peptides, plotting score change over steps, as well as how individual energy terms contribute to the MC acceptance or rejection.
 
 ### Install PepAD tools
@@ -595,10 +595,7 @@ Score and RMSD vs steps plot
 12. M.Z. Tien, D.K. Sydykova, A.G. Meyer, and C.O. Wilke, “PeptideBuilder: A
     simple Python library to generate model peptides,” *PeerJ* **1** (2013), e80.
     https://doi.org/10.7717/peerj.80
-13. P. Kunzmann, J.M. Anter, and K. Hamacher, “Adding hydrogen atoms to molecular
-    models via fragment superimposition,” *Algorithms for Molecular Biology*
-    **17** (2022), 7. https://doi.org/10.1186/s13015-022-00215-x
-14. Stroud, J. C. The Zipper Groups of the Amyloid State of Proteins. Acta Cryst D 2013, 69 (4), 540–545. https://doi.org/10.1107/S0907444912050548.
+13. Stroud, J. C. The Zipper Groups of the Amyloid State of Proteins. Acta Cryst D 2013, 69 (4), 540–545. https://doi.org/10.1107/S0907444912050548.
 
     
 ## License
