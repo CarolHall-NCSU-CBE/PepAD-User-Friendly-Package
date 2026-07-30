@@ -268,6 +268,7 @@ RESTART    = 0        # Can be omitted
 | --- | --- | ---: |
 | `RANSEED` | Integer random seed | System clock |
 | `N_STEPS` | Number of Monte Carlo steps | **Required** |
+| `N_TOP` | Number of lowest-scoring unique peptide recorded | 10 |
 | `KBT_SEQ` | Sequence-move kBT when annealing is off | `1.0` |
 | `KBT_SHEETMOVE` | Sheet-move kBT when annealing is off | `0.6` |
 | `KBT_SEQ_HIGH` | Initial sequence kBT when annealing is on | `2.0` |
@@ -285,7 +286,7 @@ RESTART    = 0        # Can be omitted
 - When `ANNEAL_STAGES = 0`, PepAD uses `KBT_SEQ` and `KBT_SHEETMOVE`.
 - When annealing is enabled, it instead uses the corresponding `HIGH` and `LOW` values.
 - All kBT values must be positive, and each high value must be greater than or equal to its low value.
-- ARVO is the geometric algorithm used to calculate solvent-accessible surface area. `ESURF_MODE = 1` performs a full calculation after each MC move. `ESURF_MODE = 2` reuses cached values and recalculates only the local region affected by a mutation, making the non-polar solvation energy calculation slightly faster.
+- ARVO is the geometric algorithm used to calculate solvent-accessible surface area. `ESURF_MODE = 1` performs a full calculation after each MC move. `ESURF_MODE = 2` reuses cached values and recalculates only the local region affected by a mutation, making the non-polar solvation energy calculation slightly faster. In current PepAD version, both `ESURF_MODE = 1` and `ESURF_MODE = 2` are both extremely computationally expensive.
 
 ### Amino acid compositions
 
@@ -303,7 +304,7 @@ The input uses minimum and maximum counts to define ranges for four amino acid t
 - An omitted minimum is set to `0`.
 - An omitted maximum is set to `N_AA`.
 - Equal minimum and maximum values impose an exact count.
-- Composition totals exclude `ACE`, `NME`, and `NHE` caps, but include residues at sites defined by single-site positional constraints and grouped-site positional constraints.
+- Number of amino acids in each types include residues in single-site positional constraints and grouped-site positional constraints, and exclude `ACE`, `NME`, and `NHE` caps.
 
 Example 1: Designing 7-mer peptides with dynamic amino acid compositions
 
