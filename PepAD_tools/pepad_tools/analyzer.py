@@ -1367,7 +1367,7 @@ def analyze_delta_energy(
 
     dominant_summary = pd.DataFrame(
         {
-            "Dominant_energy": terms,
+            "Ei": terms,
             "Accepts": dominant_counts["Accept: negative"].to_numpy(),
             "Accept_rate(%)": dominant_percentage["Accept: negative"].to_numpy(),
             "Rejects-MC": dominant_counts["Reject-MC: positive"].to_numpy(),
@@ -1386,14 +1386,10 @@ def analyze_delta_energy(
     reject_mc_count = int(trial_counts.get("Reject-MC", 0))
     reject_rotamer_count = int(trial_counts.get("Reject-Rotamer", 0))
     accepted_without_negative = int((negative_total == 0).sum())
-    rejected_without_positive = int((positive_total == 0).sum())
     accepted_uphill = int((contributions.loc[accepted].sum(axis=1) > 0).sum())
 
     print(
         f"Accepted trials without a negative contribution: {accepted_without_negative}"
-    )
-    print(
-        f"Reject-MC trials without a positive contribution: {rejected_without_positive}"
     )
     print(f"Accepted uphill trials (delta Score > 0): {accepted_uphill}")
 
@@ -1409,38 +1405,38 @@ def analyze_delta_energy(
             "Accepted trials without a negative contribution: "
             f"{accepted_without_negative}\n"
         )
-        f.write(
-            "Reject-MC trials without a positive contribution: "
-            f"{rejected_without_positive}\n"
-        )
         f.write(f"Accepted uphill trials (delta Score > 0): {accepted_uphill}\n\n")
         f.write(
-            "Energy and percentage contributions to accepted and rejected "
-            "trials:\n"
+            "Energy(-) contributions when accepted and Energy(+) "
+            "contributions when rejected:\n"
         )
         f.write(
-            "Energy_term\tMedian_negative_ddEi_when_accepted(kcal/mol)\t"
-            "Median_positive_ddEi_when_rejected(kcal/mol)\t"
-            "Frequency_of_negative_ddEi_when_accepted(%)\t"
-            "Median_negative_ddEi_contribution_when_accepted(%)\t"
-            "Frequency_of_positive_ddEi_when_rejected(%)\t"
-            "Median_positive_ddEi_contribution_when_rejected(%)\n"
+            f"{'Ei':<9}{'Mdn_ddEi(-)(kcal/mol)':>25}"
+            f"{'Mdn_ddEi(+)(kcal/mol)':>25}"
+            f"{'Frequency_of_ddEi(-)(%)':>25}"
+            f"{'Mdn_[|ddEi(-)|/sum_i|ddEi(-)|](%)':>35}"
+            f"{'Frequency_of_ddEi(+)(%)':>25}"
+            f"{'Mdn_[|ddEi(+)|/sum_i|ddEi(+)|](%)':>35}\n"
         )
         for energy, row in contribution_summary.iterrows():
             values = [
                 "NA" if pd.isna(value) else f"{value:.2f}" for value in row
             ]
-            f.write(energy + "\t" + "\t".join(values) + "\n")
+            f.write(
+                f"{energy:<9}{values[0]:>25}{values[1]:>25}"
+                f"{values[2]:>25}{values[3]:>35}"
+                f"{values[4]:>25}{values[5]:>35}\n"
+            )
         f.write("\n\n")
         f.write("Dominant contribution count and percentage:\n")
         f.write(
-            "Dominant_energy\tAccepts\tAccept(%)\t"
-            "Rejects-MC\tRejects-MC(%)\n"
+            f"{'Ei':<10}{'Accepts':>15}{'Accept(%)':>15}"
+            f"{'Rejects-MC':>15}{'Rejects-MC(%)':>15}\n"
         )
         for row in dominant_summary.itertuples(index=False, name=None):
             f.write(
-                f"{row[0]}\t{int(row[1])}\t{row[2]:.1f}\t"
-                f"{int(row[3])}\t{row[4]:.1f}\n"
+                f"{row[0]:<10}{int(row[1]):>15d}{row[2]:>15.2f}"
+                f"{int(row[3]):>15d}{row[4]:>15.2f}\n"
             )
 
     print(f"Detail report written to: {output_file}")
