@@ -348,7 +348,7 @@ class PepADAnalyzerPythonTests(unittest.TestCase):
                 (Path(temp_dir) / "Delta_energy_contribution.png").exists()
             )
             expected_header = (
-                f"{'Ei':<9}{'Median_ddEi(-)(kcal/mol)':>25}"
+                f"{'Ei':<9}{'Mdn_ddEi(-)(kcal/mol)':>25}"
                 f"{'Mdn_ddEi(+)(kcal/mol)':>25}"
                 f"{'Frequency_of_ddEi(-)(%)':>25}"
                 f"{'Mdn_[|ddEi(-)|/sum_i|ddEi(-)|](%)':>35}"

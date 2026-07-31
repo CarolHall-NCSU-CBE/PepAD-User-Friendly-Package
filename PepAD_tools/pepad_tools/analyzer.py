@@ -1090,7 +1090,14 @@ def analyze_delta_energy(
     Delta_energy_contribution.png
         Percentage violin plot written at 600 dpi when contribution is selected.
     """
-    terms = ["VDW", "ELE+SGB", "SUR", "(-TS)", "(-Pagg)"]
+    terms = ["VDW", "ELE+GB", "SURF", "(-TS)", "(-Pagg)"]
+    plot_titles = {
+        "VDW": r"$E_{\mathrm{VDW}}$",
+        "ELE+GB": r"$E_{\mathrm{ELE}} + G_{\mathrm{GB}}$",
+        "SURF": r"$G_{\mathrm{SURF}}$",
+        "(-TS)": r"$(-TS_{\mathrm{conf}})$",
+        "(-Pagg)": r"$(-P_{\mathrm{agg}})$",
+    }
     colors = {"Accept": "#4B89DB", "Reject-MC": "#DB594B"}
     subplot_pad = 10
     if plot_options is None:
@@ -1123,9 +1130,9 @@ def analyze_delta_energy(
     contributions = pd.DataFrame(
         {
             "VDW": energy_detail["dE_VDW"],
-            "ELE+SGB": energy_detail["dE_(ELE+SGB)"],
+            "ELE+GB": energy_detail["dE_(ELE+SGB)"],
             # "SGB": energy_detail["dE_SGB"],
-            "SUR": energy_detail["dE_SUR"],
+            "SURF": energy_detail["dE_SUR"],
             "(-TS)": -energy_detail["dTS"],
             "(-Pagg)": -energy_detail["dPAGG"],
         }
@@ -1241,7 +1248,7 @@ def analyze_delta_energy(
                     )
 
             ax.axhline(0, color="gray", linewidth=1, linestyle="--")
-            ax.set_title(energy, fontsize=18, pad=10)
+            ax.set_title(plot_titles[energy], fontsize=18, pad=10)
             ax.set_xlim(0.5, 2.5)
             ax.set_xticks([1, 2])
             ax.set_xticklabels(["Accept\nnegative", "Reject-MC\npositive"])
@@ -1310,7 +1317,7 @@ def analyze_delta_energy(
                         va="center",
                     )
 
-            ax.set_title(energy, fontsize=18, pad=10)
+            ax.set_title(plot_titles[energy], fontsize=18, pad=10)
             ax.set_xlim(0.5, 2.5)
             ax.set_xticks([1, 2])
             ax.set_xticklabels(
