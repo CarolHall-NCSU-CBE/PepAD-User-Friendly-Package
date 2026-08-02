@@ -87,10 +87,17 @@ class PepADAnalyzerPythonTests(unittest.TestCase):
         self.assertEqual(parser.parse_args(["--details", "--violin"]).violin, [])
         self.assertEqual(
             parser.parse_args(
-                ["--details", "--violin", "energy", "contribution"]
+                [
+                    "--details", "--violin", "energy2", "contrib2",
+                    "energy5", "contrib5",
+                ]
             ).violin,
-            ["energy", "contribution"],
+            ["energy2", "contrib2", "energy5", "contrib5"],
         )
+        help_text = " ".join(parser.format_help().split())
+        self.assertIn("energy2: ΔΔG_bind", help_text)
+        self.assertIn("ΔΔ(E_ELE+G_GB)", help_text)
+        self.assertIn("contrib5: their percentage contribution", help_text)
 
     def test_bare_violin_selects_energy_plot(self) -> None:
         analyze = mock.Mock()
@@ -119,7 +126,7 @@ class PepADAnalyzerPythonTests(unittest.TestCase):
         finally:
             self.analyzer.update(originals)
 
-        self.assertEqual(analyze.call_args.args[2], ["energy"])
+        self.assertEqual(analyze.call_args.args[2], ["energy2"])
 
     def test_top_argument_reaches_profile_report(self) -> None:
         profile = pd.DataFrame({"Sequence": ["GNN"], "Score": [-1.0]})
@@ -341,11 +348,14 @@ class PepADAnalyzerPythonTests(unittest.TestCase):
             )
 
             self.assertTrue(report.is_file())
-            self.assertFalse(
-                (Path(temp_dir) / "Delta_energy_distribution.png").exists()
-            )
-            self.assertFalse(
-                (Path(temp_dir) / "Delta_energy_contribution.png").exists()
+            figure_names = [
+                "Delta_energy2_distribution.png",
+                "Delta_energy5_distribution.png",
+                "Delta_contrib2_distribution.png",
+                "Delta_contrib5_distribution.png",
+            ]
+            self.assertTrue(
+                all(not (Path(temp_dir) / name).exists() for name in figure_names)
             )
             expected_header = (
                 f"{'Ei':<9}{'Mdn_ddEi(-)(kcal/mol)':>25}"
@@ -355,12 +365,15 @@ class PepADAnalyzerPythonTests(unittest.TestCase):
                 f"{'Frequency_of_ddEi(+)(%)':>25}"
                 f"{'Mdn_[|ddEi(+)|/sum_i|ddEi(+)|](%)':>35}"
             )
-            self.assertIn(
-                expected_header, report.read_text(encoding="utf-8")
+            report_text = report.read_text(encoding="utf-8")
+            self.assertEqual(report_text.count(expected_header), 2)
+            self.assertLess(
+                report_text.index("ddGbind and d(-Pagg):"),
+                report_text.index("ddE_VDW, dd(E_ELE+G_GB)"),
             )
             self.assertNotIn(
                 "Reject-MC trials without a positive contribution",
-                report.read_text(encoding="utf-8"),
+                report_text,
             )
 
         self.assertEqual(len(result), 3)
@@ -376,7 +389,7 @@ class PepADAnalyzerPythonTests(unittest.TestCase):
                     self.analyzer["analyze_delta_energy"](
                         sample_energy_detail(),
                         str(report),
-                        ["energy", "contribution"],
+                        ["energy2", "contrib2", "energy5", "contrib5"],
                     )
 
         filenames = [
@@ -385,8 +398,10 @@ class PepADAnalyzerPythonTests(unittest.TestCase):
         self.assertEqual(
             filenames,
             [
-                "Delta_energy_distribution.png",
-                "Delta_energy_contribution.png",
+                "Delta_energy2_distribution.png",
+                "Delta_energy5_distribution.png",
+                "Delta_contrib2_distribution.png",
+                "Delta_contrib5_distribution.png",
             ],
         )
         self.assertTrue(

@@ -5,6 +5,7 @@
 
 
 import os
+import sys
 import pandas as pd
 from matplotlib import pyplot as plt
 import argparse
@@ -785,11 +786,18 @@ def get_parser() -> argparse.ArgumentParser:
     parser.add_argument(
         "--violin",
         nargs="*",
-        choices=["energy", "contribution"],
+        choices=["energy2", "contrib2", "energy5", "contrib5"],
         default=None,
         help=(
-            "Optional detail violin plots: [energy] [contribution]. "
-            "Without a value, energy is plotted."
+            "Optional violin plots showing energy-term contributions "
+            "to the negative part of the score change (Δscore) in accepted trials, "
+            "or to the positive part of the (Δscore) in rejected trials. "
+            "energy2: ΔΔG_bind and Δ(-P_agg) distributions; "
+            "contrib2: their percentage contribution. "
+            "energy5: ΔΔE_VDW, ΔΔ(E_ELE+G_GB), ΔΔG_SURF, Δ(-TS), "
+            "Δ(-P_agg) distributions; "
+            "contrib5: their percentage contribution. "
+            "If no value is specified, energy2 is plotted by default."
         ),
     )
     parser.add_argument(
@@ -1057,7 +1065,7 @@ def analyze_delta_energy(
         Path for the energy-detail report.
 
     plot_options : list of str or None
-        Optional detail plots: energy, contribution, or both.
+        Optional detail plots: energy2, contrib2, energy5, or contrib5.
 
     Equations
     ---------
@@ -1084,19 +1092,21 @@ def analyze_delta_energy(
     Detail_report.txt
         Energy-detail report written whenever this function runs.
 
-    Delta_energy_distribution.png
-        Raw energy violin plot written at 600 dpi when energy is selected.
+    Delta_energy2_distribution.png and Delta_energy5_distribution.png
+        Raw energy violin plots written at 600 dpi.
 
-    Delta_energy_contribution.png
-        Percentage violin plot written at 600 dpi when contribution is selected.
+    Delta_contrib2_distribution.png and Delta_contrib5_distribution.png
+        Contribution violin plots written at 600 dpi.
     """
     terms = ["VDW", "ELE+GB", "SURF", "(-TS)", "(-Pagg)"]
+    dominant_terms = ["Gbind", "(-Pagg)"]
     plot_titles = {
-        "VDW": r"$E_{\mathrm{VDW}}$",
-        "ELE+GB": r"$E_{\mathrm{ELE}} + G_{\mathrm{GB}}$",
-        "SURF": r"$G_{\mathrm{SURF}}$",
-        "(-TS)": r"$(-TS_{\mathrm{conf}})$",
-        "(-Pagg)": r"$(-P_{\mathrm{agg}})$",
+        "Gbind": r"$\Delta\Delta G_{\mathrm{bind}}$",
+        "VDW": r"$\Delta\Delta E_{\mathrm{VDW}}$",
+        "ELE+GB": r"$\Delta\Delta E_{\mathrm{ELE}} + \Delta\Delta G_{\mathrm{GB}}$",
+        "SURF": r"$\Delta\Delta G_{\mathrm{SURF}}$",
+        "(-TS)": r"$-\Delta(TS)$",
+        "(-Pagg)": r"$-\lambda\Delta P_{\mathrm{agg}}$",
     }
     colors = {"Accept": "#4B89DB", "Reject-MC": "#DB594B"}
     subplot_pad = 10
@@ -1105,7 +1115,8 @@ def analyze_delta_energy(
     elif isinstance(plot_options, str):
         plot_options = [plot_options]
     plot_options = [option.lower() for option in plot_options]
-    invalid_plots = set(plot_options) - {"energy", "contribution"}
+    valid_plots = {"energy2", "contrib2", "energy5", "contrib5"}
+    invalid_plots = set(plot_options) - valid_plots
     if invalid_plots:
         invalid_text = ", ".join(sorted(invalid_plots))
         raise ValueError(f"Unknown detail plot option(s): {invalid_text}")
@@ -1119,11 +1130,8 @@ def analyze_delta_energy(
         r"\sum_i |\Delta\Delta E_i^{(+)}|\times 100\%$"
     )
     raw_ylabel = (
-        r"$\mathrm{Accept}:\ \Delta\Delta E_k^{(-)}\ "
-        r"(\mathrm{kcal/mol})$"
-        "\n"
-        r"$\mathrm{Reject\!\!-\!\!MC}:\ "
-        r"\Delta\Delta E_k^{(+)}\ (\mathrm{kcal/mol})$"
+        "Negative terms (kcal/mol) in accepted trials\n"
+        "Positive terms (kcal/mol) in rejected trials"
     )
 
     # These are signed contributions to Score. TS and PAGG enter Score with minus signs.
@@ -1137,6 +1145,10 @@ def analyze_delta_energy(
             "(-Pagg)": -energy_detail["dPAGG"],
         }
     )
+    gbind = contributions[["VDW", "ELE+GB", "SURF", "(-TS)"]].sum(axis=1)
+    raw_contributions = contributions.copy()
+    raw_contributions.insert(0, "Gbind", gbind)
+    dominant_contributions = raw_contributions[dominant_terms]
     complete = contributions.notna().all(axis=1)
     accepted = complete & energy_detail["acceptance"].eq("Accept")
     rejected = complete & energy_detail["acceptance"].eq("Reject-MC")
@@ -1165,21 +1177,13 @@ def analyze_delta_energy(
     )
     accepted_signed = contributions.loc[accepted]
     rejected_signed = contributions.loc[rejected]
-    accepted_negative_median = accepted_signed.where(
-        accepted_signed < 0
-    ).median()
-    rejected_positive_median = rejected_signed.where(
-        rejected_signed > 0
-    ).median()
+    accepted_negative_median = accepted_signed.where(accepted_signed < 0).median()
+    rejected_positive_median = rejected_signed.where(rejected_signed > 0).median()
 
-    contribution_summary = pd.DataFrame(
+    contribution_summary5 = pd.DataFrame(
         {
-            "Median_negative_ddEi_when_accepted(kcal/mol)": (
-                accepted_negative_median
-            ),
-            "Median_positive_ddEi_when_rejected(kcal/mol)": (
-                rejected_positive_median
-            ),
+            "Median_negative_ddEi_when_accepted(kcal/mol)": accepted_negative_median,
+            "Median_positive_ddEi_when_rejected(kcal/mol)": rejected_positive_median,
             "Frequency_of_negative_ddEi_when_accepted(%)": (
                 negative.gt(0).mean().mul(100)
             ),
@@ -1195,23 +1199,85 @@ def analyze_delta_energy(
         }
     ).round(2)
 
+    dominant_negative = dominant_contributions.loc[accepted].clip(upper=0).abs()
+    dominant_positive = dominant_contributions.loc[rejected].clip(lower=0)
+    dominant_negative_total = dominant_negative.sum(axis=1)
+    dominant_positive_total = dominant_positive.sum(axis=1)
+    dominant_negative_percentage = (
+        dominant_negative.loc[dominant_negative_total > 0]
+        .div(dominant_negative_total[dominant_negative_total > 0], axis=0)
+        .mul(100)
+    )
+    dominant_positive_percentage = (
+        dominant_positive.loc[dominant_positive_total > 0]
+        .div(dominant_positive_total[dominant_positive_total > 0], axis=0)
+        .mul(100)
+    )
+    dominant_accepted_median = dominant_contributions.loc[accepted].where(
+        dominant_contributions.loc[accepted] < 0
+    ).median()
+    dominant_rejected_median = dominant_contributions.loc[rejected].where(
+        dominant_contributions.loc[rejected] > 0
+    ).median()
+    contribution_summary2 = pd.DataFrame(
+        {
+            "Median_negative_ddEi_when_accepted(kcal/mol)": dominant_accepted_median,
+            "Median_positive_ddEi_when_rejected(kcal/mol)": dominant_rejected_median,
+            "Frequency_of_negative_ddEi_when_accepted(%)": (
+                dominant_negative.gt(0).mean().mul(100)
+            ),
+            "Median_negative_ddEi_contribution_when_accepted(%)": (
+                dominant_negative_percentage.mask(
+                    dominant_negative_percentage.eq(0)
+                ).median()
+            ),
+            "Frequency_of_positive_ddEi_when_rejected(%)": (
+                dominant_positive.gt(0).mean().mul(100)
+            ),
+            "Median_positive_ddEi_contribution_when_rejected(%)": (
+                dominant_positive_percentage.mask(
+                    dominant_positive_percentage.eq(0)
+                ).median()
+            ),
+        }
+    ).round(2)
+
     output_directory = os.path.dirname(os.path.abspath(output_file))
 
-    ################################
-    # Plot Delta_Ei distribution
-    ################################
-    if "energy" in plot_options:
-        fig_raw, axes_raw = plt.subplots(
-            2, 3, figsize=(18, 11), sharey=False, constrained_layout=True
+    raw_plots = {
+        "energy2": (
+            dominant_terms,
+            dominant_contributions,
+            (1, 2),
+            (12, 5),
+            "Delta_energy2_distribution.png",
+        ),
+        "energy5": (
+            terms,
+            contributions,
+            (2, 3),
+            (18, 11),
+            "Delta_energy5_distribution.png",
+        ),
+    }
+    for option, settings in raw_plots.items():
+        if option not in plot_options:
+            continue
+        plot_terms, plot_values, layout, figure_size, filename = settings
+        figure, axes = plt.subplots(
+            *layout,
+            figsize=figure_size,
+            sharey=False,
+            constrained_layout=True,
         )
-        fig_raw.set_constrained_layout_pads(
-            w_pad=subplot_pad / 72,
-            h_pad=subplot_pad / 72,
+        figure.get_layout_engine().set(
+            w_pad=subplot_pad / 72, h_pad=subplot_pad / 72
         )
-        for ax, energy in zip(axes_raw.flat, terms):
-            accepted_values = contributions.loc[accepted, energy]
+        axes = figure.axes
+        for ax, energy in zip(axes, plot_terms):
+            accepted_values = plot_values.loc[accepted, energy]
             accepted_values = accepted_values[accepted_values < 0]
-            rejected_values = contributions.loc[rejected, energy]
+            rejected_values = plot_values.loc[rejected, energy]
             rejected_values = rejected_values[rejected_values > 0]
             groups = [
                 (1, "Accept", accepted_values),
@@ -1232,10 +1298,7 @@ def analyze_delta_energy(
                     violin["bodies"][0].set_edgecolor(colors[outcome])
                     violin["bodies"][0].set_alpha(0.65)
                 elif len(values) > 0:
-                    ax.scatter(
-                        position, values.median(), color=colors[outcome], s=45
-                    )
-
+                    ax.scatter(position, values.median(), color=colors[outcome], s=45)
                 if len(values) > 0:
                     median = values.median()
                     ax.hlines(
@@ -1246,39 +1309,70 @@ def analyze_delta_energy(
                         linewidth=2.5,
                         zorder=4,
                     )
-
             ax.axhline(0, color="gray", linewidth=1, linestyle="--")
             ax.set_title(plot_titles[energy], fontsize=18, pad=10)
             ax.set_xlim(0.5, 2.5)
             ax.set_xticks([1, 2])
             ax.set_xticklabels(["Accept\nnegative", "Reject-MC\npositive"])
             ax.tick_params(axis="both", labelsize=16)
-
-        axes_raw.flat[-1].axis("off")
-        fig_raw.supylabel(raw_ylabel, fontsize=17)
-        energy_figure = os.path.join(
-            output_directory, "Delta_energy_distribution.png"
-        )
-        fig_raw.savefig(energy_figure, dpi=600, bbox_inches="tight")
+        for ax in axes[len(plot_terms):]:
+            ax.axis("off")
+        figure.supylabel(raw_ylabel, fontsize=17)
+        figure_path = os.path.join(output_directory, filename)
+        figure.savefig(figure_path, dpi=600, bbox_inches="tight")
         plt.show()
-        plt.close(fig_raw)
-        print(f"Energy violin written to: {energy_figure}")
+        plt.close(figure)
+        print(f"{option} violin written to: {figure_path}")
 
-    ################################
-    # Plot Delta_Ei percentages
-    ################################
-    if "contribution" in plot_options:
-        fig, axes = plt.subplots(
-            2, 3, figsize=(18, 11), sharey=True, constrained_layout=True
+    contribution_plots = {
+        "contrib2": (
+            dominant_terms,
+            dominant_negative_percentage,
+            dominant_positive_percentage,
+            dominant_negative,
+            dominant_positive,
+            (1, 2),
+            (12, 5),
+            "Delta_contrib2_distribution.png",
+        ),
+        "contrib5": (
+            terms,
+            negative_percentage,
+            positive_percentage,
+            negative,
+            positive,
+            (2, 3),
+            (18, 11),
+            "Delta_contrib5_distribution.png",
+        ),
+    }
+    for option, settings in contribution_plots.items():
+        if option not in plot_options:
+            continue
+        (
+            plot_terms,
+            plot_negative_percentage,
+            plot_positive_percentage,
+            plot_negative,
+            plot_positive,
+            layout,
+            figure_size,
+            filename,
+        ) = settings
+        figure, axes = plt.subplots(
+            *layout,
+            figsize=figure_size,
+            sharey=True,
+            constrained_layout=True,
         )
-        fig.set_constrained_layout_pads(
-            w_pad=subplot_pad / 72,
-            h_pad=subplot_pad / 72,
+        figure.get_layout_engine().set(
+            w_pad=subplot_pad / 72, h_pad=subplot_pad / 72
         )
-        for ax, energy in zip(axes.flat, terms):
+        axes = figure.axes
+        for ax, energy in zip(axes, plot_terms):
             groups = [
-                (1, "Accept", negative_percentage[energy]),
-                (2, "Reject-MC", positive_percentage[energy]),
+                (1, "Accept", plot_negative_percentage[energy]),
+                (2, "Reject-MC", plot_positive_percentage[energy]),
             ]
             for position, outcome, values in groups:
                 values = values[values > 0].dropna()
@@ -1295,10 +1389,7 @@ def analyze_delta_energy(
                     violin["bodies"][0].set_edgecolor(colors[outcome])
                     violin["bodies"][0].set_alpha(0.65)
                 elif len(values) > 0:
-                    ax.scatter(
-                        position, values.median(), color=colors[outcome], s=45
-                    )
-
+                    ax.scatter(position, values.median(), color=colors[outcome], s=45)
                 if len(values) > 0:
                     median = values.median()
                     ax.hlines(
@@ -1316,57 +1407,137 @@ def analyze_delta_energy(
                         fontsize=12,
                         va="center",
                     )
-
             ax.set_title(plot_titles[energy], fontsize=18, pad=10)
             ax.set_xlim(0.5, 2.5)
             ax.set_xticks([1, 2])
             ax.set_xticklabels(
                 [
-                    f"Accept\n{negative[energy].gt(0).mean() * 100:.1f}% negative",
-                    f"Reject-MC\n{positive[energy].gt(0).mean() * 100:.1f}% positive",
+                    f"Accept\n{plot_negative[energy].gt(0).mean() * 100:.1f}% negative",
+                    f"Reject-MC\n"
+                    f"{plot_positive[energy].gt(0).mean() * 100:.1f}% positive",
                 ]
             )
             ax.set_ylim(0, 100)
             ax.tick_params(axis="both", labelsize=16)
-
-        axes.flat[-1].axis("off")
-        fig.supylabel(percentage_ylabel, fontsize=17)
-        percent_figure = os.path.join(
-            output_directory, "Delta_energy_contribution.png"
-        )
-        fig.savefig(percent_figure, dpi=600, bbox_inches="tight")
+        for ax in axes[len(plot_terms):]:
+            ax.axis("off")
+        figure.supylabel(percentage_ylabel, fontsize=17)
+        figure_path = os.path.join(output_directory, filename)
+        figure.savefig(figure_path, dpi=600, bbox_inches="tight")
         plt.show()
-        plt.close(fig)
-        print(f"Contribution violin written to: {percent_figure}")
+        plt.close(figure)
+        print(f"{option} violin written to: {figure_path}")
+
+    individual_accepted_trials = energy_detail.loc[
+        negative_percentage.index,
+        ["step", "attempt", "type", "acceptance", "Sequence"],
+    ].copy()
+    individual_accepted_trials["group"] = "Accept: negative"
+    individual_accepted_trials["dominant_energy"] = negative_percentage.idxmax(axis=1)
+    individual_accepted_trials["highest_percentage"] = (
+        negative_percentage.max(axis=1).round(2)
+    )
+    individual_accepted_trials["selected_total"] = negative_total.loc[
+        negative_percentage.index
+    ]
+    individual_accepted_trials["delta_score"] = contributions.loc[
+        negative_percentage.index
+    ].sum(axis=1)
+
+    individual_rejected_trials = energy_detail.loc[
+        positive_percentage.index,
+        ["step", "attempt", "type", "acceptance", "Sequence"],
+    ].copy()
+    individual_rejected_trials["group"] = "Reject-MC: positive"
+    individual_rejected_trials["dominant_energy"] = positive_percentage.idxmax(axis=1)
+    individual_rejected_trials["highest_percentage"] = (
+        positive_percentage.max(axis=1).round(2)
+    )
+    individual_rejected_trials["selected_total"] = positive_total.loc[
+        positive_percentage.index
+    ]
+    individual_rejected_trials["delta_score"] = contributions.loc[
+        positive_percentage.index
+    ].sum(axis=1)
+
+    individual_dominant_trials = pd.concat(
+        [individual_accepted_trials, individual_rejected_trials]
+    ).sort_index()
+    individual_dominant_counts = pd.crosstab(
+        individual_dominant_trials["dominant_energy"],
+        individual_dominant_trials["group"],
+    )
+    individual_dominant_counts = individual_dominant_counts.reindex(
+        index=terms,
+        columns=["Accept: negative", "Reject-MC: positive"],
+        fill_value=0,
+    )
+    individual_dominant_percentage = (
+        individual_dominant_counts.div(individual_dominant_counts.sum(axis=0), axis=1)
+        .mul(100)
+        .round(1)
+    )
+    individual_dominant_summary = pd.DataFrame(
+        {
+            "Ei": terms,
+            "Accepts": individual_dominant_counts["Accept: negative"].to_numpy(),
+            "Accept_rate(%)": individual_dominant_percentage[
+                "Accept: negative"
+            ].to_numpy(),
+            "Rejects-MC": individual_dominant_counts["Reject-MC: positive"].to_numpy(),
+            "Rejects-MC_rate(%)": individual_dominant_percentage[
+                "Reject-MC: positive"
+            ].to_numpy(),
+        }
+    )
+    individual_dominant_summary.loc[len(individual_dominant_summary)] = [
+        "Total",
+        int(individual_dominant_counts["Accept: negative"].sum()),
+        100.0,
+        int(individual_dominant_counts["Reject-MC: positive"].sum()),
+        100.0,
+    ]
 
     accepted_trials = energy_detail.loc[
-        negative_percentage.index, ["step", "attempt", "type", "acceptance", "Sequence"]
+        dominant_negative_percentage.index,
+        ["step", "attempt", "type", "acceptance", "Sequence"],
     ].copy()
     accepted_trials["group"] = "Accept: negative"
-    accepted_trials["dominant_energy"] = negative_percentage.idxmax(axis=1)
-    accepted_trials["highest_percentage"] = negative_percentage.max(axis=1).round(2)
-    accepted_trials["selected_total"] = negative_total.loc[negative_percentage.index]
-    accepted_trials["delta_score"] = contributions.loc[negative_percentage.index].sum(
-        axis=1
+    accepted_trials["dominant_energy"] = dominant_negative_percentage.idxmax(axis=1)
+    accepted_trials["highest_percentage"] = (
+        dominant_negative_percentage.max(axis=1).round(2)
     )
+    accepted_trials["selected_total"] = dominant_negative_total.loc[
+        dominant_negative_percentage.index
+    ]
+    accepted_trials["delta_score"] = dominant_contributions.loc[
+        dominant_negative_percentage.index
+    ].sum(axis=1)
 
     rejected_trials = energy_detail.loc[
-        positive_percentage.index, ["step", "attempt", "type", "acceptance", "Sequence"]
+        dominant_positive_percentage.index,
+        ["step", "attempt", "type", "acceptance", "Sequence"],
     ].copy()
     rejected_trials["group"] = "Reject-MC: positive"
-    rejected_trials["dominant_energy"] = positive_percentage.idxmax(axis=1)
-    rejected_trials["highest_percentage"] = positive_percentage.max(axis=1).round(2)
-    rejected_trials["selected_total"] = positive_total.loc[positive_percentage.index]
-    rejected_trials["delta_score"] = contributions.loc[positive_percentage.index].sum(
-        axis=1
+    rejected_trials["dominant_energy"] = dominant_positive_percentage.idxmax(axis=1)
+    rejected_trials["highest_percentage"] = (
+        dominant_positive_percentage.max(axis=1).round(2)
     )
+    rejected_trials["selected_total"] = dominant_positive_total.loc[
+        dominant_positive_percentage.index
+    ]
+    rejected_trials["delta_score"] = dominant_contributions.loc[
+        dominant_positive_percentage.index
+    ].sum(axis=1)
 
     dominant_trials = pd.concat([accepted_trials, rejected_trials]).sort_index()
     dominant_counts = pd.crosstab(
         dominant_trials["dominant_energy"], dominant_trials["group"]
     )
     dominant_counts = dominant_counts.reindex(
-        index=terms, columns=["Accept: negative", "Reject-MC: positive"], fill_value=0
+        index=dominant_terms,
+        columns=["Accept: negative", "Reject-MC: positive"],
+        fill_value=0,
     )
     dominant_percentage = (
         dominant_counts.div(dominant_counts.sum(axis=0), axis=1).mul(100).round(1)
@@ -1374,7 +1545,7 @@ def analyze_delta_energy(
 
     dominant_summary = pd.DataFrame(
         {
-            "Ei": terms,
+            "Ei": dominant_terms,
             "Accepts": dominant_counts["Accept: negative"].to_numpy(),
             "Accept_rate(%)": dominant_percentage["Accept: negative"].to_numpy(),
             "Rejects-MC": dominant_counts["Reject-MC: positive"].to_numpy(),
@@ -1393,10 +1564,17 @@ def analyze_delta_energy(
     reject_mc_count = int(trial_counts.get("Reject-MC", 0))
     reject_rotamer_count = int(trial_counts.get("Reject-Rotamer", 0))
     accepted_without_negative = int((negative_total == 0).sum())
+    accepted_both_non_negative = int(
+        dominant_contributions.loc[accepted].ge(0).all(axis=1).sum()
+    )
     accepted_uphill = int((contributions.loc[accepted].sum(axis=1) > 0).sum())
 
     print(
         f"Accepted trials without a negative contribution: {accepted_without_negative}"
+    )
+    print(
+        "Accepted trials when both Gbind and (-Pagg) are non-negative: "
+        f"{accepted_both_non_negative}"
     )
     print(f"Accepted uphill trials (delta Score > 0): {accepted_uphill}")
 
@@ -1412,7 +1590,12 @@ def analyze_delta_energy(
             "Accepted trials without a negative contribution: "
             f"{accepted_without_negative}\n"
         )
+        f.write(
+            "Accepted trials when both Gbind and (-Pagg) are non-negative: "
+            f"{accepted_both_non_negative}\n"
+        )
         f.write(f"Accepted uphill trials (delta Score > 0): {accepted_uphill}\n\n")
+        f.write("ddGbind and d(-Pagg):\n\n")
         f.write(
             "Energy(-) contributions when accepted and Energy(+) "
             "contributions when rejected:\n"
@@ -1425,17 +1608,14 @@ def analyze_delta_energy(
             f"{'Frequency_of_ddEi(+)(%)':>25}"
             f"{'Mdn_[|ddEi(+)|/sum_i|ddEi(+)|](%)':>35}\n"
         )
-        for energy, row in contribution_summary.iterrows():
-            values = [
-                "NA" if pd.isna(value) else f"{value:.2f}" for value in row
-            ]
+        for energy, row in contribution_summary2.iterrows():
+            values = ["NA" if pd.isna(value) else f"{value:.2f}" for value in row]
             f.write(
                 f"{energy:<9}{values[0]:>25}{values[1]:>25}"
                 f"{values[2]:>25}{values[3]:>35}"
                 f"{values[4]:>25}{values[5]:>35}\n"
             )
-        f.write("\n\n")
-        f.write("Dominant contribution count and percentage:\n")
+        f.write("\n\nDominant contribution count and percentage:\n")
         f.write(
             f"{'Ei':<10}{'Accepts':>15}{'Accept(%)':>15}"
             f"{'Rejects-MC':>15}{'Rejects-MC(%)':>15}\n"
@@ -1445,9 +1625,46 @@ def analyze_delta_energy(
                 f"{row[0]:<10}{int(row[1]):>15d}{row[2]:>15.2f}"
                 f"{int(row[3]):>15d}{row[4]:>15.2f}\n"
             )
+        f.write(
+            "\n\nddE_VDW, dd(E_ELE+G_GB), ddG_SURF, d(-TS), "
+            "d(-Pagg):\n\n"
+        )
+        f.write(
+            "Energy(-) contributions when accepted and Energy(+) "
+            "contributions when rejected:\n"
+        )
+        f.write(
+            f"{'Ei':<9}{'Mdn_ddEi(-)(kcal/mol)':>25}"
+            f"{'Mdn_ddEi(+)(kcal/mol)':>25}"
+            f"{'Frequency_of_ddEi(-)(%)':>25}"
+            f"{'Mdn_[|ddEi(-)|/sum_i|ddEi(-)|](%)':>35}"
+            f"{'Frequency_of_ddEi(+)(%)':>25}"
+            f"{'Mdn_[|ddEi(+)|/sum_i|ddEi(+)|](%)':>35}\n"
+        )
+        for energy, row in contribution_summary5.iterrows():
+            values = ["NA" if pd.isna(value) else f"{value:.2f}" for value in row]
+            f.write(
+                f"{energy:<9}{values[0]:>25}{values[1]:>25}"
+                f"{values[2]:>25}{values[3]:>35}"
+                f"{values[4]:>25}{values[5]:>35}\n"
+            )
+        f.write("\n\nDominant contribution count and percentage:\n")
+        f.write(
+            f"{'Ei':<10}{'Accepts':>15}{'Accept(%)':>15}"
+            f"{'Rejects-MC':>15}{'Rejects-MC(%)':>15}\n"
+        )
+        for row in individual_dominant_summary.itertuples(index=False, name=None):
+            f.write(
+                f"{row[0]:<10}{int(row[1]):>15d}{row[2]:>15.2f}"
+                f"{int(row[3]):>15d}{row[4]:>15.2f}\n"
+            )
 
     print(f"Detail report written to: {output_file}")
-    return dominant_trials, dominant_counts, dominant_percentage
+    return (
+        individual_dominant_trials,
+        individual_dominant_counts,
+        individual_dominant_percentage,
+    )
 
 
 # In[ ]:
@@ -1507,6 +1724,8 @@ def main(argv: list[str] | None = None) -> None:
     PNG figures
         Written only when --plot or --violin is selected.
     """
+    if hasattr(sys.stdout, "reconfigure"):
+        sys.stdout.reconfigure(encoding="utf-8")
     parser = get_parser()
     args = parser.parse_args(argv)
     if not args.profiles and not args.details:
@@ -1517,11 +1736,11 @@ def main(argv: list[str] | None = None) -> None:
     if args.violin is None:
         detail_plots = []
     elif not args.violin:
-        detail_plots = ["energy"]
+        detail_plots = ["energy2"]
     else:
         detail_plots = [
             option
-            for option in ("energy", "contribution")
+            for option in ("energy2", "contrib2", "energy5", "contrib5")
             if option in args.violin
         ]
 
@@ -1535,9 +1754,7 @@ def main(argv: list[str] | None = None) -> None:
         return
 
     if args.profiles:
-        profile = read_energy_profile(
-            parameters["BASE_DIR"], parameters["N_AA"]
-        )
+        profile = read_energy_profile(parameters["BASE_DIR"], parameters["N_AA"])
         if profile_plots:
             plot_pepad(profile, parameters, profile_plots, args.rolling)
         generate_pepad_report(profile, parameters, args.top)
@@ -1546,9 +1763,7 @@ def main(argv: list[str] | None = None) -> None:
         energy_detail = read_energy_detail(
             parameters["BASE_DIR"], parameters["N_RESIDUES"]
         )
-        detail_report = os.path.join(
-            parameters["BASE_DIR"], "Detail_report.txt"
-        )
+        detail_report = os.path.join(parameters["BASE_DIR"], "Detail_report.txt")
         analyze_delta_energy(energy_detail, detail_report, detail_plots)
 
 
