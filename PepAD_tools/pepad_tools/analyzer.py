@@ -958,12 +958,7 @@ def read_energy_detail(
         energy_detail["dPAGG"] / energy_detail["d_abs_Score"]
     )  # percentage of TS changes
 
-    trial_counts = energy_detail["acceptance"].value_counts()
     print(f"Read {len(energy_detail)} energy-detail records.")
-    print("Trial counts:")
-    print(f"  Accept: {trial_counts.get('Accept', 0)}")
-    print(f"  Reject-MC: {trial_counts.get('Reject-MC', 0)}")
-    print(f"  Reject-Rotamer: {trial_counts.get('Reject-Rotamer', 0)}")
     return energy_detail
 
 
@@ -1092,10 +1087,10 @@ def analyze_delta_energy(
     Detail_report.txt
         Energy-detail report written whenever this function runs.
 
-    Delta_energy2_distribution.png and Delta_energy5_distribution.png
+    energy2.png and energy5.png
         Raw energy violin plots written at 600 dpi.
 
-    Delta_contrib2_distribution.png and Delta_contrib5_distribution.png
+    contrib2.png and contrib5.png
         Contribution violin plots written at 600 dpi.
     """
     terms = ["VDW", "ELE+GB", "SURF", "(-TS)", "(-Pagg)"]
@@ -1150,8 +1145,11 @@ def analyze_delta_energy(
     raw_contributions.insert(0, "Gbind", gbind)
     dominant_contributions = raw_contributions[dominant_terms]
     complete = contributions.notna().all(axis=1)
-    accepted = complete & energy_detail["acceptance"].eq("Accept")
-    rejected = complete & energy_detail["acceptance"].eq("Reject-MC")
+    # Only consider sequence changes
+    sequence_change = energy_detail["type"].isin(["Mutation", "Exchange"])
+    sheet_move = energy_detail["type"].str.endswith("-axis", na=False)
+    accepted = complete & sequence_change & energy_detail["acceptance"].eq("Accept")
+    rejected = complete & sequence_change & energy_detail["acceptance"].eq("Reject-MC")
     if not accepted.any() and not rejected.any():
         raise ValueError(
             "No delta-energy data are available for Accept or Reject-MC trials."
@@ -1250,14 +1248,14 @@ def analyze_delta_energy(
             dominant_contributions,
             (1, 2),
             (12, 5),
-            "Delta_energy2_distribution.png",
+            "energy2.png",
         ),
         "energy5": (
             terms,
             contributions,
             (2, 3),
             (18, 11),
-            "Delta_energy5_distribution.png",
+            "energy5.png",
         ),
     }
     for option, settings in raw_plots.items():
@@ -1333,7 +1331,7 @@ def analyze_delta_energy(
             dominant_positive,
             (1, 2),
             (12, 5),
-            "Delta_contrib2_distribution.png",
+            "contrib2.png",
         ),
         "contrib5": (
             terms,
@@ -1343,7 +1341,7 @@ def analyze_delta_energy(
             positive,
             (2, 3),
             (18, 11),
-            "Delta_contrib5_distribution.png",
+            "contrib5.png",
         ),
     }
     for option, settings in contribution_plots.items():
@@ -1559,16 +1557,29 @@ def analyze_delta_energy(
         int(dominant_counts["Reject-MC: positive"].sum()),
         100.0,
     ]
-    trial_counts = energy_detail["acceptance"].value_counts()
-    accept_count = int(trial_counts.get("Accept", 0))
-    reject_mc_count = int(trial_counts.get("Reject-MC", 0))
-    reject_rotamer_count = int(trial_counts.get("Reject-Rotamer", 0))
+    sequence_trial_counts = energy_detail.loc[
+        sequence_change, "acceptance"
+    ].value_counts()
+    sequence_accept_count = int(sequence_trial_counts.get("Accept", 0))
+    sequence_reject_mc_count = int(sequence_trial_counts.get("Reject-MC", 0))
+    sequence_reject_rotamer_count = int(
+        sequence_trial_counts.get("Reject-Rotamer", 0)
+    )
+    sheet_trial_counts = energy_detail.loc[sheet_move, "acceptance"].value_counts()
+    sheet_accept_count = int(sheet_trial_counts.get("Accept", 0))
+    sheet_reject_count = int(sheet_move.sum()) - sheet_accept_count
     accepted_without_negative = int((negative_total == 0).sum())
     accepted_both_non_negative = int(
         dominant_contributions.loc[accepted].ge(0).all(axis=1).sum()
     )
     accepted_uphill = int((contributions.loc[accepted].sum(axis=1) > 0).sum())
 
+    print(f"Total number of trials: {len(energy_detail)}")
+    print()
+    print(f"Total number of sequence change trials: {int(sequence_change.sum())}")
+    print(f"Accepted trials: {sequence_accept_count}")
+    print(f"Reject-MC trials: {sequence_reject_mc_count}")
+    print(f"Reject-Rotamer trials: {sequence_reject_rotamer_count}")
     print(
         f"Accepted trials without a negative contribution: {accepted_without_negative}"
     )
@@ -1577,15 +1588,23 @@ def analyze_delta_energy(
         f"{accepted_both_non_negative}"
     )
     print(f"Accepted uphill trials (delta Score > 0): {accepted_uphill}")
+    print()
+    print(f"Total number of sheet-move trials: {int(sheet_move.sum())}")
+    print(f"Accepted trials: {sheet_accept_count}")
+    print(f"Rejected trials: {sheet_reject_count}")
 
     #############################
     # Output Detail_report.txt
     #############################
     with open(output_file, "w", encoding="utf-8") as f:
-        f.write(f"Total number of trials: {len(energy_detail)}\n")
-        f.write(f"Accepted trials: {accept_count}\n")
-        f.write(f"Reject-MC trials: {reject_mc_count}\n")
-        f.write(f"Reject-Rotamer trials: {reject_rotamer_count}\n")
+        f.write(f"Total number of trials: {len(energy_detail)}\n\n")
+        f.write(
+            "Total number of sequence change trials: "
+            f"{int(sequence_change.sum())}\n"
+        )
+        f.write(f"Accepted trials: {sequence_accept_count}\n")
+        f.write(f"Reject-MC trials: {sequence_reject_mc_count}\n")
+        f.write(f"Reject-Rotamer trials: {sequence_reject_rotamer_count}\n")
         f.write(
             "Accepted trials without a negative contribution: "
             f"{accepted_without_negative}\n"
@@ -1595,6 +1614,9 @@ def analyze_delta_energy(
             f"{accepted_both_non_negative}\n"
         )
         f.write(f"Accepted uphill trials (delta Score > 0): {accepted_uphill}\n\n")
+        f.write(f"Total number of sheet-move trials: {int(sheet_move.sum())}\n")
+        f.write(f"Accepted trials: {sheet_accept_count}\n")
+        f.write(f"Rejected trials: {sheet_reject_count}\n\n")
         f.write("ddGbind and d(-Pagg):\n\n")
         f.write(
             "Energy(-) contributions when accepted and Energy(+) "

@@ -24,13 +24,16 @@ def load_python_functions() -> dict[str, object]:
 
 
 def sample_energy_detail() -> pd.DataFrame:
-    """Create accepted, MC-rejected, and rotamer-rejected trial records."""
+    """Create sequence-change and sheet-move trial records."""
     rows = [
-        [1, 1, "trial", "Accept", "G-N-N", -2.0, -1.0, 0.2, 1.0, 0.5],
-        [2, 1, "trial", "Accept", "G-N-Q", -1.5, 0.4, -0.2, 0.8, -0.3],
-        [3, 1, "trial", "Reject-MC", "G-Q-N", 1.2, 1.0, -0.1, -0.5, -1.0],
-        [4, 1, "trial", "Reject-MC", "Q-N-N", 1.8, -0.2, 0.3, -0.8, -0.6],
-        [5, 1, "trial", "Reject-Rotamer", "Q-Q-N", None, None, None, None, None],
+        [1, 1, "Mutation", "Accept", "G-N-N", -2.0, -1.0, 0.2, 1.0, 0.5],
+        [2, 1, "Exchange", "Accept", "G-N-Q", -1.5, 0.4, -0.2, 0.8, -0.3],
+        [3, 1, "Mutation", "Reject-MC", "G-Q-N", 1.2, 1.0, -0.1, -0.5, -1.0],
+        [4, 1, "Exchange", "Reject-MC", "Q-N-N", 1.8, -0.2, 0.3, -0.8, -0.6],
+        [5, 1, "Mutation", "Reject-Rotamer", "Q-Q-N", None, None, None, None, None],
+        [6, 1, "+X-axis", "Accept", "Q-Q-N", -8.0, -7.0, -6.0, 5.0, 4.0],
+        [7, 1, "-Y-axis", "Reject-MC", "Q-Q-N", 8.0, 7.0, 6.0, -5.0, -4.0],
+        [8, 1, "+Z-axis", "Reject-Rotamer", "Q-Q-N", None, None, None, None, None],
     ]
     columns = [
         "step",
@@ -349,10 +352,10 @@ class PepADAnalyzerPythonTests(unittest.TestCase):
 
             self.assertTrue(report.is_file())
             figure_names = [
-                "Delta_energy2_distribution.png",
-                "Delta_energy5_distribution.png",
-                "Delta_contrib2_distribution.png",
-                "Delta_contrib5_distribution.png",
+                "energy2.png",
+                "energy5.png",
+                "contrib2.png",
+                "contrib5.png",
             ]
             self.assertTrue(
                 all(not (Path(temp_dir) / name).exists() for name in figure_names)
@@ -366,6 +369,20 @@ class PepADAnalyzerPythonTests(unittest.TestCase):
                 f"{'Mdn_[|ddEi(+)|/sum_i|ddEi(+)|](%)':>35}"
             )
             report_text = report.read_text(encoding="utf-8")
+            expected_counts = (
+                "Total number of trials: 8\n\n"
+                "Total number of sequence change trials: 5\n"
+                "Accepted trials: 2\n"
+                "Reject-MC trials: 2\n"
+                "Reject-Rotamer trials: 1\n"
+                "Accepted trials without a negative contribution: 0\n"
+                "Accepted trials when both Gbind and (-Pagg) are non-negative: 0\n"
+                "Accepted uphill trials (delta Score > 0): 0\n\n"
+                "Total number of sheet-move trials: 3\n"
+                "Accepted trials: 1\n"
+                "Rejected trials: 2\n\n"
+            )
+            self.assertTrue(report_text.startswith(expected_counts))
             self.assertEqual(report_text.count(expected_header), 2)
             self.assertLess(
                 report_text.index("ddGbind and d(-Pagg):"),
@@ -378,6 +395,8 @@ class PepADAnalyzerPythonTests(unittest.TestCase):
 
         self.assertEqual(len(result), 3)
         self.assertTrue(all(isinstance(item, pd.DataFrame) for item in result))
+        self.assertEqual(int(result[1]["Accept: negative"].sum()), 2)
+        self.assertEqual(int(result[1]["Reject-MC: positive"].sum()), 2)
 
     def test_violin_order_and_600_dpi(self) -> None:
         figure_type = matplotlib.figure.Figure
@@ -398,10 +417,10 @@ class PepADAnalyzerPythonTests(unittest.TestCase):
         self.assertEqual(
             filenames,
             [
-                "Delta_energy2_distribution.png",
-                "Delta_energy5_distribution.png",
-                "Delta_contrib2_distribution.png",
-                "Delta_contrib5_distribution.png",
+                "energy2.png",
+                "energy5.png",
+                "contrib2.png",
+                "contrib5.png",
             ],
         )
         self.assertTrue(
