@@ -512,7 +512,11 @@ output:
 - `--top TOP`: Integer. Number of top-scoring unique peptides written to `PepAD report.txt`. (default: 10)
 - `--details`: Analyze `energydetails.txt` and write `Detail_report.txt`.
 - `--plot {score,rmsd,gbind,pagg} [...]`: Generate one or more optional step-wise plots. Requires `--profiles`.
-- `--violin [{energy,contribution} ...]`: Generate ΔΔE<sub>i</sub> energy or contribution violin plots. Requires `--details`. When no value is given, the energy violin plot is generated.
+- `--violin {energy2, contrib2, energy5, contrib5} [...]`: Generate violin plots showing energy-term contributions to the negative part of the score change (Δscore) in accepted trials or to the positive part of the (Δscore) in rejected trials. Requires `--details`.
+  - `energy2`: Plot the distributions of ΔΔG_binding and Δ(-P_agg). (default)
+  - `contrib2`: Plot their percentage contributions to the negative part of Δscore in accepted trials or to the positive part of Δscore in rejected trials.
+  - `energy5`: Plot the distributions of ΔΔE_VDW, ΔΔ(E_ELE + G_GB), ΔΔG_SURF, Δ(-TS), and Δ(-P_agg).
+  - `contrib5`: Plot the corresponding percentage contributions of these five terms.
 - `--rolling ROLLING`: Integer. Number of rolling-average windows for plots. (default: 0)
 
 At least one of `--profiles` or `--details` is needed. Both can be used in the same command.
