@@ -4,6 +4,7 @@
 
 
 # %% Cell 30ee6987
+import sys
 import numpy as np
 import pandas as pd
 import argparse
@@ -7174,6 +7175,8 @@ def read_arguments(
     argparse.Namespace
         Parsed and conditionally validated sheet-builder inputs.
     """
+    if hasattr(sys.stdout, "reconfigure"):
+        sys.stdout.reconfigure(encoding="utf-8")
     parser = argparse.ArgumentParser(
         description=("Initial Structure Builder v1.23: build beta sheets."),
         formatter_class=RawDefaultsHelpFormatter,
@@ -7253,7 +7256,11 @@ def read_arguments(
         "--y",
         type=float,
         default=0.0,
-        help="Sheet-2 shifts in y direction in unit of residue spacing (3.465 Angstrom).",
+        help=(
+            "Sheet-2 shifts in the y direction in units of Cα-Cα y-component "
+            "distance when peptide backbone is parallel to y-axis. (The distance "
+            "for antiparallel sheet is 3.465 Å and for parallel sheet is 3.274 Å)."
+        ),
     )
     parser.add_argument(
         "-n",
