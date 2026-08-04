@@ -485,7 +485,7 @@ conda activate /path/to/env_pepad_tools
 - `-dx DX`, `--dx DX`: Strand-strand distance (Å) along x. (default: 4.8 Å)
 - `-dz DZ`, `--dz DZ`: Sheet-sheet distance (Å) along z. (default: 11.5 Å)
 - `-x X`, `--x X`: Sheet-2 shifts in the x direction in units of `0.5 * dx`. (default: 0.0)
-- `-y Y`, `--y Y`: Sheet-2 shifts in the y direction in units of residue spacing (3.465 Å). (default: 0.0)
+- `-y Y`, `--y Y`: Sheet-2 shifts in the y direction in units of Cα-Cα y-component distance when peptide backbone is parallel to y-axis. (The distance for antiparallel sheet is 3.465 Å and for parallel sheet is 3.274 Å). (default: 0.0)
 - `-n N_CHAINS`, `--chains N_CHAINS`: Integer. Strands per sheet. (default: 8)
 - `-r {e,o}`, `--core {e,o}`: Packing mode. `e` = even-numbered residues packed inside; `o` = odd-numbered residues packed inside. (default: e)
 - `-g {minus,plus}`, `--registry {minus,plus}`: Relative direction of registry shift inside antiparallel beta-sheets. (default: minus)
