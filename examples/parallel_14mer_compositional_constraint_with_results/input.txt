@@ -1,0 +1,22 @@
+### Initial structure info
+PDBFILE = comp2.pdb   # REQUIRED. Initial structure PDB file
+
+### MC info or advanced calculation method
+RANSEED           = 310
+N_STEPS           = 10000    # REQUIRED. Interger. Number of MC Steps
+
+
+### Amino acid Compositions
+N_HYDROPHOBIC_MIN = 7        # Minimum number of hydrophobic residues
+N_HYDROPHOBIC_MAX = 7        # Maximum number of hydrophobic residues
+N_POLAR_MIN       = 7        # Minimum number of polar residues
+N_POLAR_MAX       = 7        # Maximum number of polar residues
+N_CHARGED_MIN     = 0        # Minimum number of charged residues
+N_CHARGED_MAX     = 0        # Maximum number of charged residues
+N_OTHER_MIN       = 0        # Minimum number of other residues
+N_OTHER_MAX       = 0        # Maximum number of other residues
+
+
+N_ASN_MAX = 3
+N_ALA_MIN = 1
+N_MET_MAX = 0

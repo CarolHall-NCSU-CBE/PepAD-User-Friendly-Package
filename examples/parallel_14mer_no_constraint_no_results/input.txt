@@ -1,0 +1,6 @@
+### Initial structure info
+PDBFILE = comp2.pdb   # REQUIRED. Initial structure PDB file
+RANSEED           = 310
+N_STEPS           = 10000    # REQUIRED. Interger. Number of MC Steps
+
+

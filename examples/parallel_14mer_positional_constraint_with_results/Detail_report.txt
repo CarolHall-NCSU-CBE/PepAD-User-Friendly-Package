@@ -1,0 +1,48 @@
+Total number of trials: 70000
+
+Total number of sequence change trials: 67900
+Accepted trials: 19747
+Reject-MC trials: 31564
+Reject-Rotamer trials: 16589
+Accepted trials without a negative contribution: 902
+Accepted trials when both Gbind and (-Pagg) are non-negative: 5476
+Accepted uphill trials (delta Score > 0): 9850
+
+Total number of sheet-move trials: 2100
+Accepted trials: 175
+Rejected trials: 1925
+
+ddGbind and d(-Pagg):
+
+Energy(-) contributions when accepted and Energy(+) contributions when rejected:
+Ei           Mdn_ddEi(-)(kcal/mol)    Mdn_ddEi(+)(kcal/mol)  Frequency_of_ddEi(-)(%)  Mdn_[|ddEi(-)|/sum_i|ddEi(-)|](%)  Frequency_of_ddEi(+)(%)  Mdn_[|ddEi(+)|/sum_i|ddEi(+)|](%)
+Gbind                        -0.63                     1.70                    50.44                             100.00                    90.65                              85.45
+(-Pagg)                      -0.71                     1.62                    35.31                             100.00                    62.58                              59.42
+
+
+Dominant contribution count and percentage:
+Ei                Accepts      Accept(%)     Rejects-MC  Rejects-MC(%)
+Gbind                8676          60.80          19514          61.80
+(-Pagg)              5595          39.20          12050          38.20
+Total               14271         100.00          31564         100.00
+
+
+ddE_VDW, dd(E_ELE+G_GB), ddG_SURF, d(-TS), d(-Pagg):
+
+Energy(-) contributions when accepted and Energy(+) contributions when rejected:
+Ei           Mdn_ddEi(-)(kcal/mol)    Mdn_ddEi(+)(kcal/mol)  Frequency_of_ddEi(-)(%)  Mdn_[|ddEi(-)|/sum_i|ddEi(-)|](%)  Frequency_of_ddEi(+)(%)  Mdn_[|ddEi(+)|/sum_i|ddEi(+)|](%)
+VDW                          -0.57                     1.21                    49.91                              62.72                    67.81                              41.40
+ELE+GB                       -0.39                     0.75                    49.97                              38.37                    73.60                              24.37
+SURF                            NA                       NA                     0.00                                 NA                     0.00                                 NA
+(-TS)                        -0.69                     1.10                    44.27                              58.24                    58.78                              31.28
+(-Pagg)                      -0.71                     1.62                    35.31                              46.62                    62.58                              46.74
+
+
+Dominant contribution count and percentage:
+Ei                Accepts      Accept(%)     Rejects-MC  Rejects-MC(%)
+VDW                  6050          32.10           9122          28.90
+ELE+GB               4138          22.00           5555          17.60
+SURF                    0           0.00              0           0.00
+(-TS)                5193          27.60           6194          19.60
+(-Pagg)              3464          18.40          10693          33.90
+Total               18845         100.00          31564         100.00

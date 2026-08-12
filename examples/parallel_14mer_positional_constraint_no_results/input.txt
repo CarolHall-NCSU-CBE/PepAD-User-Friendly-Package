@@ -1,0 +1,5 @@
+PDBFILE = comp2.pdb   # REQUIRED. Initial structure PDB file
+RANSEED           = 310
+N_STEPS           = 10000    # REQUIRED. Interger. Number of MC Steps
+GROUPED_SITE_AA_POOL      = ALA LEU VAL ILE PHE GLY
+GROUPED_SITE_CONSTRAINTS  = 4 6 10 12

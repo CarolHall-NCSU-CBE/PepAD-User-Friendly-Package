@@ -1,0 +1,11 @@
+    # Rank      Step     Trial Sequence                                Score          Gbind    Lambda_Pagg
+         1      2850         7 NVNAITVVTIHTNA                       -35.1124       -39.9598        -4.8474
+         2       651         6 VVTAVNNTIVSVNH                       -34.8926       -39.7052        -4.8126
+         3      4618         6 NVNAITVITISTNG                       -34.8285       -38.3161        -3.4876
+         4       651         7 VVTAVNNVITSVNH                       -34.6757       -39.4883        -4.8126
+         5      3353         3 NVNAWTVVTINTGS                       -34.6273       -38.1663        -3.5390
+         6      2846         2 NTNAITHVVIHVNA                       -34.5347       -40.7708        -6.2361
+         7      4496         2 NTNAGVNIIVLTSS                       -34.5283       -39.5775        -5.0491
+         8      4618         2 NVNAITVTIISTNG                       -34.4467       -37.9343        -3.4876
+         9      1877         7 TVNAVTVVTINTNV                       -34.3776       -37.0867        -2.7091
+        10      2846         1 NTNAVTHVIIHVNA                       -34.3619       -40.5980        -6.2361

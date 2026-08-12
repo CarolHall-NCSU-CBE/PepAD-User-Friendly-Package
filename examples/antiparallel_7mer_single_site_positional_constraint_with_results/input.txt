@@ -1,0 +1,5 @@
+PDBFILE = comp1.pdb   # REQUIRED. Initial structure PDB file
+RANSEED           = 10
+N_STEPS           = 10000    # REQUIRED. Interger. Number of MC Steps
+
+SINGLE_SITE_CONSTRAINTS   = 2
