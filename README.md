@@ -80,6 +80,8 @@ structure, and edit `input.txt`:
 
 Example: if a run directory is created in the `/PepAD-User-Friendly-Package`
 ```bash
+git clone https://github.com/CarolHall-NCSU-CBE/PepAD-User-Friendly-Package.git
+cd PepAD-User-Friendly-Package
 mkdir -p run1
 cp src/input.example.txt run1/input.txt
 cp Initial_structures/comp1/comp1.pdb run1/
@@ -422,11 +424,10 @@ Second, users can build artificial amyloid backbones using molecular modeling to
 </p>
 <p align="center"><b>Fig. 4.</b> Prepare initial structure using molecular modeling tool.</p>
 
-### Format of PDB file
-PepAD only takes PDB files in following format:
-`Atom  [Atom number]  [Atom type]  [Residue Type]  [Residue number]  [X]  [Y]  [Z]`
-
-both `[atom number]` and `[atom type]` must increase according according to entire structure.
+#### Format of PDB file
+PepAD accepts PDB files in the following format:
+`ATOM  [Atom number]  [Atom type]  [Residue type]  [Residue number]  [X]  [Y]  [Z]`
+Both `[Atom number]` and `[Residue number]` must increase sequentially throughout the entire structure.
 
 ## Output files
 
