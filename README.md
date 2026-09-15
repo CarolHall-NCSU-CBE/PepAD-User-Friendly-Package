@@ -422,6 +422,12 @@ Second, users can build artificial amyloid backbones using molecular modeling to
 </p>
 <p align="center"><b>Fig. 4.</b> Prepare initial structure using molecular modeling tool.</p>
 
+### Format of PDB file
+PepAD only takes PDB files in following format:
+`Atom  [Atom number]  [Atom type]  [Residue Type]  [Residue number]  [X]  [Y]  [Z]`
+
+both `[atom number]` and `[atom type]` must increase according according to entire structure.
+
 ## Output files
 
 PepAD writes output into the run directory.
