@@ -1,4 +1,4 @@
-### PepAD v1.42 input template
+### PepAD v1.42-3 input template
 ### Copy this file into the run directory as input.txt.
 ### Format: PARAMETER = value. Parameter order does not matter.
 ### Comments may begin with # or !. Each parameter may appear only once.

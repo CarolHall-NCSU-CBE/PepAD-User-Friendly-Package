@@ -11,7 +11,7 @@ and constraints. PepAD outputs peptide sequences with their corresponding scores
 as well as structural files for the top-scoring designs, which can be used in
 downstream simulations or experiments.
 
-**Current version: v1.42.** This version uses named `PARAMETER = value` entries instead of the fixed, position-dependent input format. Inputs written for v1.37 are not compatible.
+**Current version: v1.42-3.** This version uses named `PARAMETER = value` entries instead of the fixed, position-dependent input format. Inputs written for v1.37 are not compatible.
 
 ## What PepAD does
 
@@ -37,13 +37,12 @@ More negative scores indicate stronger predicted binding at the evaluated config
 
 | Path | Contents |
 | --- | --- |
-| [`src/main_v1.42-2.f90`](src/main_v1.42-2.f90) | PepAD source code |
+| [`src/main_v1.42-3.f90`](src/main_v1.42-3.f90) | PepAD source code |
 | [`src/input.example.txt`](src/input.example.txt) | Annotated input template |
 | `src/lib/` | Force-field and rotamer data |
 | [`examples/`](examples/) | Examples |
 | [`Initial_structures/`](Initial_structures/) | Prepared fibril backbones and supporting files |
-| [`Initial_structure_builder/`](Initial_structure_builder/) | Initial Structure Builder |
-| [`PepAD_analyzer/`](PepAD_analyzer/) | PepAD output-analysis tools |
+| [`PepAD_tools/`](PepAD_tools/) | Initial Structure Builder and PepAD output-analysis tools |
 | [`archive/`](archive/) | Old source code, documentation, analyzer, and examples |
 
 ## Running PepAD
@@ -63,7 +62,7 @@ Load Apptainer if it is provided as a module on the local system. Go to the dire
 module load apptainer  # if required on the local system
 mkdir -p /path/to/PepAD_container
 cd /path/to/PepAD_container
-apptainer pull PepAD_package.sif docker://ghcr.io/carolhall-ncsu-cbe/pepad-user-friendly-package:1.42-2
+apptainer pull PepAD_package.sif docker://ghcr.io/carolhall-ncsu-cbe/pepad-user-friendly-package:1.42-3
 ```
 
 This creates `PepAD_package.sif` in `/path/to/PepAD_container`.
@@ -75,15 +74,15 @@ Each run needs:
 - an initial structure PDB file
 - `input.txt`.
 
-Then create a run directory and change to the run directory. Copy the input template into the run directory as `input.txt`, copy the initial
-structure, and edit `input.txt`:
+Create a run directory outside the package. Copy the input template into the run directory as `input.txt`, copy the initial structure, and edit `input.txt`:
 
-Example: if a run directory is created in the `/PepAD-User-Friendly-Package`
 ```bash
-mkdir -p run1
-cp src/input.example.txt run1/input.txt
-cp Initial_structures/comp1/comp1.pdb run1/
-cd run1
+PEPAD_PACKAGE=/path/to/PepAD-User-Friendly-Package
+RUN_DIR=/path/to/PepAD_runs/run1
+mkdir -p "$RUN_DIR"
+cp "$PEPAD_PACKAGE/src/input.example.txt" "$RUN_DIR/input.txt"
+cp "$PEPAD_PACKAGE/Initial_structures/comp1/comp1.pdb" "$RUN_DIR/"
+cd "$RUN_DIR"
 ```
 
 ### 3. Run PepAD
@@ -180,15 +179,15 @@ Each run needs:
 - an initial structure PDB file
 - `input.txt`.
 
-Then create a run directory and change to the run directory. Copy the input template into the run directory as `input.txt`, copy the initial
-structure, and edit `input.txt`:
+Create a run directory outside the package. Copy the input template into the run directory as `input.txt`, copy the initial structure, and edit `input.txt`:
 
-Example: if a run directory is created in the `PepAD-User-Friendly-Package/`
 ```bash
-mkdir -p run1
-cp src/input.example.txt run1/input.txt
-cp Initial_structures/comp1/comp1.pdb run1/
-cd run1
+PEPAD_PACKAGE=/path/to/PepAD-User-Friendly-Package
+RUN_DIR=/path/to/PepAD_runs/run1
+mkdir -p "$RUN_DIR"
+cp "$PEPAD_PACKAGE/src/input.example.txt" "$RUN_DIR/input.txt"
+cp "$PEPAD_PACKAGE/Initial_structures/comp1/comp1.pdb" "$RUN_DIR/"
+cd "$RUN_DIR"
 ```
 
 ### 4. Run PepAD
@@ -199,10 +198,10 @@ In `run1`, execute PepAD. It reads `input.txt` and writes the results in the run
 PepAD
 ```
 
-If PepAD has not been added to `PATH`, the default installation can instead be run from `run1` using:
+If PepAD has not been added to `PATH`, use the absolute path to the executable:
 
 ```bash
-../src/PepAD/PepAD
+/path/to/PepAD-User-Friendly-Package/src/PepAD/PepAD
 ```
 
 ## Input format

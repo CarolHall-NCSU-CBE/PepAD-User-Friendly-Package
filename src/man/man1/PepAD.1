@@ -1,4 +1,4 @@
-.TH PEPAD 1 "24 July 2026" "PepAD 1.42" "PepAD User Manual"
+.TH PEPAD 1 "1 October 2026" "PepAD 1.42-3" "PepAD User Manual"
 .
 .SH NAME
 PepAD \- Peptide Assembly Design Algorithm
@@ -242,7 +242,7 @@ Integer.
 Maximum number of other-category amino acids.
 .
 .PP
-If all category flags are omitted, PepAD uses the composition of the
+If all category parameters are omitted, PepAD uses the composition of the
 initial PDB structure.
 In custom composition mode, every category requires a minimum, a
 maximum, or both.
@@ -280,12 +280,12 @@ ASN GLN THR HIE ARG LYS GLU ASP CYS PRO
 .PP
 Users may provide only a minimum, only a maximum, or both.
 Equal minimum and maximum values impose an exact amino-acid count.
-An amino acid without either flag is unrestricted.
+An amino acid without either parameter is unrestricted.
 Each
 .B N_<AA>_MIN
 or
 .B N_<AA>_MAX
-flag may appear only once.
+parameter may appear only once.
 Specific-amino-acid minimums cannot exceed the corresponding category
 maximum.
 .
@@ -405,4 +405,4 @@ PepAD reloads this file when
 Haoyu Wang, Sudeep Sarma, and Carol K. Hall.
 .
 .SH VERSION
-PepAD version 1.42.
+PepAD version 1.42-3.

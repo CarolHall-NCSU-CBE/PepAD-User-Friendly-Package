@@ -17,13 +17,13 @@ RUN apt-get update \
 WORKDIR /opt/PepAD
 
 # Copy the current source code, runtime library, and manual page.
-COPY main_v1.42-2.f90 /opt/PepAD/main_v1.42-2.f90
+COPY main_v1.42-3.f90 /opt/PepAD/main_v1.42-3.f90
 COPY lib/ /opt/PepAD/lib/
 COPY man/ /opt/PepAD/man/
 
 # Compile PepAD and remove the source file from the runtime installation.
-RUN ifx -O2 -o /opt/PepAD/PepAD /opt/PepAD/main_v1.42-2.f90 \
-    && rm /opt/PepAD/main_v1.42-2.f90 \
+RUN ifx -O2 -o /opt/PepAD/PepAD /opt/PepAD/main_v1.42-3.f90 \
+    && rm /opt/PepAD/main_v1.42-3.f90 \
     && ln -s /opt/PepAD/PepAD /usr/local/bin/PepAD \
     && test -x /opt/PepAD/PepAD \
     && test -x /usr/local/bin/PepAD \

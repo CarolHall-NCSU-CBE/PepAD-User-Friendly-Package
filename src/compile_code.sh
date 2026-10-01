@@ -4,7 +4,7 @@
 # src/
 # |-- compile_code.sh
 # |-- Dockerfile
-# |-- main_v1.42-2.f90
+# |-- main_v1.42-3.f90
 # |-- lib/
 # `-- man/
 #     `-- man1/
@@ -27,7 +27,7 @@ SOURCE_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd -P)"
 # Use src/PepAD by default, or accept a user-defined installation directory.
 OUTPUT_DIR="${1:-$SOURCE_DIR/PepAD}"
 
-SOURCE_FILE="$SOURCE_DIR/main_v1.42-2.f90"
+SOURCE_FILE="$SOURCE_DIR/main_v1.42-3.f90"
 LIB_DIR="$SOURCE_DIR/lib"
 MAN_FILE="$SOURCE_DIR/man/man1/PepAD.1"
 
