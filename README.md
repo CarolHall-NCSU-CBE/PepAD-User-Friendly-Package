@@ -609,7 +609,11 @@ Score and RMSD vs steps plot
     https://doi.org/10.7717/peerj.80
 13. Stroud, J. C. The Zipper Groups of the Amyloid State of Proteins. Acta Cryst D 2013, 69 (4), 540–545. https://doi.org/10.1107/S0907444912050548.
 
-    
+## Citation   
+If you use PepAD in your research, please cite:
+
+Wang, H.; Sarma, S.; Hall, C. K. Peptide Assembly Design Algorithm: A User-Friendly Computational Tool for Discovering Amyloid-forming Peptides. *Journal of Chemical Information and Modeling*, 2026. https://doi.org/10.1021/acs.jcim.6c01893
+
 ## License
 
 This project is distributed under the terms in [`LICENSE`](LICENSE).
