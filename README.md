@@ -77,12 +77,21 @@ Each run needs:
 Create a run directory outside the package. Copy the input template into the run directory as `input.txt`, copy the initial structure, and edit `input.txt`:
 
 ```bash
+<<<<<<< HEAD
 PEPAD_PACKAGE=/path/to/PepAD-User-Friendly-Package
 RUN_DIR=/path/to/PepAD_runs/run1
 mkdir -p "$RUN_DIR"
 cp "$PEPAD_PACKAGE/src/input.example.txt" "$RUN_DIR/input.txt"
 cp "$PEPAD_PACKAGE/Initial_structures/comp1/comp1.pdb" "$RUN_DIR/"
 cd "$RUN_DIR"
+=======
+git clone https://github.com/CarolHall-NCSU-CBE/PepAD-User-Friendly-Package.git
+cd PepAD-User-Friendly-Package
+mkdir -p run1
+cp src/input.example.txt run1/input.txt
+cp Initial_structures/comp1/comp1.pdb run1/
+cd run1
+>>>>>>> 4abd2106a6e7089b6f02d1c6f8e7e89eacc9c00f
 ```
 
 ### 3. Run PepAD
@@ -421,6 +430,11 @@ Second, users can build artificial amyloid backbones using molecular modeling to
 </p>
 <p align="center"><b>Fig. 4.</b> Prepare initial structure using molecular modeling tool.</p>
 
+#### Format of PDB file
+PepAD accepts PDB files in the following format:
+`ATOM  [Atom number]  [Atom type]  [Residue type]  [Residue number]  [X]  [Y]  [Z]`
+Both `[Atom number]` and `[Residue number]` must increase sequentially throughout the entire structure.
+
 ## Output files
 
 PepAD writes output into the run directory.
@@ -601,7 +615,11 @@ Score and RMSD vs steps plot
     https://doi.org/10.7717/peerj.80
 13. Stroud, J. C. The Zipper Groups of the Amyloid State of Proteins. Acta Cryst D 2013, 69 (4), 540–545. https://doi.org/10.1107/S0907444912050548.
 
-    
+## Citation   
+If you use PepAD in your research, please cite:
+
+Wang, H.; Sarma, S.; Hall, C. K. Peptide Assembly Design Algorithm: A User-Friendly Computational Tool for Discovering Amyloid-forming Peptides. *Journal of Chemical Information and Modeling*, 2026. https://doi.org/10.1021/acs.jcim.6c01893
+
 ## License
 
 This project is distributed under the terms in [`LICENSE`](LICENSE).
