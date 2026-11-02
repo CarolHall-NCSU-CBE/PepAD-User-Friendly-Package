@@ -199,6 +199,63 @@ class PepADAnalyzerPythonTests(unittest.TestCase):
         )
         self.assertTrue(pd.isna(result.loc[1, "dE_VDW"]))
 
+    def test_read_energy_detail_includes_sheetmove_and_no_exchange(self) -> None:
+        content = (
+            "1 1 -1 1 2 3 4 5 6 -1 -2 -3 -4 5 6 Sheetmove Accept\n"
+            "ACE GLY ASN NHE\n"
+            "1 2 Exchange Reject-NoExchange\n"
+            "ACE GLY ASN NHE\n"
+            "1 3 Sheetmove Reject-Rotamer\n"
+            "ACE GLY ASN NHE\n"
+        )
+        with tempfile.TemporaryDirectory() as temp_dir:
+            (Path(temp_dir) / "energydetails.txt").write_text(content, encoding="utf-8")
+            result = self.analyzer["read_energy_detail"](temp_dir)
+
+        self.assertEqual(result["type"].tolist(), ["Sheetmove", "Exchange", "Sheetmove"])
+        self.assertEqual(
+            result["acceptance"].tolist(),
+            ["Accept", "Reject-NoExchange", "Reject-Rotamer"],
+        )
+        self.assertEqual(result.loc[1, "Sequence"], "ACE-GLY-ASN-NHE")
+        self.assertTrue(result.loc[1:, ["Score", "dE_VDW", "d_abs_Score"]].isna().all().all())
+
+    def test_read_energy_detail_only_no_exchange_has_missing_energy(self) -> None:
+        with tempfile.TemporaryDirectory() as temp_dir:
+            (Path(temp_dir) / "energydetails.txt").write_text(
+                "1 1 Exchange Reject-NoExchange\nGLY ASN ASN\n", encoding="utf-8"
+            )
+            result = self.analyzer["read_energy_detail"](temp_dir)
+        self.assertTrue(result[["Score", "dE_VDW", "d_abs_Score"]].isna().all().all())
+
+    def test_report_counts_new_sheetmove_and_no_exchange(self) -> None:
+        detail = sample_energy_detail().reindex(range(9))
+        detail.loc[5, "type"] = "Sheetmove"
+        detail.loc[6, "type"] = "sheetmove"
+        detail.loc[8] = [
+            9, 1, "Exchange", "Reject-NoExchange", "Q-Q-N",
+            None, None, None, None, None,
+        ]
+        output = io.StringIO()
+        with tempfile.TemporaryDirectory() as temp_dir:
+            report = Path(temp_dir) / "Detail_report.txt"
+            with contextlib.redirect_stdout(output):
+                result = self.analyzer["analyze_delta_energy"](detail, str(report), [])
+            report_text = report.read_text(encoding="utf-8")
+
+        for text in (report_text, output.getvalue()):
+            self.assertIn("Total number of trials: 9", text)
+            self.assertIn("Total number of sequence change trials: 6", text)
+            self.assertIn("Reject-NoExchange trials: 1", text)
+            self.assertIn(
+                "Total number of sheet-move trials: 3\nAccepted trials: 1\nRejected trials: 2",
+                text,
+            )
+        self.assertEqual(len(result[0]), 4)
+        self.assertEqual(int(result[1]["Accept: negative"].sum()), 2)
+        self.assertEqual(int(result[1]["Reject-MC: positive"].sum()), 2)
+        self.assertNotIn("Reject-NoExchange", result[0]["acceptance"].tolist())
+
     def test_energy_profile_removes_incomplete_records(self) -> None:
         content = (
             "0 GNN 0 0 0 0\n"
@@ -375,6 +432,7 @@ class PepADAnalyzerPythonTests(unittest.TestCase):
                 "Accepted trials: 2\n"
                 "Reject-MC trials: 2\n"
                 "Reject-Rotamer trials: 1\n"
+                "Reject-NoExchange trials: 0\n"
                 "Accepted trials without a negative contribution: 0\n"
                 "Accepted trials when both Gbind and (-Pagg) are non-negative: 0\n"
                 "Accepted uphill trials (delta Score > 0): 0\n\n"

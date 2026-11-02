@@ -817,7 +817,7 @@ def read_energy_detail(
 ) -> pd.DataFrame:
     """
     Function:
-        Read energy details, including trials rejected by the rotamer check.
+        Read energy details, including rotamer and no-exchange rejections.
 
     Parameters
     ----------
@@ -874,7 +874,7 @@ def read_energy_detail(
 
     rows = []
     sequence_length = expected_sequence_length
-    valid_outcomes = {"Accept", "Reject-MC", "Reject-Rotamer"}
+    valid_outcomes = {"Accept", "Reject-MC", "Reject-Rotamer", "Reject-NoExchange"}
     for i in range(0, len(data_lines), 2):
         line_number, values = data_lines[i]
         sequence_line, sequence = data_lines[i + 1]
@@ -901,7 +901,7 @@ def read_energy_detail(
 
         try:
             if len(values) == 4:
-                if values[3] != "Reject-Rotamer":
+                if values[3] not in {"Reject-Rotamer", "Reject-NoExchange"}:
                     raise ValueError
                 energy_values = [int(values[0]), int(values[1])] + [None] * 7
                 delta_values = [None] * 7
@@ -927,6 +927,8 @@ def read_energy_detail(
         )
 
     energy_detail = pd.DataFrame(rows, columns=headers)
+    # Missing energies stay NaN, including files containing only short records.
+    energy_detail[headers[2:16]] = energy_detail[headers[2:16]].astype(float)
     energy_detail["step"] = _normalize_step_numbers(
         energy_detail["step"].astype(int).tolist(),
         "energydetails.txt",
@@ -1147,7 +1149,10 @@ def analyze_delta_energy(
     complete = contributions.notna().all(axis=1)
     # Only consider sequence changes
     sequence_change = energy_detail["type"].isin(["Mutation", "Exchange"])
-    sheet_move = energy_detail["type"].str.endswith("-axis", na=False)
+    sheet_move = (
+        energy_detail["type"].str.casefold().eq("sheetmove")
+        | energy_detail["type"].str.endswith("-axis", na=False)
+    )
     accepted = complete & sequence_change & energy_detail["acceptance"].eq("Accept")
     rejected = complete & sequence_change & energy_detail["acceptance"].eq("Reject-MC")
     if not accepted.any() and not rejected.any():
@@ -1565,6 +1570,7 @@ def analyze_delta_energy(
     sequence_reject_rotamer_count = int(
         sequence_trial_counts.get("Reject-Rotamer", 0)
     )
+    sequence_no_exchange_count = int(sequence_trial_counts.get("Reject-NoExchange", 0))
     sheet_trial_counts = energy_detail.loc[sheet_move, "acceptance"].value_counts()
     sheet_accept_count = int(sheet_trial_counts.get("Accept", 0))
     sheet_reject_count = int(sheet_move.sum()) - sheet_accept_count
@@ -1580,6 +1586,7 @@ def analyze_delta_energy(
     print(f"Accepted trials: {sequence_accept_count}")
     print(f"Reject-MC trials: {sequence_reject_mc_count}")
     print(f"Reject-Rotamer trials: {sequence_reject_rotamer_count}")
+    print(f"Reject-NoExchange trials: {sequence_no_exchange_count}")
     print(
         f"Accepted trials without a negative contribution: {accepted_without_negative}"
     )
@@ -1605,6 +1612,7 @@ def analyze_delta_energy(
         f.write(f"Accepted trials: {sequence_accept_count}\n")
         f.write(f"Reject-MC trials: {sequence_reject_mc_count}\n")
         f.write(f"Reject-Rotamer trials: {sequence_reject_rotamer_count}\n")
+        f.write(f"Reject-NoExchange trials: {sequence_no_exchange_count}\n")
         f.write(
             "Accepted trials without a negative contribution: "
             f"{accepted_without_negative}\n"
