@@ -11,11 +11,8 @@ and constraints. PepAD outputs peptide sequences with their corresponding scores
 as well as structural files for the top-scoring designs, which can be used in
 downstream simulations or experiments.
 
-<<<<<<< Updated upstream
-**Current version: v1.42-3.** 
-=======
 **Current version: v1.42-4.** This version uses named `PARAMETER = value` entries instead of the fixed, position-dependent input format. Inputs written for v1.37 are not compatible.
->>>>>>> Stashed changes
+
 
 ## What PepAD does
 
