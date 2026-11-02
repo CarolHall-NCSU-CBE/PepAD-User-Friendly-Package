@@ -34,4 +34,4 @@ jobs:
             context: ./src
             file: ./src/Dockerfile
             push: true
-            tags: ${{ env.IMAGE_NAME }}:1.42-3
+            tags: ${{ env.IMAGE_NAME }}:1.42-4

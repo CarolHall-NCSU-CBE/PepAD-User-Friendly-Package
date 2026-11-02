@@ -1,4 +1,4 @@
-### PepAD v1.42-3 input template
+### PepAD v1.42-4 input template
 ### Copy this file into the run directory as input.txt.
 ### Format: PARAMETER = value. Parameter order does not matter.
 ### Comments may begin with # or !. Each parameter may appear only once.
@@ -65,6 +65,7 @@ SINGLE_SITE_CONSTRAINTS   = 5:ASN 6
 
 # Grouped site Positional constraints:
   # GROUPED_SITE_AA_POOL: Allowed amino acids for grouped-site positional constrained sites
-  # GROUPED_SITE_CONSTRAINTS: Sites only select amino acid in the grouped pool without repetition
+  # GROUPED_SITE_CONSTRAINTS: Sites use the pool; repeated entries set the allowed count.
+  # During mutation, each distinct legal alternative amino acid has equal selection probability.
 GROUPED_SITE_AA_POOL      = ASN SER THR ALA VAL
 GROUPED_SITE_CONSTRAINTS  = 1 2 3

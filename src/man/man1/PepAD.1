@@ -1,4 +1,4 @@
-.TH PEPAD 1 "1 October 2026" "PepAD 1.42-3" "PepAD User Manual"
+.TH PEPAD 1 "2 November 2026" "PepAD 1.42-4" "PepAD User Manual"
 .
 .SH NAME
 PepAD \- Peptide Assembly Design Algorithm
@@ -338,8 +338,9 @@ GROUPED_SITE_AA_POOL = ASN SER ALA ALA
 .
 .IP
 Repeated amino acids are allowed.
-Each remaining pool copy has an equal selection probability, so
-repeated entries increase that amino acid's selection probability.
+Repeated entries set the maximum number of that amino acid at grouped sites.
+During mutation, each distinct legal alternative amino acid has an equal
+selection probability, regardless of how many unused copies remain.
 The number of pool entries must be at least the number of grouped-site
 constraints.
 .
@@ -405,4 +406,4 @@ PepAD reloads this file when
 Haoyu Wang, Sudeep Sarma, and Carol K. Hall.
 .
 .SH VERSION
-PepAD version 1.42-3.
+PepAD version 1.42-4.

@@ -10393,8 +10393,8 @@ module optimization_techniques
 						binding_snp_new,entropy_new, &
 						(score4hydration_new+Pagg_new)*propensity_weighting_factor,delta_E_vdw, &
 						delta_E_ele,delta_E_sgb,delta_E_sur,delta_TS,lambda_delta_Pagg, &
-						"Mutation ",accpt
-					write(3,'(*(A5))') (tgroup(1,j)%gtype,j=1,gnum)
+						"Mutation",trim(accpt)
+					write(3,'(*(1X,A4))') (tgroup(1,j)%gtype,j=1,gnum)
 				close(3)
 			elseif (accpt=="Reject-Rotamer") then
 				do j=1,gnum
@@ -10402,8 +10402,8 @@ module optimization_techniques
 				enddo
 				trial_sequence(ic_1)=aminoacid_name_1
 				open(3, file="energydetails.txt", access="append")
-					write(3,'(I7,I7,A15,A15)') step,attempt,"Mutation ",accpt
-					write(3,'(*(A5))') (trial_sequence(j),j=1,gnum)
+					write(3,'(I7,1X,I7,1X,A15,1X,A15)') step,attempt,"Mutation",trim(accpt)
+					write(3,'(*(1X,A4))') (trial_sequence(j),j=1,gnum)
 				close(3)
 			endif
         else ! Exchange the amino-acid identities at two randomly selected sites.
@@ -10489,8 +10489,8 @@ module optimization_techniques
 						binding_snp_new,entropy_new, &
 						(score4hydration_new+Pagg_new)*propensity_weighting_factor,delta_E_vdw, &
 						delta_E_ele,delta_E_sgb,delta_E_sur,delta_TS,lambda_delta_Pagg, &
-						"Exchange ",accpt
-					write(3,'(*(A5))') (tgroup(1,j)%gtype,j=1,gnum)
+						"Exchange",trim(accpt)
+					write(3,'(*(1X,A4))') (tgroup(1,j)%gtype,j=1,gnum)
 				close(3)
 			elseif (accpt=="Reject-Rotamer") then
 				do j=1,gnum
@@ -10499,8 +10499,8 @@ module optimization_techniques
 				trial_sequence(ic_1)=aminoacid_name_1
 				trial_sequence(ic_2)=aminoacid_name_2
 				open(3, file="energydetails.txt", access="append")
-					write(3,'(I7,I7,A15,A15)') step,attempt,"Exchange ",accpt
-					write(3,'(*(A5))') (trial_sequence(j),j=1,gnum)
+					write(3,'(I7,1X,I7,1X,A15,1X,A15)') step,attempt,"Exchange",trim(accpt)
+					write(3,'(*(1X,A4))') (trial_sequence(j),j=1,gnum)
 				close(3)
 			endif
 		endif
@@ -10510,7 +10510,7 @@ module optimization_techniques
 			real(score4hydration_old+Pagg_old,kind=8))
         !if (accpt=="Accept") exit
 	enddo
-4	format(i7,i7,13f15.4,a15,a15)
+4	format(I7,1X,I7,13(1X,F15.4),1X,A15,1X,A15)
 
 	return
 	end subroutine sequence_optimization
@@ -11092,8 +11092,8 @@ module optimization_techniques
 		open(3, file="energydetails.txt",  access="append")
 		write(3,4) step, attempt, score_old, binding_vdw_old, binding_ele_old, &
 			binding_sgb_old, binding_snp_old, entropy_old, &
-			(score4hydration_old+Pagg_old)*propensity_weighting_factor, backbone_change, accpt
-		write(3,'(*(A5))') (group(1,j)%gtype, j=1, gnum)
+			(score4hydration_old+Pagg_old)*propensity_weighting_factor, trim(backbone_change), trim(accpt)
+		write(3,'(*(1X,A4))') (group(1,j)%gtype, j=1, gnum)
 		close(3)
 
 		if (feedback_2 == 1) call update_minimum_energy(step,attempt,group,score_old, &
@@ -11101,7 +11101,7 @@ module optimization_techniques
 			real(score4hydration_old+Pagg_old,kind=8))
 	enddo
 
-4	format(i7,i7,7f15.4,a15,a15)
+4	format(I7,1X,I7,7(1X,F15.4),1X,A15,1X,A15)
 	return
 	end subroutine backbone_optimization_conrot
 	
@@ -11238,13 +11238,13 @@ module optimization_techniques
 					binding_snp_new,entropy_new, &
 					(score4hydration_new+Pagg_new)*propensity_weighting_factor,delta_E_vdw, &
 					delta_E_ele,delta_E_sgb,delta_E_sur,delta_TS,lambda_delta_Pagg, &
-					sheet_change,accpt
-				write(3,'(*(A5))') (temp_group(1,j)%gtype,j=1,gnum)
+					"Sheetmove",trim(accpt)
+				write(3,'(*(1X,A4))') (temp_group(1,j)%gtype,j=1,gnum)
 			close(3)
 		elseif (accpt=="Reject-Rotamer") then
 			open(3, file="energydetails.txt", access="append")
-				write(3,'(I7,I7,A15,A15)') step,attempt,sheet_change,accpt
-				write(3,'(*(A5))') (group(1,j)%gtype,j=1,gnum)
+				write(3,'(I7,1X,I7,1X,A15,1X,A15)') step,attempt,"Sheetmove",trim(accpt)
+				write(3,'(*(1X,A4))') (group(1,j)%gtype,j=1,gnum)
 			close(3)
 		endif
 	
@@ -11254,7 +11254,7 @@ module optimization_techniques
         !if (accpt=="Accept") exit
 	enddo
 	
-4	format(i7,i7,13f15.4,a15,a15)
+4	format(I7,1X,I7,13(1X,F15.4),1X,A15,1X,A15)
 	return
 	end subroutine sheet_optimization
 

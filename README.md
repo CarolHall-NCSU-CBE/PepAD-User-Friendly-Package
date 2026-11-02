@@ -11,7 +11,11 @@ and constraints. PepAD outputs peptide sequences with their corresponding scores
 as well as structural files for the top-scoring designs, which can be used in
 downstream simulations or experiments.
 
+<<<<<<< Updated upstream
 **Current version: v1.42-3.** 
+=======
+**Current version: v1.42-4.** This version uses named `PARAMETER = value` entries instead of the fixed, position-dependent input format. Inputs written for v1.37 are not compatible.
+>>>>>>> Stashed changes
 
 ## What PepAD does
 
@@ -37,7 +41,7 @@ More negative scores indicate stronger predicted binding at the evaluated config
 
 | Path | Contents |
 | --- | --- |
-| [`src/main_v1.42-3.f90`](src/main_v1.42-3.f90) | PepAD source code |
+| [`src/main_v1.42-4.f90`](src/main_v1.42-4.f90) | PepAD source code |
 | [`src/input.example.txt`](src/input.example.txt) | Annotated input template |
 | `src/lib/` | Force-field and rotamer data |
 | [`examples/`](examples/) | Examples |
@@ -62,7 +66,7 @@ Load Apptainer if it is provided as a module on the local system. Go to the dire
 module load apptainer  # if required on the local system
 mkdir -p /path/to/PepAD_container
 cd /path/to/PepAD_container
-apptainer pull PepAD_package.sif docker://ghcr.io/carolhall-ncsu-cbe/pepad-user-friendly-package:1.42-3
+apptainer pull PepAD_package.sif docker://ghcr.io/carolhall-ncsu-cbe/pepad-user-friendly-package:1.42-4
 ```
 
 This creates `PepAD_package.sif` in `/path/to/PepAD_container`.
@@ -404,6 +408,7 @@ Here, `ALA` may appear on sites 2, 3, and 5 at most twice.
 
 - The number of amino acids in `GROUPED_SITE_AA_POOL` must not be less than the number of sites in `GROUPED_SITE_CONSTRAINTS`.
 - To allow an amino acid to appear one additional time, enter it one additional time in the pool.
+- During mutation, each distinct legal alternative amino acid has equal selection probability; repeated pool entries set count limits, not probability weights.
 - `GROUPED_SITE_CONSTRAINTS` cannot overlap with sites listed in `SINGLE_SITE_CONSTRAINTS`.
 - PepAD checks whether the grouped-site pool is compatible with the overall composition limits and compositional constraints.
 
