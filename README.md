@@ -75,24 +75,17 @@ Each run needs:
 - an initial structure PDB file
 - `input.txt`.
 
-Create a run directory outside the package. Copy the input template into the run directory as `input.txt`, copy the initial structure, and edit `input.txt`:
+Then create a run directory and change to the run directory. Copy the input template into the run directory as `input.txt`, copy the initial
+structure, and edit `input.txt`:
 
+Example: if a run directory is created in the `/PepAD-User-Friendly-Package`
 ```bash
-<<<<<<< HEAD
-PEPAD_PACKAGE=/path/to/PepAD-User-Friendly-Package
-RUN_DIR=/path/to/PepAD_runs/run1
-mkdir -p "$RUN_DIR"
-cp "$PEPAD_PACKAGE/src/input.example.txt" "$RUN_DIR/input.txt"
-cp "$PEPAD_PACKAGE/Initial_structures/comp1/comp1.pdb" "$RUN_DIR/"
-cd "$RUN_DIR"
-=======
 git clone https://github.com/CarolHall-NCSU-CBE/PepAD-User-Friendly-Package.git
 cd PepAD-User-Friendly-Package
 mkdir -p run1
 cp src/input.example.txt run1/input.txt
 cp Initial_structures/comp1/comp1.pdb run1/
 cd run1
->>>>>>> 4abd2106a6e7089b6f02d1c6f8e7e89eacc9c00f
 ```
 
 ### 3. Run PepAD
